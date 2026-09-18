@@ -66,14 +66,16 @@ export function AuthPage() {
             {!hasSupabaseConfig ? (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-2xl font-semibold">Configure o Supabase</h2>
+                  <h2 className="text-2xl font-semibold">Entrar na agenda</h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Para login real, cadastros e dados privados por usuário, preencha as variáveis de ambiente
-                    `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` usando `.env.example`.
+                    A versão publicada ainda não recebeu as chaves do Supabase. Enquanto isso, você pode entrar em modo demonstração para testar a agenda no celular.
                   </p>
                 </div>
+                <Button className="w-full" size="lg" onClick={() => signIn("demo@agenda.local", "demo")}>
+                  Entrar na agenda agora
+                </Button>
                 <div className="rounded-2xl border bg-muted/50 p-4 text-sm text-muted-foreground">
-                  O app não usa `service_role` no cliente. As migrations incluem RLS para que cada corretor veja apenas os próprios dados.
+                  Os dados desse modo ficam somente neste navegador. Para login real e sincronização entre dispositivos, basta configurar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
                 </div>
               </div>
             ) : (

@@ -2,10 +2,13 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
 
+type AppUser = Pick<User, "id" | "email">;
+
 type AuthContextValue = {
-  user: User | null;
+  user: AppUser | null;
   session: Session | null;
   loading: boolean;
+  isDemo: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -16,6 +19,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [demoEnabled, setDemoEnabled] = useState(() => localStorage.getItem("agenda-demo-session") === "true");
   const [loading, setLoading] = useState(hasSupabaseConfig);
 
   useEffect(() => {
@@ -38,16 +42,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: session?.user ?? null,
+      user: session?.user ?? (!hasSupabaseConfig && demoEnabled ? { id: "demo-user", email: "demo@agenda.local" } : null),
       session,
       loading,
+      isDemo: !hasSupabaseConfig && demoEnabled,
       async signIn(email, password) {
-        if (!supabase) throw new Error("Supabase não configurado.");
+        if (!supabase) {
+          localStorage.setItem("agenda-demo-session", "true");
+          setDemoEnabled(true);
+          return;
+        }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
       async signUp(email, password) {
-        if (!supabase) throw new Error("Supabase não configurado.");
+        if (!supabase) {
+          localStorage.setItem("agenda-demo-session", "true");
+          setDemoEnabled(true);
+          return;
+        }
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
       },
@@ -59,12 +72,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
       },
       async signOut() {
-        if (!supabase) return;
+        if (!supabase) {
+          localStorage.removeItem("agenda-demo-session");
+          setDemoEnabled(false);
+          return;
+        }
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
       }
     }),
-    [loading, session]
+    [demoEnabled, loading, session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
