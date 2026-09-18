@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agenda do Corretor</title>
+    <meta
+      name="description"
+      content="Agenda prática para corretores acompanharem visitas, clientes, retornos e prioridades do dia."
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1f2a'/%3E%3Cpath d='M18 26 32 15l14 11v22H18z' fill='%23f6c957'/%3E%3Cpath d='M25 48V34h14v14' fill='%230b1f2a'/%3E%3Cpath d='M16 50h32' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #101820;
+        --muted: #60707c;
+        --line: #dbe4e8;
+        --soft: #eef4f6;
+        --paper: #fbfcfa;
+        --panel: #ffffff;
+        --navy: #0b1f2a;
+        --gold: #f6c957;
+        --teal: #1b8a8f;
+        --red: #c64b4b;
+        --green: #2f8f60;
+        --shadow: 0 18px 50px rgba(14, 31, 42, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(135deg, rgba(11, 31, 42, 0.04), transparent 34%),
+          var(--paper);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      aside {
+        background: var(--navy);
+        color: white;
+        padding: 28px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .mark {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        background: var(--gold);
+        color: var(--navy);
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 1.1rem;
+        line-height: 1.2;
+      }
+
+      .brand p,
+      .side-note p {
+        margin: 4px 0 0;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 0.9rem;
+      }
+
+      .side-note {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .side-note strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .nav-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .nav-list button {
+        border: 0;
+        width: 100%;
+        text-align: left;
+        border-radius: 8px;
+        padding: 12px 14px;
+        color: rgba(255, 255, 255, 0.78);
+        background: transparent;
+      }
+
+      .nav-list button.active,
+      .nav-list button:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      main {
+        padding: 26px;
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+
+      .topbar h2 {
+        margin: 0;
+        font-size: clamp(1.5rem, 3vw, 2.4rem);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .topbar p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+
+      .date-box {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 14px;
+        min-width: 180px;
+        box-shadow: var(--shadow);
+      }
+
+      .date-box span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .date-box strong {
+        font-size: 1.05rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(130px, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .stat,
+      .panel,
+      .appointment,
+      .client-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .stat {
+        padding: 14px;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 1.45rem;
+      }
+
+      .panel {
+        padding: 18px;
+        box-shadow: var(--shadow);
+      }
+
+      .panel + .panel {
+        margin-top: 18px;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .panel h3 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: white;
+        color: var(--muted);
+        padding: 8px 11px;
+        font-size: 0.88rem;
+      }
+
+      .chip.active {
+        background: var(--navy);
+        border-color: var(--navy);
+        color: white;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 12px;
+      }
+
+      .appointment {
+        display: grid;
+        grid-template-columns: 78px minmax(0, 1fr) auto;
+        gap: 14px;
+        padding: 14px;
+        align-items: center;
+      }
+
+      .time {
+        color: var(--navy);
+        font-weight: 800;
+      }
+
+      .appointment h4,
+      .client-card h4 {
+        margin: 0 0 5px;
+        font-size: 1rem;
+      }
+
+      .appointment p,
+      .client-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .tag {
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .tag.visit {
+        background: rgba(27, 138, 143, 0.12);
+        color: #12696c;
+      }
+
+      .tag.return {
+        background: rgba(246, 201, 87, 0.22);
+        color: #835d00;
+      }
+
+      .tag.contract {
+        background: rgba(47, 143, 96, 0.14);
+        color: #1f6d48;
+      }
+
+      .tag.risk {
+        background: rgba(198, 75, 75, 0.12);
+        color: #9b3333;
+      }
+
+      form {
+        display: grid;
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        padding: 11px 12px;
+        color: var(--ink);
+        min-height: 44px;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 76px;
+      }
+
+      .primary {
+        border: 0;
+        border-radius: 8px;
+        background: var(--teal);
+        color: white;
+        min-height: 46px;
+        font-weight: 800;
+      }
+
+      .client-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .client-card {
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .client-meta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .mini {
+        color: var(--muted);
+        background: var(--soft);
+        border-radius: 999px;
+        padding: 6px 9px;
+        font-size: 0.8rem;
+      }
+
+      .empty {
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 24px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        background: var(--navy);
+        color: white;
+        padding: 12px 14px;
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        opacity: 0;
+        transform: translateY(10px);
+        transition: 180ms ease;
+        pointer-events: none;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        aside {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+          padding: 16px;
+        }
+
+        .side-note,
+        .nav-list {
+          display: none;
+        }
+
+        .grid,
+        .stats {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          flex-direction: column;
+        }
+
+        .date-box {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 16px;
+        }
+
+        .appointment {
+          grid-template-columns: 1fr;
+          align-items: start;
+        }
+
+        .tag {
+          width: fit-content;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside>
+        <div class="brand">
+          <div class="mark">AC</div>
+          <div>
+            <h1>Agenda do Corretor</h1>
+            <p>Rotina comercial em ordem</p>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Seções da agenda">
+          <button class="active" type="button">Hoje</button>
+          <button type="button">Clientes quentes</button>
+          <button type="button">Retornos</button>
+          <button type="button">Fechamentos</button>
+        </nav>
+
+        <div class="side-note">
+          <strong>Próxima ação</strong>
+          <p id="nextAction">Carregando a prioridade do dia...</p>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <h2>Agenda operacional do dia</h2>
+            <p>Visitas, follow-ups e clientes com chance real de fechamento.</p>
+          </div>
+          <div class="date-box" aria-live="polite">
+            <span>Data de trabalho</span>
+            <strong id="todayLabel"></strong>
+          </div>
+        </header>
+
+        <section class="stats" aria-label="Resumo do dia">
+          <div class="stat">
+            <span>Compromissos</span>
+            <strong id="statTotal">0</strong>
+          </div>
+          <div class="stat">
+            <span>Visitas</span>
+            <strong id="statVisits">0</strong>
+          </div>
+          <div class="stat">
+            <span>Retornos</span>
+            <strong id="statReturns">0</strong>
+          </div>
+          <div class="stat">
+            <span>Contratos</span>
+            <strong id="statContracts">0</strong>
+          </div>
+        </section>
+
+        <div class="grid">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Agenda</h3>
+              <div class="filters" aria-label="Filtrar agenda">
+                <button class="chip active" type="button" data-filter="all">Todos</button>
+                <button class="chip" type="button" data-filter="visit">Visitas</button>
+                <button class="chip" type="button" data-filter="return">Retornos</button>
+                <button class="chip" type="button" data-filter="contract">Contratos</button>
+              </div>
+            </div>
+            <div class="timeline" id="timeline"></div>
+          </section>
+
+          <section>
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Novo compromisso</h3>
+              </div>
+              <form id="appointmentForm">
+                <label>
+                  Cliente
+                  <input name="client" placeholder="Ex.: Marina Lopes" required />
+                </label>
+                <label>
+                  Horário
+                  <input name="time" type="time" required />
+                </label>
+                <label>
+                  Tipo
+                  <select name="type">
+                    <option value="visit">Visita</option>
+                    <option value="return">Retorno</option>
+                    <option value="contract">Contrato</option>
+                    <option value="risk">Pendência</option>
+                  </select>
+                </label>
+                <label>
+                  Imóvel ou assunto
+                  <textarea name="subject" placeholder="Ex.: Apto 82m² no Centro, proposta revisada"></textarea>
+                </label>
+                <button class="primary" type="submit">Adicionar na agenda</button>
+              </form>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Clientes em movimento</h3>
+              </div>
+              <div class="client-list" id="clientList"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">Compromisso adicionado</div>
+
+    <script>
+      const fallbackAppointments = [
+        {
+          client: "Rafael e Bianca",
+          time: "09:30",
+          type: "visit",
+          subject: "Visita no sobrado do Jardim América, confirmar documentação do financiamento."
+        },
+        {
+          client: "Dra. Helena Moura",
+          time: "11:10",
+          type: "return",
+          subject: "Enviar comparativo de preço do condomínio Vista Norte."
+        },
+        {
+          client: "Paulo Andrade",
+          time: "14:00",
+          type: "contract",
+          subject: "Assinatura digital da proposta do apartamento 1204."
+        },
+        {
+          client: "Carolina Reis",
+          time: "17:30",
+          type: "risk",
+          subject: "Retomar objeção sobre entrada e simular segunda condição."
+        }
+      ];
+
+      const clients = [
+        {
+          name: "Rafael e Bianca",
+          stage: "Visita hoje",
+          budget: "até R$ 780 mil",
+          need: "3 quartos, quintal, escola perto"
+        },
+        {
+          name: "Dra. Helena Moura",
+          stage: "Comparando opções",
+          budget: "até R$ 1,2 mi",
+          need: "alto padrão, vista livre"
+        },
+        {
+          name: "Paulo Andrade",
+          stage: "Fechamento",
+          budget: "proposta enviada",
+          need: "urgência para mudança"
+        }
+      ];
+
+      const typeLabels = {
+        visit: "Visita",
+        return: "Retorno",
+        contract: "Contrato",
+        risk: "Pendência"
+      };
+
+      const storageKey = "agenda-do-corretor-items";
+      let activeFilter = "all";
+      let appointments = loadAppointments();
+
+      function loadAppointments() {
+        const saved = localStorage.getItem(storageKey);
+        if (!saved) return fallbackAppointments;
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.isArray(parsed) ? parsed : fallbackAppointments;
+        } catch {
+          return fallbackAppointments;
+        }
+      }
+
+      function saveAppointments() {
+        localStorage.setItem(storageKey, JSON.stringify(appointments));
+      }
+
+      function formatToday() {
+        const formatter = new Intl.DateTimeFormat("pt-BR", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long"
+        });
+        const text = formatter.format(new Date());
+        return text.charAt(0).toUpperCase() + text.slice(1);
+      }
+
+      function renderStats() {
+        document.getElementById("statTotal").textContent = appointments.length;
+        document.getElementById("statVisits").textContent = appointments.filter(
+          (item) => item.type === "visit"
+        ).length;
+        document.getElementById("statReturns").textContent = appointments.filter(
+          (item) => item.type === "return"
+        ).length;
+        document.getElementById("statContracts").textContent = appointments.filter(
+          (item) => item.type === "contract"
+        ).length;
+      }
+
+      function renderTimeline() {
+        const timeline = document.getElementById("timeline");
+        const items = appointments
+          .slice()
+          .sort((a, b) => a.time.localeCompare(b.time))
+          .filter((item) => activeFilter === "all" || item.type === activeFilter);
+
+        if (!items.length) {
+          timeline.innerHTML = '<div class="empty">Nenhum compromisso nesse filtro.</div>';
+          return;
+        }
+
+        timeline.innerHTML = items
+          .map(
+            (item) => `
+              <article class="appointment">
+                <div class="time">${item.time}</div>
+                <div>
+                  <h4>${escapeHtml(item.client)}</h4>
+                  <p>${escapeHtml(item.subject || "Sem observação cadastrada.")}</p>
+                </div>
+                <span class="tag ${item.type}">${typeLabels[item.type] || "Agenda"}</span>
+              </article>
+            `
+          )
+          .join("");
+      }
+
+      function renderClients() {
+        document.getElementById("clientList").innerHTML = clients
+          .map(
+            (client) => `
+              <article class="client-card">
+                <div>
+                  <h4>${client.name}</h4>
+                  <p>${client.need}</p>
+                </div>
+                <div class="client-meta">
+                  <span class="mini">${client.stage}</span>
+                  <span class="mini">${client.budget}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("");
+      }
+
+      function updateNextAction() {
+        const sorted = appointments.slice().sort((a, b) => a.time.localeCompare(b.time));
+        const next = sorted[0];
+        const message = next
+          ? `${next.time} - ${next.client}: ${typeLabels[next.type] || "Agenda"}`
+          : "Sem compromisso cadastrado. Comece pelo próximo follow-up.";
+        document.getElementById("nextAction").textContent = message;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function showToast() {
+        const toast = document.getElementById("toast");
+        toast.classList.add("show");
+        window.setTimeout(() => toast.classList.remove("show"), 1800);
+      }
+
+      function createAppointment(input) {
+        const appointment = {
+          client: String(input.client || "").trim(),
+          time: String(input.time || "").trim(),
+          type: String(input.type || "visit"),
+          subject: String(input.subject || "").trim()
+        };
+
+        if (!appointment.client) {
+          throw new Error("Informe o nome do cliente.");
+        }
+
+        if (!/^\d{2}:\d{2}$/.test(appointment.time)) {
+          throw new Error("Informe o horário no formato HH:MM.");
+        }
+
+        if (!["visit", "return", "contract", "risk"].includes(appointment.type)) {
+          throw new Error("Tipo de compromisso inválido.");
+        }
+
+        appointments.push(appointment);
+        saveAppointments();
+        render();
+        return {
+          status: "created",
+          appointment
+        };
+      }
+
+      function registerModelContextTools() {
+        const context = document.modelContext;
+        if (!context || typeof context.registerTool !== "function") return;
+
+        const controller = new AbortController();
+        try {
+          Promise.resolve(
+            context.registerTool(
+              {
+                name: "create_broker_appointment",
+                title: "Adicionar compromisso",
+                description:
+                  "Cria um compromisso na Agenda do Corretor com cliente, horário, tipo e assunto.",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    client: { type: "string" },
+                    time: {
+                      type: "string",
+                      pattern: "^\\d{2}:\\d{2}$",
+                      description: "Horário em HH:MM."
+                    },
+                    type: {
+                      type: "string",
+                      enum: ["visit", "return", "contract", "risk"]
+                    },
+                    subject: { type: "string" }
+                  },
+                  required: ["client", "time", "type"],
+                  additionalProperties: false
+                },
+                annotations: {
+                  readOnlyHint: false,
+                  untrustedContentHint: false
+                },
+                execute(input) {
+                  return createAppointment(input || {});
+                }
+              },
+              { signal: controller.signal }
+            )
+          ).catch(() => {});
+        } catch {
+          controller.abort();
+        }
+      }
+
+      function render() {
+        renderStats();
+        renderTimeline();
+        renderClients();
+        updateNextAction();
+      }
+
+      document.getElementById("todayLabel").textContent = formatToday();
+
+      document.querySelectorAll("[data-filter]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activeFilter = button.dataset.filter;
+          document
+            .querySelectorAll("[data-filter]")
+            .forEach((item) => item.classList.toggle("active", item === button));
+          renderTimeline();
+        });
+      });
+
+      document.getElementById("appointmentForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        createAppointment({
+          client: data.get("client").trim(),
+          time: data.get("time"),
+          type: data.get("type"),
+          subject: data.get("subject").trim()
+        });
+        event.currentTarget.reset();
+        showToast();
+      });
+
+      render();
+      registerModelContextTools();
+    </script>
+  </body>
+</html>
