@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, Loader2, LockKeyhole, Mail } from "lucide-react";
+import { Loader2, LockKeyhole, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,16 +41,18 @@ export function AuthPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(231,200,115,0.22),_transparent_34%),linear-gradient(135deg,#07151f,#0d2a38_48%,#f6f8f8_48%)] p-4 text-foreground dark:from-background">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(218,165,57,0.26),_transparent_34%),linear-gradient(135deg,#050403,#15100a_48%,#faf8f1_48%)] p-4 text-foreground dark:from-background">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl items-center gap-8 md:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-[2rem] p-4 text-white md:p-8">
           <div className="mb-10 flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-accent text-primary">
-              <Building2 className="h-6 w-6" />
-            </div>
+            <img
+              src="/brand/mv-broker-logo.jpg"
+              alt="MV Broker"
+              className="h-16 w-16 rounded-2xl border border-primary/40 object-cover shadow-[0_18px_44px_rgba(218,165,57,0.28)]"
+            />
             <div>
-              <h1 className="text-xl font-semibold">Agenda do Corretor</h1>
-              <p className="text-sm text-white/65">Sua rotina comercial no bolso.</p>
+              <h1 className="text-xl font-semibold">MV Broker</h1>
+              <p className="text-sm text-white/65">Sistema de suporte imobiliário</p>
             </div>
           </div>
           <h2 className="max-w-xl text-4xl font-semibold leading-tight md:text-6xl">

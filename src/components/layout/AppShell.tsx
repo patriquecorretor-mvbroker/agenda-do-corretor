@@ -31,15 +31,17 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r bg-[#080604] p-5 text-white backdrop-blur-xl lg:flex lg:flex-col">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(218,165,57,0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-primary/20 bg-[#050403] p-5 text-white backdrop-blur-xl lg:flex lg:flex-col">
         <div className="mb-8 flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white">
-            <Home className="h-5 w-5" />
-          </div>
+          <img
+            src="/brand/mv-broker-logo.jpg"
+            alt="MV Broker"
+            className="h-14 w-14 rounded-2xl border border-primary/35 object-cover shadow-[0_12px_36px_rgba(218,165,57,0.25)]"
+          />
           <div>
-            <p className="font-semibold">Agenda do Corretor</p>
-            <p className="text-xs text-white/55">Base PWA inicial</p>
+            <p className="font-semibold">MV Broker</p>
+            <p className="text-xs text-white/55">Agenda do Corretor</p>
           </div>
         </div>
         <nav className="grid gap-2">
@@ -50,7 +52,7 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
               onClick={() => setView(item.view)}
               className={cn(
                 "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/62 transition hover:bg-white/10 hover:text-white",
-                view === item.view && "bg-primary text-white shadow-[0_18px_42px_rgba(249,115,22,0.28)] hover:bg-primary hover:text-white"
+                view === item.view && "bg-primary text-primary-foreground shadow-[0_18px_42px_rgba(218,165,57,0.28)] hover:bg-primary hover:text-primary-foreground"
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -91,7 +93,7 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
           <button
             type="button"
             onClick={() => setQuickAddOpen(true)}
-            className="-mt-8 grid h-16 w-16 place-items-center justify-self-center rounded-full bg-primary text-white shadow-[0_18px_44px_rgba(249,115,22,0.35)]"
+            className="-mt-8 grid h-16 w-16 place-items-center justify-self-center rounded-full bg-primary text-primary-foreground shadow-[0_18px_44px_rgba(218,165,57,0.35)]"
             aria-label="Adicionar"
           >
             <CirclePlus className="h-7 w-7" />
@@ -105,7 +107,7 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
       <button
         type="button"
         onClick={() => setQuickAddOpen(true)}
-        className="fixed bottom-8 right-8 hidden rounded-full bg-primary p-5 text-white shadow-[0_18px_44px_rgba(249,115,22,0.35)] transition hover:scale-105 lg:block"
+        className="fixed bottom-8 right-8 hidden rounded-full bg-primary p-5 text-primary-foreground shadow-[0_18px_44px_rgba(218,165,57,0.35)] transition hover:scale-105 lg:block"
         aria-label="Adicionar compromisso ou tarefa"
       >
         <CirclePlus className="h-7 w-7" />

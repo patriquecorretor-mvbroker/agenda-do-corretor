@@ -6,10 +6,16 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#080604",
-  "theme_color": "#080604",
+  "background_color": "#050403",
+  "theme_color": "#050403",
   "categories": ["business", "productivity"],
   "icons": [
+    {
+      "src": "/brand/mv-broker-logo.jpg",
+      "sizes": "1280x1280",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
     {
       "src": "/icons/icon-192.svg",
       "sizes": "192x192",

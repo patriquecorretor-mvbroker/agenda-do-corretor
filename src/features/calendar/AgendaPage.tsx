@@ -96,13 +96,13 @@ export function AgendaPage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[2rem] bg-[#080604] text-white shadow-soft">
+      <section className="overflow-hidden rounded-[2rem] bg-[#050403] text-white shadow-soft">
         <div className="relative p-5 md:p-8">
           <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/35 blur-3xl" />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/70">
-                <Flame className="h-3.5 w-3.5 text-primary" />
+                <img src="/brand/mv-broker-logo.jpg" alt="" className="h-5 w-5 rounded-full object-cover" />
                 Agenda operacional
               </div>
               <h1 className="max-w-2xl text-3xl font-semibold leading-tight md:text-5xl">Sua rotina do dia, sem ruído.</h1>
@@ -139,7 +139,7 @@ export function AgendaPage() {
                 <CardTitle className="text-xl">Linha do tempo</CardTitle>
                 <CardDescription>Toque em concluir, reagende ou registre uma observação sem sair da agenda.</CardDescription>
               </div>
-              <div className="hidden rounded-2xl bg-[#080604] px-4 py-3 text-right text-white sm:block">
+              <div className="hidden rounded-2xl bg-[#050403] px-4 py-3 text-right text-white sm:block">
                 <p className="text-xs text-white/55">Hoje</p>
                 <p className="font-semibold">{format(new Date(), "dd/MM")}</p>
               </div>
@@ -349,7 +349,7 @@ function TimelineEvent({
   return (
     <article className="grid grid-cols-[76px_1fr] gap-3 px-4 py-4 sm:grid-cols-[92px_1fr] sm:px-5">
       <div className="relative text-right">
-        <p className={cn("font-semibold", completed ? "text-muted-foreground" : "text-[#080604] dark:text-white")}>
+        <p className={cn("font-semibold", completed ? "text-muted-foreground" : "text-[#050403] dark:text-white")}>
           {event.start_time.slice(0, 5)}
         </p>
         {event.end_time && <p className="text-xs text-muted-foreground">{event.end_time.slice(0, 5)}</p>}
@@ -357,7 +357,7 @@ function TimelineEvent({
         <div
           className={cn(
             "absolute right-[-25px] top-2 grid h-4 w-4 place-items-center rounded-full border-2 sm:right-[-29px]",
-            completed ? "border-primary bg-primary" : "border-[#080604] bg-background dark:border-white"
+            completed ? "border-primary bg-primary" : "border-[#050403] bg-background dark:border-white"
           )}
         />
       </div>
