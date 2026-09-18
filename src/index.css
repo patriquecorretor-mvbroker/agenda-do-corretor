@@ -4,44 +4,44 @@
 
 @layer base {
   :root {
-    --background: 210 33% 98%;
-    --foreground: 207 43% 9%;
+    --background: 24 45% 98%;
+    --foreground: 24 20% 7%;
     --card: 0 0% 100%;
-    --card-foreground: 207 43% 9%;
-    --primary: 202 70% 12%;
-    --primary-foreground: 42 76% 88%;
-    --secondary: 194 23% 92%;
-    --secondary-foreground: 202 70% 12%;
-    --muted: 204 24% 93%;
-    --muted-foreground: 203 13% 43%;
-    --accent: 43 67% 68%;
-    --accent-foreground: 202 70% 12%;
+    --card-foreground: 24 20% 7%;
+    --primary: 24 94% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 16% 10%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 24 22% 93%;
+    --muted-foreground: 24 8% 42%;
+    --accent: 24 94% 52%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 67% 52%;
     --destructive-foreground: 0 0% 100%;
-    --border: 200 24% 87%;
-    --input: 200 24% 87%;
-    --ring: 43 67% 58%;
+    --border: 24 20% 87%;
+    --input: 24 20% 87%;
+    --ring: 24 94% 52%;
     --radius: 1rem;
   }
 
   .dark {
-    --background: 207 43% 7%;
+    --background: 24 15% 5%;
     --foreground: 210 40% 96%;
-    --card: 205 38% 11%;
+    --card: 24 12% 9%;
     --card-foreground: 210 40% 96%;
-    --primary: 43 67% 68%;
-    --primary-foreground: 202 70% 12%;
-    --secondary: 204 33% 16%;
+    --primary: 24 94% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 12% 15%;
     --secondary-foreground: 210 40% 96%;
-    --muted: 204 31% 15%;
-    --muted-foreground: 207 16% 68%;
-    --accent: 184 45% 38%;
+    --muted: 24 12% 15%;
+    --muted-foreground: 24 8% 68%;
+    --accent: 24 94% 56%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 203 25% 20%;
-    --input: 203 25% 20%;
-    --ring: 43 67% 68%;
+    --border: 24 11% 20%;
+    --input: 24 11% 20%;
+    --ring: 24 94% 56%;
   }
 
   * {
@@ -71,6 +71,6 @@
   }
 
   .glass-card {
-    @apply border border-white/40 bg-white/70 shadow-soft backdrop-blur-xl dark:border-white/10 dark:bg-white/5;
+    @apply border border-white/60 bg-white/80 shadow-soft backdrop-blur-xl dark:border-white/10 dark:bg-white/5;
   }
 }

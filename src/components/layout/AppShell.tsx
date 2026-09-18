@@ -31,15 +31,15 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(231,200,115,0.16),_transparent_30%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r bg-card/82 p-5 backdrop-blur-xl lg:flex lg:flex-col">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r bg-[#080604] p-5 text-white backdrop-blur-xl lg:flex lg:flex-col">
         <div className="mb-8 flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white">
             <Home className="h-5 w-5" />
           </div>
           <div>
             <p className="font-semibold">Agenda do Corretor</p>
-            <p className="text-xs text-muted-foreground">Base PWA inicial</p>
+            <p className="text-xs text-white/55">Base PWA inicial</p>
           </div>
         </div>
         <nav className="grid gap-2">
@@ -49,8 +49,8 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
               type="button"
               onClick={() => setView(item.view)}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground",
-                view === item.view && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/62 transition hover:bg-white/10 hover:text-white",
+                view === item.view && "bg-primary text-white shadow-[0_18px_42px_rgba(249,115,22,0.28)] hover:bg-primary hover:text-white"
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -83,7 +83,7 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/92 px-3 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/94 px-3 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl lg:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5 items-end gap-1">
           {navItems.filter((item) => !item.desktop).slice(0, 2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
@@ -91,7 +91,7 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
           <button
             type="button"
             onClick={() => setQuickAddOpen(true)}
-            className="-mt-8 grid h-16 w-16 place-items-center justify-self-center rounded-full bg-primary text-primary-foreground shadow-soft"
+            className="-mt-8 grid h-16 w-16 place-items-center justify-self-center rounded-full bg-primary text-white shadow-[0_18px_44px_rgba(249,115,22,0.35)]"
             aria-label="Adicionar"
           >
             <CirclePlus className="h-7 w-7" />
@@ -105,7 +105,7 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
       <button
         type="button"
         onClick={() => setQuickAddOpen(true)}
-        className="fixed bottom-8 right-8 hidden rounded-full bg-primary p-5 text-primary-foreground shadow-soft transition hover:scale-105 lg:block"
+        className="fixed bottom-8 right-8 hidden rounded-full bg-primary p-5 text-white shadow-[0_18px_44px_rgba(249,115,22,0.35)] transition hover:scale-105 lg:block"
         aria-label="Adicionar compromisso ou tarefa"
       >
         <CirclePlus className="h-7 w-7" />
