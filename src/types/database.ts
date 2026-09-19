@@ -78,6 +78,113 @@ export type DailySummary = {
   updated_at: string;
 };
 
+export type CommissionStatus =
+  | "estimada"
+  | "em negociação"
+  | "confirmada"
+  | "parcialmente recebida"
+  | "recebida"
+  | "atrasada"
+  | "cancelada";
+
+export type InstallmentStatus = "prevista" | "confirmada" | "parcialmente recebida" | "recebida" | "atrasada" | "cancelada";
+export type FinancialTransactionType = "income" | "expense";
+export type FinancialTransactionStatus = "pendente" | "pago" | "recebido" | "parcial" | "atrasado" | "cancelado";
+
+export type Commission = {
+  id: string;
+  user_id: string;
+  sale_id: string | null;
+  client: string | null;
+  property: string | null;
+  development: string | null;
+  builder: string | null;
+  sale_date: string | null;
+  vgv: number;
+  total_commission_percent: number;
+  gross_commission: number;
+  broker_percent: number;
+  broker_commission: number;
+  discounts: number;
+  partner_split: number;
+  net_commission: number;
+  installments_count: number;
+  first_expected_date: string | null;
+  notes: string | null;
+  status: CommissionStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommissionInstallment = {
+  id: string;
+  user_id: string;
+  commission_id: string;
+  installment_number: number;
+  due_date: string;
+  expected_amount: number;
+  received_amount: number;
+  received_date: string | null;
+  status: InstallmentStatus;
+  payment_method: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialTransaction = {
+  id: string;
+  user_id: string;
+  type: FinancialTransactionType;
+  category: string;
+  description: string;
+  amount: number;
+  due_date: string | null;
+  paid_date: string | null;
+  status: FinancialTransactionStatus;
+  payment_method: string | null;
+  client_id: string | null;
+  property_id: string | null;
+  sale_id: string | null;
+  commission_id: string | null;
+  is_recurring: boolean;
+  recurrence_rule: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialCategory = {
+  id: string;
+  user_id: string;
+  type: FinancialTransactionType;
+  name: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MonthlyBudget = {
+  id: string;
+  user_id: string;
+  category: string;
+  month: string;
+  limit_amount: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinancialAttachment = {
+  id: string;
+  user_id: string;
+  transaction_id: string | null;
+  commission_id: string | null;
+  file_path: string;
+  file_type: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -111,6 +218,60 @@ export type Database = {
           date: string;
         };
         Update: Partial<DailySummary>;
+      };
+      financial_transactions: {
+        Row: FinancialTransaction;
+        Insert: Omit<Partial<FinancialTransaction>, "id" | "created_at" | "updated_at"> & {
+          user_id: string;
+          type: FinancialTransactionType;
+          category: string;
+          description: string;
+          amount: number;
+        };
+        Update: Partial<FinancialTransaction>;
+      };
+      commissions: {
+        Row: Commission;
+        Insert: Omit<Partial<Commission>, "id" | "created_at" | "updated_at"> & { user_id: string };
+        Update: Partial<Commission>;
+      };
+      commission_installments: {
+        Row: CommissionInstallment;
+        Insert: Omit<Partial<CommissionInstallment>, "id" | "created_at" | "updated_at"> & {
+          user_id: string;
+          commission_id: string;
+          installment_number: number;
+          due_date: string;
+          expected_amount: number;
+        };
+        Update: Partial<CommissionInstallment>;
+      };
+      financial_categories: {
+        Row: FinancialCategory;
+        Insert: Omit<Partial<FinancialCategory>, "id" | "created_at" | "updated_at"> & {
+          user_id: string;
+          type: FinancialTransactionType;
+          name: string;
+        };
+        Update: Partial<FinancialCategory>;
+      };
+      monthly_budgets: {
+        Row: MonthlyBudget;
+        Insert: Omit<Partial<MonthlyBudget>, "id" | "created_at" | "updated_at"> & {
+          user_id: string;
+          category: string;
+          month: string;
+          limit_amount: number;
+        };
+        Update: Partial<MonthlyBudget>;
+      };
+      financial_attachments: {
+        Row: FinancialAttachment;
+        Insert: Omit<Partial<FinancialAttachment>, "id" | "created_at"> & {
+          user_id: string;
+          file_path: string;
+        };
+        Update: Partial<FinancialAttachment>;
       };
     };
     Views: Record<string, never>;

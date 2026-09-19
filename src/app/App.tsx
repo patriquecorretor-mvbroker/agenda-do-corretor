@@ -10,7 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 function AppContent() {
   const { user, loading } = useAuth();
   const { profile, isLoading } = useProfile();
-  const [dark, setDark] = useState(() => localStorage.getItem("theme") === "dark");
+  const [dark, setDark] = useState(() => localStorage.getItem("theme") !== "light");
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, isBefore, isToday, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarCheck2, CheckCircle2, CloudSun, Clock, ListChecks, Target, TrendingUp } from "lucide-react";
+import { CalendarCheck2, CheckCircle2, CloudSun, Clock, ListChecks, Target, TrendingUp, WalletCards } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { clampPercent, formatCurrency } from "@/lib/utils";
 import { useEvents } from "@/features/calendar/use-events";
 import { useTasks } from "@/features/tasks/use-tasks";
 import { useProfile } from "@/features/profile/use-profile";
+import { useFinance } from "@/features/finance/use-finance";
 import { getWeather, weatherMessage } from "@/features/dashboard/weather-service";
 import type { AppView } from "@/types/ui";
 
@@ -30,6 +31,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
   const { profile } = useProfile();
   const { events, isLoading: loadingEvents, updateEvent } = useEvents(today);
   const { tasks, isLoading: loadingTasks, updateTask } = useTasks();
+  const finance = useFinance();
   const { toast } = useToast();
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [tomorrowNotes, setTomorrowNotes] = useState("");
@@ -105,6 +107,32 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
         <SummaryCard icon={TrendingUp} label="Progresso mensal" value="0%" onClick={() => onNavigate("goals")} />
         <SummaryCard icon={Clock} label="Atrasados" value={overdueEvents.length} />
       </section>
+
+      <button
+        type="button"
+        onClick={() => onNavigate("finance")}
+        className="w-full overflow-hidden rounded-[1.75rem] border border-primary/20 bg-[#050403] p-4 text-left text-white shadow-[0_24px_70px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_28px_80px_rgba(218,165,57,0.16)] md:p-5"
+      >
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
+              <WalletCards className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-semibold">Central financeira</p>
+              <p className="text-xs text-white/55">Resumo rápido para hoje e para os próximos 30 dias.</p>
+            </div>
+          </div>
+          <span className="hidden rounded-full border border-primary/30 px-3 py-1 text-xs text-primary sm:inline-flex">Abrir financeiro</span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <FinanceMini label="Receber hoje" value={formatCurrency(finance.metrics.receiveToday)} />
+          <FinanceMini label="Pagar hoje" value={formatCurrency(finance.metrics.payToday)} />
+          <FinanceMini label="Comissão 30 dias" value={formatCurrency(finance.metrics.forecast.today + finance.metrics.forecast.next7 + finance.metrics.forecast.next30)} />
+          <FinanceMini label="Despesa do mês" value={formatCurrency(finance.metrics.expensesMonth)} />
+          <FinanceMini label="Resultado líquido" value={formatCurrency(finance.metrics.netResultMonth)} />
+        </div>
+      </button>
 
       <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
         <Card>
@@ -290,6 +318,15 @@ function SummaryPill({ label, value }: { label: string; value: number }) {
     <div className="rounded-2xl border p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function FinanceMini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+      <p className="text-xs text-white/50">{label}</p>
+      <p className="mt-1 font-semibold">{value}</p>
     </div>
   );
 }
