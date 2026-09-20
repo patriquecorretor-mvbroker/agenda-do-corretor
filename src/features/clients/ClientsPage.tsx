@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
-import { Building2, Crown, Filter, MapPin, Search, Trophy, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Crown, MapPin, Plus, Search, Trophy, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { useFinance } from "@/features/finance/use-finance";
 
@@ -28,17 +31,33 @@ const demoClients: ClientMapItem[] = [
   { id: "4", name: "Felipe Rocha", city: "Santo André", neighborhood: "Campestre", profile: "Studio", stage: "lead", bought: false, downloads: 4, x: 62, y: 67 },
   { id: "5", name: "Aline Souza", city: "São Bernardo", neighborhood: "Jardim do Mar", profile: "Apartamento 3 quartos", stage: "comprador", bought: true, downloads: 8, x: 52, y: 75 },
   { id: "6", name: "Bruno Costa", city: "Osasco", neighborhood: "Centro", profile: "Apartamento 2 quartos", stage: "pós-venda", bought: true, downloads: 7, x: 34, y: 50 },
-  { id: "7", name: "Patrícia Gomes", city: "Barueri", neighborhood: "Alphaville", profile: "Casa em condomínio", stage: "em contato", bought: false, downloads: 11, x: 25, y: 42 }
+  { id: "7", name: "Patrícia Gomes", city: "Barueri", neighborhood: "Alphaville", profile: "Casa em condomínio", stage: "em contato", bought: false, downloads: 11, x: 25, y: 42 },
+  { id: "8", name: "Eduardo Nunes", city: "Campinas", neighborhood: "Cambuí", profile: "Apartamento alto padrão", stage: "lead", bought: false, downloads: 6, x: 18, y: 28 },
+  { id: "9", name: "Bianca Reis", city: "Sorocaba", neighborhood: "Campolim", profile: "Casa em condomínio", stage: "visita agendada", bought: false, downloads: 10, x: 23, y: 78 },
+  { id: "10", name: "Rafael Martins", city: "Santos", neighborhood: "Ponta da Praia", profile: "Apartamento vista mar", stage: "comprador", bought: true, downloads: 14, x: 76, y: 84 }
 ];
 
 const allValue = "todos";
+const clientStorageKey = "mv-broker-clients";
 
 export function ClientsPage() {
   const finance = useFinance();
+  const { toast } = useToast();
+  const [customClients, setCustomClients] = useState<ClientMapItem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(clientStorageKey) ?? "[]") as ClientMapItem[];
+    } catch {
+      return [];
+    }
+  });
   const [query, setQuery] = useState("");
   const [city, setCity] = useState(allValue);
   const [profile, setProfile] = useState(allValue);
   const [stage, setStage] = useState(allValue);
+
+  useEffect(() => {
+    localStorage.setItem(clientStorageKey, JSON.stringify(customClients));
+  }, [customClients]);
 
   const financeClients = finance.commissions
     .filter((commission) => commission.client)
@@ -55,7 +74,7 @@ export function ClientsPage() {
       y: 38 + (index % 3) * 12
     }));
 
-  const clients = financeClients.length ? financeClients : demoClients;
+  const clients = [...demoClients, ...financeClients, ...customClients];
   const cities = Array.from(new Set(clients.map((client) => client.city)));
   const profiles = Array.from(new Set(clients.map((client) => client.profile)));
   const stages = Array.from(new Set(clients.map((client) => client.stage)));
@@ -71,6 +90,32 @@ export function ClientsPage() {
   const profileChampion = topBy(clients, (client) => client.profile, (client) => client.downloads);
   const cityChampion = topBy(clients, (client) => client.city);
   const citySalesChampion = topBy(clients.filter((client) => client.bought), (client) => client.city);
+
+  function addClient(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") || "").trim();
+    const nextCity = String(form.get("city") || "").trim();
+    const nextProfile = String(form.get("profile") || "").trim();
+    if (!name || !nextCity || !nextProfile) return;
+    const index = customClients.length + demoClients.length;
+    const next: ClientMapItem = {
+      id: `custom-${Date.now()}`,
+      name,
+      city: nextCity,
+      neighborhood: String(form.get("neighborhood") || "").trim() || "Bairro não informado",
+      profile: nextProfile,
+      stage: String(form.get("stage") || "lead") as ClientStage,
+      bought: form.get("bought") === "on",
+      downloads: Number(form.get("downloads") || 1),
+      x: 18 + (index * 13) % 66,
+      y: 24 + (index * 17) % 58
+    };
+    setCustomClients((current) => [...current, next]);
+    setCity(nextCity);
+    toast({ title: "Cliente cadastrado no mapa." });
+    event.currentTarget.reset();
+  }
 
   return (
     <div className="space-y-5">
@@ -113,6 +158,43 @@ export function ClientsPage() {
           <FilterSelect value={city} onValueChange={setCity} items={cities} placeholder="Cidade" />
           <FilterSelect value={profile} onValueChange={setProfile} items={profiles} placeholder="Perfil" />
           <FilterSelect value={stage} onValueChange={setStage} items={stages} placeholder="Etapa" />
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-primary/20">
+        <CardHeader className="bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.14),_transparent_38%),hsl(var(--card))]">
+          <CardTitle>Cadastrar cliente de teste</CardTitle>
+          <CardDescription>O cliente entra na carteira e aparece no mapa automaticamente.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_0.8fr_0.8fr_0.9fr_0.7fr_auto]" onSubmit={addClient}>
+            <Field name="name" label="Cliente" placeholder="Nome do cliente" required />
+            <Field name="city" label="Cidade" placeholder="Ex.: São Paulo" required />
+            <Field name="neighborhood" label="Bairro" placeholder="Ex.: Mooca" />
+            <Field name="profile" label="Perfil de imóvel" placeholder="Ex.: Casa em condomínio" required />
+            <div className="space-y-2">
+              <Label>Etapa</Label>
+              <Select name="stage" defaultValue="lead">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(["lead", "em contato", "visita agendada", "comprador", "pós-venda"] as ClientStage[]).map((item) => (
+                    <SelectItem key={item} value={item}>{item}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button className="min-h-11 w-full" type="submit">
+                <Plus className="h-4 w-4" />
+                Salvar
+              </Button>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl border p-3 md:col-span-2 xl:col-span-2">
+              <input id="bought" name="bought" type="checkbox" className="h-4 w-4" />
+              <Label htmlFor="bought">Cliente já comprou</Label>
+            </div>
+            <Field name="downloads" label="Interações/downloads" type="number" placeholder="1" />
+          </form>
         </CardContent>
       </Card>
 
@@ -215,6 +297,27 @@ function Mini({ label, value }: { label: string; value: string | number }) {
     <div className="rounded-2xl bg-muted p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  required
+}: {
+  label: string;
+  name: string;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={name}>{label}</Label>
+      <Input id={name} name={name} type={type} placeholder={placeholder} required={required} />
     </div>
   );
 }

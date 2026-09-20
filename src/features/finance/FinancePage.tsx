@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addDays, format, isSameMonth, parseISO } from "date-fns";
 import {
   AlertTriangle,
@@ -6,11 +6,15 @@ import {
   ArrowUpCircle,
   Banknote,
   CalendarDays,
+  Car,
   Download,
+  Home,
   LineChart,
+  Plane,
   Plus,
   Receipt,
   Search,
+  Sparkles,
   TrendingUp,
   WalletCards
 } from "lucide-react";
@@ -257,6 +261,8 @@ function DashboardFinance({
             <MiniBarChart income={finance.metrics.incomeMonth} expenses={finance.metrics.expensesMonth} />
           </CardContent>
         </Card>
+
+        <ExpenseAIReport transactions={finance.transactions} />
       </div>
 
       <div className="space-y-5">
@@ -283,6 +289,8 @@ function DashboardFinance({
             <GoalProgress label="Meta resultado líquido" value={finance.metrics.netResultMonth} target={profile?.meta_comissao_mensal ?? 0} progress={commissionProgress} />
           </CardContent>
         </Card>
+
+        <DreamGoalsCard />
 
         <Card>
           <CardHeader>
@@ -657,16 +665,33 @@ function FinancialCalendar({ transactions, installments }: { transactions: Finan
 export function TransactionForm({ type, onSaved }: { type: "income" | "expense"; onSaved: () => void }) {
   const finance = useFinance();
   const { toast } = useToast();
-  const categories = type === "income" ? incomeCategories : expenseCategories;
+  const storageKey = `mv-broker-${type}-categories`;
+  const baseCategories = type === "income" ? incomeCategories : expenseCategories;
+  const [customCategories, setCustomCategories] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(storageKey) ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+  const categories = Array.from(new Set([...baseCategories, ...customCategories])).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(customCategories));
+  }, [customCategories, storageKey]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const category = String(form.get("category") || "").trim() || "outro";
+    if (!categories.some((item) => item.toLowerCase() === category.toLowerCase())) {
+      setCustomCategories((current) => [...current, category]);
+    }
     await finance.createTransaction.mutateAsync({
       type,
       amount: Number(form.get("amount") || 0),
-      category: String(form.get("category") || "outro"),
-      description: String(form.get("description") || ""),
+      category,
+      description: category,
       due_date: String(form.get("date") || format(new Date(), "yyyy-MM-dd")),
       paid_date: type === "income" ? String(form.get("date") || format(new Date(), "yyyy-MM-dd")) : null,
       status: type === "income" ? "recebido" : "pendente",
@@ -686,13 +711,22 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
         <Field name="date" label="Data" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
       </div>
       <div className="space-y-2">
-        <Label>Categoria</Label>
-        <Select name="category" defaultValue={categories[0]}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{categories.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
-        </Select>
+        <Label htmlFor={`${type}-category`}>Categoria</Label>
+        <Input
+          id={`${type}-category`}
+          name="category"
+          list={`${type}-category-list`}
+          placeholder={type === "income" ? "Ex.: comissão, indicação..." : "Ex.: combustível, anúncios..."}
+          defaultValue={baseCategories[0]}
+          required
+        />
+        <datalist id={`${type}-category-list`}>
+          {categories.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+        <p className="text-xs text-muted-foreground">Digite uma nova categoria e ela ficará disponível nos próximos lançamentos.</p>
       </div>
-      <Field name="description" label="Descrição" required />
       <div className="space-y-2">
         <Label>Forma de pagamento</Label>
         <Select name="payment_method" defaultValue="PIX">
@@ -825,15 +859,15 @@ function FinanceCard({ label, value, icon: Icon, onClick, featured }: { label: s
     <Comp
       onClick={onClick}
       className={cn(
-        "min-h-[116px] rounded-3xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft",
-        featured && "border-primary/35 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.18),_transparent_42%),hsl(var(--card))] sm:col-span-2 xl:col-span-1"
+        "min-h-[116px] rounded-3xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.22),_transparent_42%),linear-gradient(135deg,_#050403,_#15100b_64%,_#050403)] p-4 text-left text-white shadow-[0_24px_60px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-[0_28px_70px_rgba(0,0,0,0.34)]",
+        featured && "border-primary/45 sm:col-span-2 xl:col-span-1"
       )}
     >
       <div className="mb-4 flex items-center justify-between">
         <Icon className="h-5 w-5 text-primary" />
-        {featured && <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[0.68rem] font-semibold text-primary">mês</span>}
+        {featured && <span className="rounded-full border border-primary/25 bg-primary/15 px-2.5 py-1 text-[0.68rem] font-semibold text-primary">mês</span>}
       </div>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xs text-white/52">{label}</p>
       <p className={cn("mt-1 font-semibold", featured ? "text-2xl" : "text-xl")}>{value}</p>
     </Comp>
   );
@@ -854,6 +888,81 @@ function ProjectionCard({ label, value, muted }: { label: string; value: number;
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{formatCurrency(value)}</p>
     </div>
+  );
+}
+
+function DreamGoalsCard() {
+  const goals = [
+    { label: "Viagem nas férias", target: 18000, saved: 4200, icon: Plane },
+    { label: "Carro novo", target: 95000, saved: 18500, icon: Car },
+    { label: "Meu imóvel", target: 280000, saved: 36000, icon: Home }
+  ];
+
+  return (
+    <Card className="overflow-hidden border-primary/25 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.18),_transparent_36%),linear-gradient(135deg,_#050403,_#15100b)] text-white">
+      <CardHeader>
+        <CardTitle>Metas de conquista</CardTitle>
+        <CardDescription className="text-white/62">Viagem, carro ou imóvel conectados ao foco financeiro.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {goals.map((goal) => {
+          const progress = clampPercent((goal.saved / goal.target) * 100);
+          const Icon = goal.icon;
+          return (
+            <div key={goal.label} className="rounded-2xl border border-white/10 bg-white/[0.055] p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Icon className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="truncate text-sm font-semibold">{goal.label}</span>
+                </div>
+                <span className="text-xs text-white/62">{progress}%</span>
+              </div>
+              <Progress value={progress} className="bg-white/10" />
+              <p className="mt-2 text-xs text-white/58">{formatCurrency(goal.saved)} guardados de {formatCurrency(goal.target)}</p>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExpenseAIReport({ transactions }: { transactions: FinancialTransaction[] }) {
+  const expenses = transactions.filter((item) => item.type === "expense");
+  const paid = expenses.filter((item) => item.status === "pago");
+  const pending = expenses.filter((item) => item.status !== "pago" && item.status !== "cancelado");
+  const totalPaid = sum(paid.map((item) => item.amount));
+  const categoryGroups = groupByCategory(paid);
+  const topEntry = Object.entries(categoryGroups).sort((a, b) => b[1] - a[1])[0];
+  const topPercent = topEntry && totalPaid ? clampPercent((topEntry[1] / totalPaid) * 100) : 0;
+  const marketing = paid.filter((item) => ["anúncios", "tráfego pago", "Instagram", "portais imobiliários"].includes(item.category));
+  const marketingTotal = sum(marketing.map((item) => item.amount));
+
+  const insights = [
+    !paid.length ? "Ainda não há despesas pagas suficientes para uma análise confiável." : null,
+    topEntry ? `${topEntry[0]} concentra ${topPercent}% das despesas pagas. Vale revisar se esse gasto está trazendo visitas, leads ou vendas.` : null,
+    pending.length ? `Existem ${pending.length} despesa(s) pendente(s). Priorize as que vencem primeiro para evitar atrasos.` : null,
+    marketingTotal ? `Marketing consumiu ${formatCurrency(marketingTotal)}. Compare esse valor com leads recebidos e visitas agendadas antes de aumentar orçamento.` : null,
+    paid.length ? "Sugestão: registre toda despesa no mesmo dia para o resultado líquido ficar confiável no fim do mês." : null
+  ].filter(Boolean);
+
+  return (
+    <Card className="overflow-hidden border-primary/20">
+      <CardHeader className="bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.14),_transparent_34%),hsl(var(--card))]">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <CardTitle>Relatório de despesas com IA</CardTitle>
+        </div>
+        <CardDescription>Análise assistida por regras locais. Pronta para conectar uma IA real no futuro.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {insights.map((insight) => (
+          <div key={insight} className="rounded-2xl border bg-muted/55 p-3 text-sm leading-6 text-muted-foreground">
+            {insight}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
