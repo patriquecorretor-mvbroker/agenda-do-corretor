@@ -94,7 +94,7 @@ export function AppShell({
       </aside>
 
       <main className="mx-auto min-h-screen max-w-7xl px-4 pb-28 pt-5 sm:px-6 lg:ml-72 lg:px-8 lg:pb-8">
-        {view === "day" && <DashboardPage onNavigate={setView} />}
+        {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
         {view === "agenda" && <AgendaPage />}
         {view === "clients" && <ClientsPage />}
         {view === "finance" && <FinancePage />}

@@ -5,6 +5,8 @@ import {
   Building2,
   CalendarCheck2,
   CheckCircle2,
+  Cloud,
+  CloudRain,
   CloudSun,
   Clock,
   Handshake,
@@ -15,6 +17,8 @@ import {
   PhoneCall,
   Play,
   RotateCcw,
+  Moon,
+  Sun,
   Target,
   TimerReset,
   TrendingUp,
@@ -37,6 +41,7 @@ import { useFinance } from "@/features/finance/use-finance";
 import { getWeather, weatherMessage } from "@/features/dashboard/weather-service";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import type { AppView } from "@/types/ui";
+import type { WeatherData } from "@/features/dashboard/weather-service";
 
 const phrases = [
   "Consistência gera resultado.",
@@ -46,7 +51,15 @@ const phrases = [
   "Pequenas ações diárias constroem grandes meses."
 ];
 
-export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => void }) {
+export function DashboardPage({
+  onNavigate,
+  dark,
+  onDarkChange
+}: {
+  onNavigate: (view: AppView) => void;
+  dark: boolean;
+  onDarkChange: (dark: boolean) => void;
+}) {
   const today = format(new Date(), "yyyy-MM-dd");
   const { profile } = useProfile();
   const { events, isLoading: loadingEvents, updateEvent } = useEvents(today);
@@ -146,19 +159,48 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
 
   const phrase = phrases[new Date().getDate() % phrases.length];
   const greeting = new Date().getHours() < 12 ? "Bom dia" : new Date().getHours() < 18 ? "Boa tarde" : "Boa noite";
+  const weatherVisual = getWeatherVisual(weatherQuery.data);
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[2rem] bg-primary p-5 text-primary-foreground shadow-soft md:p-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <section className={`relative overflow-hidden rounded-[2rem] p-5 text-white shadow-soft md:p-8 ${weatherVisual.background}`}>
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,_rgba(0,0,0,0.26),_rgba(0,0,0,0.05)_45%,_rgba(0,0,0,0.38))]" />
+        <div className={`absolute ${weatherVisual.orbClass}`} />
+        <div className="absolute -bottom-24 left-1/4 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm opacity-75">{format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/12 px-3 py-1 text-xs font-semibold text-white/80 backdrop-blur">
+                <weatherVisual.icon className="h-3.5 w-3.5" />
+                {weatherVisual.label}
+              </span>
+              <div className="grid grid-cols-2 gap-1 rounded-full border border-white/15 bg-white/10 p-1 backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => onDarkChange(false)}
+                  className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${!dark ? "bg-white text-[#17120b]" : "text-white/70 hover:text-white"}`}
+                >
+                  <Sun className="h-3.5 w-3.5" />
+                  Claro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDarkChange(true)}
+                  className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${dark ? "bg-white text-[#17120b]" : "text-white/70 hover:text-white"}`}
+                >
+                  <Moon className="h-3.5 w-3.5" />
+                  Escuro
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-white/75">{format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
             <h1 className="mt-2 text-3xl font-semibold md:text-5xl">
               {greeting}, {profile?.nome?.split(" ")[0] ?? "corretor"}
             </h1>
-            <p className="mt-3 text-sm opacity-80">
+            <p className="mt-3 text-sm text-white/80">
               {format(new Date(), "HH:mm")} • {profile?.cidade ?? "Cidade não informada"}
             </p>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/75">{weatherVisual.message}</p>
           </div>
           <WeatherMini weather={weatherQuery.data} loading={weatherQuery.isLoading} />
         </div>
@@ -374,6 +416,42 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
       </Dialog>
     </div>
   );
+}
+
+function getWeatherVisual(weather?: WeatherData) {
+  const condition = weather?.condition?.toLowerCase() ?? "";
+  const rain = weather?.rainChance ?? 0;
+  const isRain = rain >= 50 || condition.includes("chuva") || condition.includes("rain") || condition.includes("storm");
+  const isCloud = condition.includes("nublado") || condition.includes("cloud") || condition.includes("neblina") || condition.includes("overcast");
+  const unavailable = !weather || weather.source === "unavailable";
+
+  if (isRain) {
+    return {
+      icon: CloudRain,
+      label: "Previsão de chuva",
+      message: "Há possibilidade de chuva. Vale confirmar rotas, horários e visitas externas.",
+      background: "bg-[radial-gradient(circle_at_18%_20%,_rgba(148,163,184,0.45),_transparent_30%),linear-gradient(135deg,_#0f172a,_#334155_48%,_#020617)]",
+      orbClass: "right-[-4rem] top-[-5rem] h-64 w-64 rounded-full bg-sky-300/20 blur-3xl"
+    };
+  }
+
+  if (isCloud || unavailable) {
+    return {
+      icon: Cloud,
+      label: unavailable ? "Clima não configurado" : "Tempo nublado",
+      message: unavailable ? "Integração preparada para exibir sol, chuva e condições reais assim que a API estiver configurada." : "Tempo mais fechado. Bom momento para organizar retornos, ligações e documentos.",
+      background: "bg-[radial-gradient(circle_at_20%_18%,_rgba(255,255,255,0.24),_transparent_28%),linear-gradient(135deg,_#1f2937,_#64748b_52%,_#111827)]",
+      orbClass: "right-[-5rem] top-[-5rem] h-72 w-72 rounded-full bg-white/18 blur-3xl"
+    };
+  }
+
+  return {
+    icon: CloudSun,
+    label: "Boa condição externa",
+    message: weather ? weatherMessage(weather) : "Boa condição para organizar visitas e compromissos externos.",
+    background: "bg-[radial-gradient(circle_at_18%_15%,_rgba(255,214,102,0.55),_transparent_28%),linear-gradient(135deg,_#f59e0b,_#f97316_44%,_#0f172a)]",
+    orbClass: "right-[-4rem] top-[-5rem] h-72 w-72 rounded-full bg-yellow-200/35 blur-3xl"
+  };
 }
 
 function SummaryCard({ icon: Icon, label, value, onClick }: { icon: React.ElementType; label: string; value: number | string; onClick?: () => void }) {
