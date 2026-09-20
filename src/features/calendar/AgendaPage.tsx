@@ -96,7 +96,7 @@ export function AgendaPage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[2rem] bg-[#050403] text-white shadow-soft">
+      <section className="overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.38),_transparent_35%),linear-gradient(135deg,_#050403,_#15100b_58%,_#050403)] text-white shadow-soft">
         <div className="relative p-5 md:p-8">
           <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/35 blur-3xl" />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -139,7 +139,7 @@ export function AgendaPage() {
                 <CardTitle className="text-xl">Linha do tempo</CardTitle>
                 <CardDescription>Toque em concluir, reagende ou registre uma observação sem sair da agenda.</CardDescription>
               </div>
-              <div className="hidden rounded-2xl bg-[#050403] px-4 py-3 text-right text-white sm:block">
+              <div className="hidden rounded-2xl bg-[linear-gradient(135deg,_#050403,_hsl(var(--primary)/0.72))] px-4 py-3 text-right text-white shadow-[0_16px_36px_hsl(var(--primary)/0.20)] sm:block">
                 <p className="text-xs text-white/55">Hoje</p>
                 <p className="font-semibold">{format(new Date(), "dd/MM")}</p>
               </div>
@@ -349,7 +349,7 @@ function TimelineEvent({
   return (
     <article className="grid grid-cols-[76px_1fr] gap-3 px-4 py-4 sm:grid-cols-[92px_1fr] sm:px-5">
       <div className="relative text-right">
-        <p className={cn("font-semibold", completed ? "text-muted-foreground" : "text-[#050403] dark:text-white")}>
+        <p className={cn("font-semibold", completed ? "text-muted-foreground" : "text-foreground")}>
           {event.start_time.slice(0, 5)}
         </p>
         {event.end_time && <p className="text-xs text-muted-foreground">{event.end_time.slice(0, 5)}</p>}
@@ -357,7 +357,7 @@ function TimelineEvent({
         <div
           className={cn(
             "absolute right-[-25px] top-2 grid h-4 w-4 place-items-center rounded-full border-2 sm:right-[-29px]",
-            completed ? "border-primary bg-primary" : "border-[#050403] bg-background dark:border-white"
+            completed ? "border-primary bg-primary shadow-[0_0_0_5px_hsl(var(--primary)/0.12)]" : "border-primary bg-background shadow-[0_0_0_5px_hsl(var(--primary)/0.10)]"
           )}
         />
       </div>

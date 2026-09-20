@@ -93,23 +93,23 @@ export function FinancePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-[2rem] bg-[#050403] text-white shadow-soft">
-        <div className="relative p-5 md:p-8">
+    <div className="space-y-4 md:space-y-5">
+      <section className="overflow-hidden rounded-[1.75rem] bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.36),_transparent_36%),linear-gradient(135deg,_#050403,_#15100b_58%,_#050403)] text-white shadow-soft md:rounded-[2rem]">
+        <div className="relative p-4 md:p-8">
           <div className="absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/35 blur-3xl" />
           <div className="absolute bottom-0 left-1/3 h-24 w-72 rounded-full bg-white/10 blur-3xl" />
-          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary md:mb-4">
                 <WalletCards className="h-3.5 w-3.5" />
                 Financeiro MV Broker
               </div>
-              <h1 className="max-w-3xl text-3xl font-semibold leading-tight md:text-5xl">Controle real do dinheiro que entrou, vai entrar e ainda é potencial.</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/62">
+              <h1 className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl md:text-5xl">Controle real do dinheiro.</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/62 md:mt-3">
                 Separação clara entre realizado, confirmado, previsto, potencial e atrasado. Sem misturar promessa com caixa.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:min-w-[420px]">
+            <div className="grid grid-cols-2 gap-2 sm:min-w-[420px] sm:gap-3">
               <HeroMetric label="Resultado mês" value={formatCurrency(finance.metrics.netResultMonth)} />
               <HeroMetric label="Receber hoje" value={formatCurrency(finance.metrics.receiveToday)} />
             </div>
@@ -117,14 +117,14 @@ export function FinancePage() {
         </div>
       </section>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
             className={cn(
-              "shrink-0 rounded-2xl border px-4 py-2 text-sm font-semibold transition",
+              "min-h-10 shrink-0 rounded-2xl border px-4 py-2 text-sm font-semibold transition",
               tab === item.id ? "border-primary bg-primary text-primary-foreground shadow-soft" : "bg-card text-muted-foreground hover:text-foreground"
             )}
           >
@@ -133,29 +133,29 @@ export function FinancePage() {
         ))}
       </div>
 
-      <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <FinanceCard featured label="Resultado líquido" value={formatCurrency(finance.metrics.netResultMonth)} icon={LineChart} onClick={() => setTab("result")} />
         <FinanceCard label="Comissão recebida" value={formatCurrency(finance.metrics.commissionReceivedMonth)} icon={Banknote} onClick={() => setTab("commissions")} />
-        <FinanceCard label="Comissão a receber" value={formatCurrency(finance.metrics.commissionReceivable)} icon={ArrowDownCircle} onClick={() => setTab("receivable")} />
-        <FinanceCard label="Em negociação" value={formatCurrency(finance.metrics.commissionPotential)} icon={TrendingUp} />
-        <FinanceCard label="Despesas do mês" value={formatCurrency(finance.metrics.expensesMonth)} icon={ArrowUpCircle} onClick={() => setTab("payable")} />
-        <FinanceCard label="VGV do mês" value={formatCurrency(finance.metrics.vgvMonth)} icon={LineChart} />
+        <FinanceCard label="A receber" value={formatCurrency(finance.metrics.commissionReceivable)} icon={ArrowDownCircle} onClick={() => setTab("receivable")} />
+        <FinanceCard label="Despesas" value={formatCurrency(finance.metrics.expensesMonth)} icon={ArrowUpCircle} onClick={() => setTab("payable")} />
+        <FinanceCard label="Potencial" value={formatCurrency(finance.metrics.commissionPotential)} icon={TrendingUp} />
       </section>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="rounded-3xl border bg-card p-3 shadow-sm md:flex md:items-center md:justify-between md:gap-3">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-11" placeholder="Pesquisar cliente, imóvel, categoria..." value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:flex">
-          <Button size="sm" onClick={() => setForm("income")}>
+        <div className="mt-3 grid grid-cols-3 gap-2 md:mt-0 md:flex">
+          <Button className="min-h-11 px-2 text-xs sm:text-sm" onClick={() => setForm("income")}>
             <Plus className="h-4 w-4" />
             Receita
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setForm("expense")}>
+          <Button className="min-h-11 px-2 text-xs sm:text-sm" variant="outline" onClick={() => setForm("expense")}>
             <Plus className="h-4 w-4" />
             Despesa
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setForm("commission")}>
+          <Button className="min-h-11 px-2 text-xs sm:text-sm" variant="outline" onClick={() => setForm("commission")}>
             <Plus className="h-4 w-4" />
             Comissão
           </Button>
@@ -180,7 +180,7 @@ export function FinancePage() {
       {tab === "calendar" && <FinancialCalendar transactions={finance.transactions} installments={finance.installments} />}
 
       <Dialog open={Boolean(form)} onOpenChange={() => setForm(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{form === "commission" ? "Nova comissão" : form === "expense" ? "Nova despesa" : "Nova receita"}</DialogTitle>
             <DialogDescription>
@@ -322,32 +322,32 @@ function CommissionList({
           <CardTitle>Comissões</CardTitle>
           <CardDescription>Histórico, status e parcelas vinculadas.</CardDescription>
         </div>
-        <Button variant="outline" onClick={onExport}>
+        <Button className="w-full sm:w-auto" variant="outline" onClick={onExport}>
           <Download className="h-4 w-4" />
           CSV
         </Button>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 sm:space-y-4">
         {commissions.map((commission) => {
           const linked = installments.filter((item) => item.commission_id === commission.id);
           return (
-            <article key={commission.id} className="rounded-3xl border bg-card p-4 shadow-sm">
+            <article key={commission.id} className="rounded-3xl border bg-card p-3 shadow-sm sm:p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
+                <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap gap-2">
                     <StatusBadge status={commission.status} />
                     <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{commission.builder ?? "sem construtora"}</span>
                   </div>
-                  <h3 className="text-lg font-semibold">{commission.client ?? "Cliente não informado"}</h3>
-                  <p className="text-sm text-muted-foreground">{commission.property ?? commission.development ?? "Imóvel não informado"}</p>
+                  <h3 className="truncate text-base font-semibold sm:text-lg">{commission.client ?? "Cliente não informado"}</h3>
+                  <p className="truncate text-sm text-muted-foreground">{commission.property ?? commission.development ?? "Imóvel não informado"}</p>
                 </div>
-                <div className="text-left lg:text-right">
+                <div className="rounded-2xl bg-muted p-3 text-left lg:bg-transparent lg:p-0 lg:text-right">
                   <p className="text-xs text-muted-foreground">Comissão líquida</p>
-                  <p className="text-2xl font-semibold">{formatCurrency(commission.net_commission)}</p>
+                  <p className="text-xl font-semibold sm:text-2xl">{formatCurrency(commission.net_commission)}</p>
                   <p className="text-xs text-muted-foreground">VGV {formatCurrency(commission.vgv)}</p>
                 </div>
               </div>
-              <div className="mt-4 grid gap-2 md:grid-cols-3">
+              <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1 md:grid md:grid-cols-3 md:overflow-visible">
                 {linked.map((installment) => (
                   <InstallmentCard key={installment.id} installment={installment} onReceive={() => onReceive(installment)} />
                 ))}
@@ -404,18 +404,18 @@ function ReceivableList({
             <CardTitle>Contas a receber</CardTitle>
             <CardDescription>Parcelas de comissão e recebimentos previstos.</CardDescription>
           </div>
-          <Button variant="outline" onClick={onExport}>
+          <Button className="w-full sm:w-auto" variant="outline" onClick={onExport}>
             <Download className="h-4 w-4" />
             CSV
           </Button>
         </div>
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {["todos", "hoje", "atrasadas", "7", "30", "recebidas", "pendentes"].map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => onFilter(item)}
-              className={cn("shrink-0 rounded-full border px-3 py-1 text-xs font-semibold", filter === item ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground")}
+              className={cn("min-h-9 shrink-0 rounded-full border px-3 py-1 text-xs font-semibold", filter === item ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground")}
             >
               {item === "7" ? "7 dias" : item === "30" ? "30 dias" : item}
             </button>
@@ -426,26 +426,26 @@ function ReceivableList({
         {rows.map((installment) => {
           const commission = commissions.find((item) => item.id === installment.commission_id);
           return (
-            <article key={installment.id} className="grid gap-3 rounded-3xl border p-4 lg:grid-cols-[1fr_auto]">
-              <div>
+            <article key={installment.id} className="grid gap-3 rounded-3xl border bg-card p-3 shadow-sm sm:p-4 lg:grid-cols-[1fr_auto]">
+              <div className="min-w-0">
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status={installment.status} />
                   <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{installment.due_date}</span>
                 </div>
-                <h3 className="mt-2 font-semibold">{commission?.client ?? "Comissão"}</h3>
-                <p className="text-sm text-muted-foreground">{commission?.property ?? "Origem: comissão"} • parcela {installment.installment_number}</p>
+                <h3 className="mt-2 truncate font-semibold">{commission?.client ?? "Comissão"}</h3>
+                <p className="truncate text-sm text-muted-foreground">{commission?.property ?? "Origem: comissão"} • parcela {installment.installment_number}</p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[420px]">
+              <div className="grid grid-cols-3 gap-2 lg:min-w-[420px]">
                 <MiniAmount label="Previsto" value={installment.expected_amount} />
                 <MiniAmount label="Recebido" value={installment.received_amount} />
                 <MiniAmount label="Saldo" value={installmentBalance(installment)} />
               </div>
               {installment.status !== "recebida" && (
-                <div className="flex flex-wrap gap-2 lg:col-span-2">
-                  <Button size="sm" onClick={() => onReceive(installment)}>
+                <div className="grid grid-cols-2 gap-2 lg:col-span-2 sm:flex sm:flex-wrap">
+                  <Button className="min-h-10" size="sm" onClick={() => onReceive(installment)}>
                     Receber integral
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => onReceive(installment, Math.round(installment.expected_amount * 0.6))}>
+                  <Button className="min-h-10" size="sm" variant="outline" onClick={() => onReceive(installment, Math.round(installment.expected_amount * 0.6))}>
                     Receber parcial 60%
                   </Button>
                 </div>
@@ -479,26 +479,26 @@ function TransactionList({
           <CardTitle>{title}</CardTitle>
           <CardDescription>Descrição, categoria, vencimento, status e forma de pagamento.</CardDescription>
         </div>
-        <Button variant="outline" onClick={onExport}>
+        <Button className="w-full sm:w-auto" variant="outline" onClick={onExport}>
           <Download className="h-4 w-4" />
           CSV
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {rows.map((transaction) => (
-          <article key={transaction.id} className="grid gap-3 rounded-3xl border p-4 md:grid-cols-[1fr_auto]">
-            <div>
+          <article key={transaction.id} className="grid gap-3 rounded-3xl border bg-card p-3 shadow-sm sm:p-4 md:grid-cols-[1fr_auto]">
+            <div className="min-w-0">
               <div className="flex flex-wrap gap-2">
                 <StatusBadge status={transaction.status} />
                 <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{transaction.category}</span>
               </div>
-              <h3 className="mt-2 font-semibold">{transaction.description}</h3>
-              <p className="text-sm text-muted-foreground">Vence {transaction.due_date ?? "sem data"} • {transaction.payment_method ?? "sem forma"}</p>
+              <h3 className="mt-2 truncate font-semibold">{transaction.description}</h3>
+              <p className="truncate text-sm text-muted-foreground">Vence {transaction.due_date ?? "sem data"} • {transaction.payment_method ?? "sem forma"}</p>
             </div>
-            <div className="text-left md:text-right">
-              <p className="text-2xl font-semibold">{formatCurrency(transaction.amount)}</p>
+            <div className="rounded-2xl bg-muted p-3 text-left md:bg-transparent md:p-0 md:text-right">
+              <p className="text-xl font-semibold sm:text-2xl">{formatCurrency(transaction.amount)}</p>
               {transaction.status !== "pago" && transaction.type === "expense" && (
-                <Button size="sm" className="mt-2" onClick={() => onPay(transaction)}>
+                <Button size="sm" className="mt-2 min-h-10 w-full md:w-auto" onClick={() => onPay(transaction)}>
                   Marcar pago
                 </Button>
               )}
@@ -542,12 +542,21 @@ function CashFlow({ transactions, installments }: { transactions: FinancialTrans
       </CardHeader>
       <CardContent className="space-y-3">
         {rows.map((row, index) => (
-          <div key={`${row.date}-${index}`} className="grid gap-2 rounded-2xl border p-3 md:grid-cols-[110px_1fr_repeat(3,120px)] md:items-center">
-            <strong>{row.date}</strong>
-            <span>{row.description}</span>
-            <span className="text-emerald-600">{row.in ? formatCurrency(row.in) : "-"}</span>
-            <span className="text-red-600">{row.out ? formatCurrency(row.out) : "-"}</span>
-            <span className="font-semibold">{formatCurrency(row.accumulated)}</span>
+          <div key={`${row.date}-${index}`} className="rounded-2xl border bg-card p-3 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <strong className="text-sm">{row.date}</strong>
+                <p className="mt-1 truncate text-sm text-muted-foreground">{row.description}</p>
+              </div>
+              <span className={cn("shrink-0 text-sm font-semibold", row.balance >= 0 ? "text-emerald-600" : "text-red-600")}>
+                {formatCurrency(row.balance)}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <MiniAmount label="Entrada" value={row.in} />
+              <MiniAmount label="Saída" value={row.out} />
+              <MiniAmount label="Acumulado" value={row.accumulated} />
+            </div>
           </div>
         ))}
       </CardContent>
@@ -632,12 +641,12 @@ function FinancialCalendar({ transactions, installments }: { transactions: Finan
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {upcoming.map((item, index) => (
-          <div key={`${item.date}-${index}`} className="rounded-3xl border p-4">
+          <div key={`${item.date}-${index}`} className="rounded-3xl border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{item.date}</span>
               <span className={cn("text-sm font-semibold", item.type === "income" ? "text-emerald-600" : "text-red-600")}>{formatCurrency(item.value)}</span>
             </div>
-            <p className="mt-3 font-medium">{item.label}</p>
+            <p className="mt-3 truncate font-medium">{item.label}</p>
           </div>
         ))}
       </CardContent>
@@ -672,7 +681,7 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
 
   return (
     <form className="grid gap-4" onSubmit={submit}>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field name="amount" label="Valor" type="number" step="0.01" required />
         <Field name="date" label="Data" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
       </div>
@@ -803,20 +812,29 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: str
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 sm:rounded-3xl sm:p-4">
       <p className="text-xs text-white/55">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+      <p className="mt-1 text-lg font-semibold sm:text-xl">{value}</p>
     </div>
   );
 }
 
-function FinanceCard({ label, value, icon: Icon, onClick }: { label: string; value: string; icon: React.ElementType; onClick?: () => void }) {
+function FinanceCard({ label, value, icon: Icon, onClick, featured }: { label: string; value: string; icon: React.ElementType; onClick?: () => void; featured?: boolean }) {
   const Comp = onClick ? "button" : "div";
   return (
-    <Comp onClick={onClick} className="rounded-3xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft">
-      <Icon className="mb-4 h-5 w-5 text-primary" />
+    <Comp
+      onClick={onClick}
+      className={cn(
+        "min-h-[116px] rounded-3xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft",
+        featured && "border-primary/35 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.18),_transparent_42%),hsl(var(--card))] sm:col-span-2 xl:col-span-1"
+      )}
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <Icon className="h-5 w-5 text-primary" />
+        {featured && <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[0.68rem] font-semibold text-primary">mês</span>}
+      </div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+      <p className={cn("mt-1 font-semibold", featured ? "text-2xl" : "text-xl")}>{value}</p>
     </Comp>
   );
 }
@@ -889,9 +907,9 @@ function GoalProgress({ label, value, target, progress }: { label: string; value
 
 function DataLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-2xl bg-muted p-3 text-sm">
+    <div className="grid gap-1 rounded-2xl bg-muted p-3 text-sm sm:flex sm:items-start sm:justify-between sm:gap-3">
       <span className="text-muted-foreground">{label}</span>
-      <strong className="text-right">{value}</strong>
+      <strong className="sm:text-right">{value}</strong>
     </div>
   );
 }
@@ -903,7 +921,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function InstallmentCard({ installment, onReceive }: { installment: CommissionInstallment; onReceive: () => void }) {
   return (
-    <div className="rounded-2xl bg-muted p-3">
+    <div className="min-w-[230px] rounded-2xl bg-muted p-3 md:min-w-0">
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{installment.installment_number}ª parcela</span>
         <StatusBadge status={installment.status} />
@@ -912,7 +930,7 @@ function InstallmentCard({ installment, onReceive }: { installment: CommissionIn
       <p className="text-xs text-muted-foreground">Vence {installment.due_date}</p>
       <p className="text-xs text-muted-foreground">Saldo {formatCurrency(installmentBalance(installment))}</p>
       {installment.status !== "recebida" && (
-        <Button size="sm" className="mt-3 w-full" onClick={onReceive}>
+        <Button size="sm" className="mt-3 min-h-10 w-full" onClick={onReceive}>
           Receber
         </Button>
       )}
@@ -922,9 +940,9 @@ function InstallmentCard({ installment, onReceive }: { installment: CommissionIn
 
 function MiniAmount({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-muted p-3">
+    <div className="min-w-0 rounded-2xl bg-muted p-2.5 sm:p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold">{formatCurrency(value)}</p>
+      <p className="truncate text-sm font-semibold sm:text-base">{formatCurrency(value)}</p>
     </div>
   );
 }

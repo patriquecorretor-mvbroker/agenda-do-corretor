@@ -10,6 +10,8 @@ import { AgendaPage } from "@/features/calendar/AgendaPage";
 import { FinancePage } from "@/features/finance/FinancePage";
 import { GoalsPage } from "@/features/goals/GoalsPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
+import { SettingsPage } from "@/features/settings/SettingsPage";
+import type { PaletteId } from "@/lib/appearance";
 import type { AppView } from "@/types/ui";
 
 const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; mobile?: boolean }> = [
@@ -21,7 +23,21 @@ const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; m
   { view: "settings", label: "Configurações", icon: Settings }
 ];
 
-export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: (dark: boolean) => void }) {
+export function AppShell({
+  dark,
+  onDarkChange,
+  palette,
+  onPaletteChange,
+  customColor,
+  onCustomColorChange
+}: {
+  dark: boolean;
+  onDarkChange: (dark: boolean) => void;
+  palette: PaletteId;
+  onPaletteChange: (palette: PaletteId) => void;
+  customColor: string;
+  onCustomColorChange: (color: string) => void;
+}) {
   const [view, setView] = useState<AppView>("day");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const { signOut } = useAuth();
@@ -34,8 +50,8 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(218,165,57,0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-primary/20 bg-[#050403] p-5 text-white backdrop-blur-xl lg:flex lg:flex-col">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-primary/20 bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.18),_transparent_35%),linear-gradient(180deg,_#050403,_#0f0b08)] p-5 text-white backdrop-blur-xl lg:flex lg:flex-col">
         <div className="mb-8 flex items-center gap-3">
           <img
             src="/brand/mv-broker-logo.jpg"
@@ -82,10 +98,14 @@ export function AppShell({ dark, onDarkChange }: { dark: boolean; onDarkChange: 
         {view === "goals" && <GoalsPage />}
         {view === "profile" && <ProfilePage />}
         {view === "settings" && (
-          <div className="rounded-3xl border bg-card p-6">
-            <h1 className="text-2xl font-semibold">Configurações</h1>
-            <p className="mt-2 text-muted-foreground">Estrutura reservada para preferências, notificações e integrações futuras.</p>
-          </div>
+          <SettingsPage
+            dark={dark}
+            onDarkChange={onDarkChange}
+            palette={palette}
+            onPaletteChange={onPaletteChange}
+            customColor={customColor}
+            onCustomColorChange={onCustomColorChange}
+          />
         )}
       </main>
 
