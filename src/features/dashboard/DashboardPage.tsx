@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, isBefore, isToday, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -10,9 +10,13 @@ import {
   Handshake,
   Home,
   ListChecks,
+  Pause,
   Percent,
   PhoneCall,
+  Play,
+  RotateCcw,
   Target,
+  TimerReset,
   TrendingUp,
   Users,
   WalletCards
@@ -51,6 +55,9 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
   const { toast } = useToast();
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [tomorrowNotes, setTomorrowNotes] = useState("");
+  const [focusSeconds, setFocusSeconds] = useState(25 * 60);
+  const [focusRunning, setFocusRunning] = useState(false);
+  const focusProgress = clampPercent(((25 * 60 - focusSeconds) / (25 * 60)) * 100);
 
   const weatherQuery = useQuery({
     queryKey: ["weather", profile?.cidade],
@@ -110,6 +117,22 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
       })
       .slice(0, 5);
   }, [tasks]);
+
+  useEffect(() => {
+    if (!focusRunning) return;
+    const timer = window.setInterval(() => {
+      setFocusSeconds((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          setFocusRunning(false);
+          toast({ title: "Foco concluído. Hora de respirar e registrar o próximo passo." });
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [focusRunning, toast]);
 
   async function finishDay() {
     const tomorrow = format(new Date(Date.now() + 86_400_000), "yyyy-MM-dd");
@@ -177,6 +200,37 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
           <CommercialCard icon={Target} label="Carteira de clientes" value={commercialMetrics.clientPortfolio} helper="clientes únicos" />
         </CardContent>
       </Card>
+
+      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <ProductivityFocusCard
+          visitedProperties={commercialMetrics.visitedProperties}
+          scheduledVisits={commercialMetrics.scheduledVisits}
+          dailyProgress={dailyProgress}
+          seconds={focusSeconds}
+          progress={focusProgress}
+          running={focusRunning}
+          onToggle={() => setFocusRunning((current) => !current)}
+          onReset={() => {
+            setFocusRunning(false);
+            setFocusSeconds(25 * 60);
+          }}
+          onShortBreak={() => {
+            setFocusRunning(false);
+            setFocusSeconds(5 * 60);
+          }}
+        />
+        <Card className="overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.16),_transparent_36%),hsl(var(--card))]">
+          <CardHeader>
+            <CardTitle>Bloco de produtividade dos imóveis</CardTitle>
+            <CardDescription>Uma leitura simples para manter captação, visitas e retorno no ritmo.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <GoalLine label="Visitados" value={`${commercialMetrics.visitedProperties} imóveis`} />
+            <GoalLine label="Visitas abertas" value={`${commercialMetrics.scheduledVisits} agendas`} />
+            <GoalLine label="Ritmo do dia" value={`${dailyProgress}% concluído`} />
+          </CardContent>
+        </Card>
+      </section>
 
       <button
         type="button"
@@ -356,6 +410,82 @@ function CommercialCard({
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-2xl font-semibold">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+    </div>
+  );
+}
+
+function ProductivityFocusCard({
+  visitedProperties,
+  scheduledVisits,
+  dailyProgress,
+  seconds,
+  progress,
+  running,
+  onToggle,
+  onReset,
+  onShortBreak
+}: {
+  visitedProperties: number;
+  scheduledVisits: number;
+  dailyProgress: number;
+  seconds: number;
+  progress: number;
+  running: boolean;
+  onToggle: () => void;
+  onReset: () => void;
+  onShortBreak: () => void;
+}) {
+  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const rest = String(seconds % 60).padStart(2, "0");
+  return (
+    <Card className="overflow-hidden border-primary/25 bg-[#050403] text-white">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Foco total</CardTitle>
+            <CardDescription className="text-white/65">Pomodoro divertido para ligar, prospectar e fechar pendências.</CardDescription>
+          </div>
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-foreground">
+            <TimerReset className="h-6 w-6" />
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-5 text-center">
+          <p className="text-xs uppercase tracking-[0.18em] text-white/45">{running ? "foco ligado" : "pronto para começar"}</p>
+          <p className="mt-2 text-5xl font-semibold tabular-nums">{minutes}:{rest}</p>
+          <Progress value={progress} className="mt-4 bg-white/10" />
+          <p className="mt-3 text-sm text-white/62">
+            {running ? "Modo avião mental: uma missão por vez." : "Escolha uma tarefa, respire e aperte iniciar."}
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Button type="button" onClick={onToggle}>
+            {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {running ? "Pausar" : "Iniciar"}
+          </Button>
+          <Button type="button" variant="outline" onClick={onShortBreak}>
+            5 min
+          </Button>
+          <Button type="button" variant="ghost" onClick={onReset}>
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <FocusMini label="Visitados" value={visitedProperties} />
+          <FocusMini label="Agendas" value={scheduledVisits} />
+          <FocusMini label="Dia" value={`${dailyProgress}%`} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FocusMini({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+      <p className="text-xs text-white/45">{label}</p>
+      <p className="mt-1 font-semibold">{value}</p>
     </div>
   );
 }

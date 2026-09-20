@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, CirclePlus, Home, LogOut, Moon, Settings, Sun, Target, User, WalletCards } from "lucide-react";
+import { CalendarDays, CirclePlus, Home, LogOut, Moon, Settings, Sun, Target, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { QuickAddDialog } from "@/components/layout/QuickAddDialog";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { AgendaPage } from "@/features/calendar/AgendaPage";
+import { ClientsPage } from "@/features/clients/ClientsPage";
 import { FinancePage } from "@/features/finance/FinancePage";
 import { GoalsPage } from "@/features/goals/GoalsPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
@@ -17,6 +18,7 @@ import type { AppView } from "@/types/ui";
 const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; mobile?: boolean }> = [
   { view: "day", label: "Meu Dia", icon: Home },
   { view: "agenda", label: "Agenda", icon: CalendarDays },
+  { view: "clients", label: "Clientes", icon: Users },
   { view: "finance", label: "Financeiro", icon: WalletCards },
   { view: "goals", label: "Metas", icon: Target },
   { view: "profile", label: "Perfil", icon: User },
@@ -94,9 +96,19 @@ export function AppShell({
       <main className="mx-auto min-h-screen max-w-7xl px-4 pb-28 pt-5 sm:px-6 lg:ml-72 lg:px-8 lg:pb-8">
         {view === "day" && <DashboardPage onNavigate={setView} />}
         {view === "agenda" && <AgendaPage />}
+        {view === "clients" && <ClientsPage />}
         {view === "finance" && <FinancePage />}
         {view === "goals" && <GoalsPage />}
-        {view === "profile" && <ProfilePage />}
+        {view === "profile" && (
+          <ProfilePage
+            dark={dark}
+            onDarkChange={onDarkChange}
+            palette={palette}
+            onPaletteChange={onPaletteChange}
+            customColor={customColor}
+            onCustomColorChange={onCustomColorChange}
+          />
+        )}
         {view === "settings" && (
           <SettingsPage
             dark={dark}
@@ -110,7 +122,7 @@ export function AppShell({
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/94 px-3 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 items-end gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-6 items-end gap-1">
           {mobileItems.slice(0, 2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
           ))}
