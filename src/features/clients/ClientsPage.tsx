@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Crown, ExternalLink, LocateFixed, MapPin, Navigation, Plus, Search, Trophy, Users } from "lucide-react";
+import { CalendarPlus, Camera, Check, Crown, ExternalLink, LocateFixed, MapPin, Navigation, Plus, Search, Trophy, Users, X, RotateCcw } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useEvents } from "@/features/calendar/use-events";
+import { useAuth } from "@/features/auth/auth-context";
+import { hasSupabaseConfig, requireSupabase } from "@/lib/supabase";
+import type { CalendarEvent } from "@/types/database";
+import { useClientMarks } from "./use-client-marks";
+import { ClientAvatar } from "./ClientAvatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +33,7 @@ type ClientMapItem = {
   y: number;
   lat?: number;
   lng?: number;
+  photo?: string;
 };
 
 type MapTransform = {
@@ -80,6 +90,22 @@ const cityCoordinates: Record<string, { lat: number; lng: number }> = {
 export function ClientsPage() {
   const finance = useFinance();
   const { toast } = useToast();
+  const { user, isDemo } = useAuth();
+  const marks = useClientMarks();
+  const calendar = useEvents();
+  const [mapFilter, setMapFilter] = useState("todos");
+  const [scheduleClient, setScheduleClient] = useState<ClientMapItem | null>(null);
+  const gestureMoved = useRef(false);
+  const scheduled = useQuery({
+    queryKey: ["events", user?.id, "client-map"],
+    enabled: Boolean(user),
+    queryFn: async (): Promise<CalendarEvent[]> => {
+      if (!hasSupabaseConfig) return (JSON.parse(localStorage.getItem("agenda-demo-events") ?? "[]") as CalendarEvent[]).filter((event) => event.notes?.startsWith("client-map:") && event.status === "agendado");
+      const { data, error } = await (requireSupabase() as any).from("calendar_events").select("*").eq("user_id", user!.id).eq("status", "agendado").like("notes", "client-map:%").order("date");
+      if (error) throw error;
+      return data;
+    }
+  });
   const [customClients, setCustomClients] = useState<ClientMapItem[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(clientStorageKey) ?? "[]") as ClientMapItem[];
@@ -95,7 +121,7 @@ export function ClientsPage() {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapTransform, setMapTransform] = useState<MapTransform>({ x: 0, y: 0, scale: 1 });
   const touchGesture = useRef<TouchGesture | null>(null);
-  const [visitLog, setVisitLog] = useState<Array<{ clientId: string; date: string }>>(() => {
+  const [legacyVisits] = useState<Array<{ clientId: string; date: string }>>(() => {
     try {
       return JSON.parse(localStorage.getItem(visitStorageKey) ?? "[]") as Array<{ clientId: string; date: string }>;
     } catch {
@@ -107,9 +133,9 @@ export function ClientsPage() {
     localStorage.setItem(clientStorageKey, JSON.stringify(customClients));
   }, [customClients]);
 
-  useEffect(() => {
-    localStorage.setItem(visitStorageKey, JSON.stringify(visitLog));
-  }, [visitLog]);
+  const visitLog = [...(isDemo ? legacyVisits : []), ...marks.marks.flatMap((mark) => (mark.visits ?? []).map((date) => ({ clientId: mark.client_id, date })))];
+  const visitedClientIds = new Set(visitLog.map((visit) => visit.clientId));
+  const scheduledIds = new Set((scheduled.data ?? []).map((event) => event.notes?.slice("client-map:".length)));
 
   const financeClients = finance.commissions
     .filter((commission) => commission.client)
@@ -126,7 +152,10 @@ export function ClientsPage() {
       y: 38 + (index % 3) * 12
     }));
 
-  const clients = [...demoClients, ...financeClients, ...customClients];
+  const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}` })) : []), ...financeClients, ...customClients].map((client) => {
+    const mark = marks.marks.find((item) => item.client_id === client.id);
+    return { ...client, photo: mark?.photo ?? ("photo" in client ? client.photo as string : undefined), bought: mark?.sold ?? client.bought };
+  });
   const cities = Array.from(new Set(clients.map((client) => client.city)));
   const profiles = Array.from(new Set(clients.map((client) => client.profile)));
   const stages = Array.from(new Set(clients.map((client) => client.stage)));
@@ -142,12 +171,12 @@ export function ClientsPage() {
   const profileChampion = topBy(clients, (client) => client.profile, (client) => client.downloads);
   const cityChampion = topBy(clients, (client) => client.city);
   const citySalesChampion = topBy(clients.filter((client) => client.bought), (client) => client.city);
-  const mappedClients = positionClients(filtered);
-  const selectedClient = mappedClients.find((client) => client.id === selectedClientId) ?? mappedClients[0];
+  const matchesMapFilter = (client: ClientMapItem, filter: string) => filter === "todos" || (filter === "vendi" && client.bought) || (filter === "visitei" && visitedClientIds.has(client.id)) || (filter === "agendadas" && (scheduledIds.has(client.id) || client.stage === "visita agendada")) || (filter === "sem-visita" && !visitedClientIds.has(client.id));
+  const mappedClients = positionClients(clients).filter((client) => filtered.some((item) => item.id === client.id) && matchesMapFilter(client, mapFilter));
+  const selectedClient = mappedClients.find((client) => client.id === selectedClientId);
   const now = new Date();
   const visitsThisMonth = visitLog.filter((visit) => isSameMonthKey(visit.date, now)).length;
   const visitsThisYear = visitLog.filter((visit) => new Date(visit.date).getFullYear() === now.getFullYear()).length;
-  const visitedClientIds = new Set(visitLog.map((visit) => visit.clientId));
   const selectedClientVisits = selectedClient ? visitLog.filter((visit) => visit.clientId === selectedClient.id) : [];
   const selectedVisitedToday = selectedClient ? visitLog.some((visit) => visit.clientId === selectedClient.id && isTodayKey(visit.date)) : false;
 
@@ -175,7 +204,7 @@ export function ClientsPage() {
     };
     setCustomClients((current) => [...current, next]);
     setCity(nextCity);
-    setSelectedClientId(next.id);
+    setSelectedClientId(null);
     toast({ title: "Cliente cadastrado no mapa." });
     event.currentTarget.reset();
   }
@@ -195,13 +224,58 @@ export function ClientsPage() {
     );
   }
 
-  function markVisit(client: ClientMapItem) {
-    const date = new Date().toISOString();
-    setVisitLog((current) => [...current, { clientId: client.id, date }]);
-    toast({ title: `Visita ao cliente ${client.name} marcada no mapa.` });
+  async function markVisit(client: ClientMapItem) {
+    if (marks.save.isPending || visitLog.some((visit) => visit.clientId === client.id && isTodayKey(visit.date))) return;
+    try {
+      const previous = marks.marks.find((mark) => mark.client_id === client.id);
+      await marks.save.mutateAsync({ client_id: client.id, visits: [...(previous?.visits ?? []), new Date().toISOString()] });
+      toast({ title: `Visita a ${client.name} registrada.` });
+    } catch { toast({ title: "Não foi possível registrar a visita. Tente novamente.", variant: "error" }); }
+  }
+
+  async function markSold(client: ClientMapItem) {
+    try {
+      await marks.save.mutateAsync({ client_id: client.id, sold: !client.bought });
+      toast({ title: client.bought ? "Marcação de venda removida." : "Cliente marcado como venda realizada." });
+    } catch { toast({ title: "Não foi possível salvar a marcação.", variant: "error" }); }
+  }
+
+  async function changePhoto(client: ClientMapItem, file?: File) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 300000) {
+      toast({ title: "Escolha uma foto JPG, PNG ou WebP de até 300 KB.", variant: "error" });
+      return;
+    }
+    try {
+      const photo = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await marks.save.mutateAsync({ client_id: client.id, photo });
+      toast({ title: "Foto atualizada." });
+    } catch { toast({ title: "Não foi possível salvar a foto.", variant: "error" }); }
+  }
+
+  async function scheduleVisit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!scheduleClient || calendar.createEvent.isPending) return;
+    const form = new FormData(event.currentTarget);
+    const date = String(form.get("date"));
+    const time = String(form.get("time"));
+    if (new Date(`${date}T${time}`).getTime() <= Date.now()) {
+      toast({ title: "Escolha uma data e horário futuros.", variant: "error" }); return;
+    }
+    try {
+      await calendar.createEvent.mutateAsync({ title: `Visita: ${scheduleClient.name}`, date, start_time: time, type: "visita", status: "agendado", location: `${scheduleClient.neighborhood}, ${scheduleClient.city}`, notes: `client-map:${scheduleClient.id}` });
+      setScheduleClient(null);
+      toast({ title: "Visita adicionada à agenda." });
+    } catch { toast({ title: "Não foi possível agendar. Seus dados foram mantidos.", variant: "error" }); }
   }
 
   function handleMapTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    gestureMoved.current = false;
     if (event.touches.length === 1) {
       const touch = event.touches[0];
       touchGesture.current = {
@@ -224,7 +298,7 @@ export function ClientsPage() {
   function handleMapTouchMove(event: React.TouchEvent<HTMLDivElement>) {
     const gesture = touchGesture.current;
     if (!gesture) return;
-    event.preventDefault();
+    if (gesture.mode === "zoom" || Math.hypot(event.touches[0].clientX - gesture.startX, event.touches[0].clientY - gesture.startY) > 8) gestureMoved.current = true;
     if (gesture.mode === "pan" && event.touches.length === 1) {
       const touch = event.touches[0];
       setMapTransform((current) => ({
@@ -256,7 +330,7 @@ export function ClientsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex min-w-0 flex-col gap-5">
       <section className="overflow-hidden rounded-[1.75rem] bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.34),_transparent_36%),linear-gradient(135deg,_#050403,_#15100b_58%,_#050403)] p-4 text-white shadow-soft md:rounded-[2rem] md:p-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -264,10 +338,7 @@ export function ClientsPage() {
               <Users className="h-3.5 w-3.5" />
               Carteira de clientes
             </div>
-            <h1 className="text-2xl font-semibold md:text-5xl">Clientes no mapa e na carteira.</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/62">
-              Visualize onde estão os clientes, quais perfis atraem mais interesse e quais cidades geram mais vendas.
-            </p>
+            <h1 className="text-2xl font-semibold">Meus clientes</h1>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <HeroStat label="Clientes" value={clients.length} />
@@ -277,19 +348,19 @@ export function ClientsPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="order-3 grid gap-3 md:grid-cols-3">
         <ChampionCard icon={Crown} label="Perfil mais baixado" value={profileChampion?.label ?? "Dados insuficientes"} helper={`${profileChampion?.score ?? 0} interações`} />
         <ChampionCard icon={MapPin} label="Cidade campeã" value={cityChampion?.label ?? "Dados insuficientes"} helper={`${cityChampion?.score ?? 0} clientes`} />
         <ChampionCard icon={Trophy} label="Cidade que mais vendeu" value={citySalesChampion?.label ?? "Dados insuficientes"} helper={`${citySalesChampion?.score ?? 0} vendas`} />
       </section>
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="order-4 grid gap-3 md:grid-cols-3">
         <ChampionCard icon={Check} label="Visitas feitas no mês" value={String(visitsThisMonth)} helper="clientes marcados como visitados" />
         <ChampionCard icon={Navigation} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} />
         <ChampionCard icon={Users} label="Clientes já visitados" value={String(visitedClientIds.size)} helper="clientes únicos com check" />
       </section>
 
-      <Card>
+      <Card className="order-1">
         <CardHeader>
           <CardTitle>Filtros da carteira</CardTitle>
           <CardDescription>Filtre por perfil de imóvel, cidade, etapa ou busca livre.</CardDescription>
@@ -297,15 +368,15 @@ export function ClientsPage() {
         <CardContent className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-11" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar cliente, bairro, imóvel..." />
+            <Input className="pl-11" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedClientId(null); }} placeholder="Buscar cliente, bairro, imóvel..." />
           </div>
-          <FilterSelect value={city} onValueChange={setCity} items={cities} placeholder="Cidade" />
-          <FilterSelect value={profile} onValueChange={setProfile} items={profiles} placeholder="Perfil" />
-          <FilterSelect value={stage} onValueChange={setStage} items={stages} placeholder="Etapa" />
+          <FilterSelect value={city} onValueChange={(value) => { setCity(value); setSelectedClientId(null); }} items={cities} placeholder="Cidade" />
+          <FilterSelect value={profile} onValueChange={(value) => { setProfile(value); setSelectedClientId(null); }} items={profiles} placeholder="Perfil" />
+          <FilterSelect value={stage} onValueChange={(value) => { setStage(value); setSelectedClientId(null); }} items={stages} placeholder="Etapa" />
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-primary/20">
+      <Card className="order-5 overflow-hidden border-primary/20">
         <CardHeader className="bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.14),_transparent_38%),hsl(var(--card))]">
           <CardTitle>Cadastrar cliente de teste</CardTitle>
           <CardDescription>O cliente entra na carteira e aparece no mapa automaticamente.</CardDescription>
@@ -342,12 +413,12 @@ export function ClientsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="overflow-hidden">
+      <div className="order-2 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Mapa de clientes</CardTitle>
-              <CardDescription>Pontos por coordenada, localização atual e rota rápida.</CardDescription>
+              <CardDescription>{mappedClients.length} clientes{isDemo ? " · Demonstração" : ""}</CardDescription>
             </div>
             <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={locateMe}>
               <LocateFixed className="h-4 w-4" />
@@ -355,8 +426,23 @@ export function ClientsPage() {
             </Button>
           </CardHeader>
           <CardContent>
+            <div className="mb-3 flex flex-wrap gap-2" aria-label="Filtrar marcações do mapa">
+              {([
+                ["todos", "Todos", Users, "text-foreground"],
+                ["vendi", "Vendi", Trophy, "text-emerald-600 dark:text-emerald-400"],
+                ["visitei", "Visitei", Check, "text-sky-600 dark:text-sky-400"],
+                ["agendadas", "Agendadas", CalendarPlus, "text-amber-600 dark:text-amber-400"],
+                ["sem-visita", "Sem visita", MapPin, "text-muted-foreground"]
+              ] as const).map(([value, label, Icon, color]) => (
+                <button key={value} type="button" aria-pressed={mapFilter === value} onClick={() => { setMapFilter(value); setSelectedClientId(null); }} className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors", mapFilter === value ? "border-primary bg-primary/10 ring-1 ring-primary" : "border-border bg-background hover:bg-muted")}>
+                  <Icon className={cn("h-4 w-4", color)} />{label}<span className="text-xs tabular-nums text-muted-foreground">{filtered.filter((client) => matchesMapFilter(client, value)).length}</span>
+                </button>
+              ))}
+            </div>
+            {(marks.error || scheduled.error) && <p role="alert" className="mb-3 text-sm text-destructive">Não foi possível carregar as marcações. <button className="underline" onClick={() => window.location.reload()}>Tentar novamente</button></p>}
             <div
-              className="relative min-h-[430px] touch-none overflow-hidden rounded-[1.75rem] border bg-[radial-gradient(circle_at_18%_20%,_rgba(218,165,57,0.20),_transparent_18%),radial-gradient(circle_at_78%_76%,_rgba(255,255,255,0.12),_transparent_24%),linear-gradient(135deg,_#070604,_#17110b_48%,_#030201)] p-4 text-white"
+              className="relative h-[440px] touch-none overflow-hidden rounded-lg border bg-zinc-100 text-foreground dark:bg-zinc-950 sm:h-[520px]"
+              onClick={() => { if (!gestureMoved.current) setSelectedClientId(null); }}
               onTouchStart={handleMapTouchStart}
               onTouchMove={handleMapTouchMove}
               onTouchEnd={handleMapTouchEnd}
@@ -380,48 +466,59 @@ export function ClientsPage() {
                   <button
                     key={client.id}
                     type="button"
-                    onClick={() => setSelectedClientId(client.id)}
+                    onClick={(event) => { event.stopPropagation(); if (!gestureMoved.current) setSelectedClientId(client.id); }}
+                    aria-label={`Abrir ${client.name}${client.bought ? ", venda realizada" : ""}${visitedClientIds.has(client.id) ? ", visitado" : ""}${scheduledIds.has(client.id) || client.stage === "visita agendada" ? ", visita agendada" : ""}`}
+                    aria-expanded={selectedClient?.id === client.id}
                     className={cn(
-                      "absolute z-20 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full p-2 text-primary-foreground shadow-[0_12px_30px_rgba(218,165,57,0.30)] transition hover:scale-110",
-                      selectedClient?.id === client.id ? "bg-white text-[#17120b] ring-4 ring-primary/40" : "bg-primary"
+                      "absolute z-20 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] bg-background shadow-lg transition hover:z-30 focus-visible:z-30 focus-visible:outline focus-visible:outline-4 focus-visible:outline-primary",
+                      client.bought ? "border-emerald-500" : visitedClientIds.has(client.id) ? "border-sky-500" : scheduledIds.has(client.id) || client.stage === "visita agendada" ? "border-amber-500" : "border-zinc-400",
+                      selectedClient?.id === client.id && "z-30 ring-4 ring-primary/40"
                     )}
                     style={{ left: `${client.x}%`, top: `${client.y}%` }}
                     title={`${client.name} - ${client.city}`}
                   >
-                    {visitedClientIds.has(client.id) ? <Check className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                    <ClientAvatar name={client.name} photo={client.photo} />
+                    <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 gap-0.5">
+                      {client.bought && <span className="rounded-full bg-emerald-600 p-1 text-white"><Trophy className="h-3 w-3" /></span>}
+                      {visitedClientIds.has(client.id) && <span className="rounded-full bg-sky-600 p-1 text-white"><Check className="h-3 w-3" /></span>}
+                      {(scheduledIds.has(client.id) || client.stage === "visita agendada") && <span className="rounded-full bg-amber-500 p-1 text-black"><CalendarPlus className="h-3 w-3" /></span>}
+                    </span>
                   </button>
                 ))}
               </div>
-              <div className="absolute left-4 top-4 z-30 rounded-full border border-white/10 bg-black/38 px-3 py-1 text-xs text-white/60 backdrop-blur">
-                1 dedo move • 2 dedos aproxima
-              </div>
+              {!mappedClients.length && <div className="absolute inset-0 grid place-content-center gap-3 p-8 text-center"><p>Nenhum cliente neste filtro.</p><Button variant="outline" onClick={() => { setMapFilter("todos"); setCity(allValue); setProfile(allValue); setStage(allValue); setQuery(""); }}>Limpar filtros</Button></div>}
               <button
                 type="button"
-                onClick={() => setMapTransform({ x: 0, y: 0, scale: 1 })}
-                className="absolute right-4 top-4 z-30 rounded-full border border-white/10 bg-black/38 px-3 py-1 text-xs font-semibold text-white/72 backdrop-blur"
+                aria-label="Centralizar mapa" title="Centralizar mapa"
+                onClick={(event) => { event.stopPropagation(); setMapTransform({ x: 0, y: 0, scale: 1 }); }}
+                className="absolute right-3 top-3 z-30 grid h-11 w-11 place-items-center rounded-lg border bg-background text-foreground shadow-md"
               >
-                Resetar
+                <RotateCcw className="h-4 w-4" />
               </button>
+            </div>
               {selectedClient && (
-                <div className="absolute inset-x-4 bottom-4 z-30 rounded-3xl border border-white/10 bg-black/58 p-4 text-white shadow-2xl backdrop-blur md:left-auto md:w-[330px]">
+                <div className="mt-3 rounded-lg border bg-card p-4" aria-label={`Detalhes de ${selectedClient.name}`}>
                   <div className="flex items-start justify-between gap-3">
+                    <div className="h-12 w-12 shrink-0"><ClientAvatar name={selectedClient.name} photo={selectedClient.photo} /></div>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{selectedClient.name}</p>
-                      <p className="truncate text-sm text-white/62">{selectedClient.city} • {selectedClient.neighborhood}</p>
+                      <p className="break-words font-semibold">{selectedClient.name}</p>
+                      <p className="text-sm text-muted-foreground">{selectedClient.city} • {selectedClient.neighborhood}</p>
                     </div>
-                    <span className="rounded-full border border-primary/30 bg-primary/15 px-2 py-1 text-[0.68rem] font-semibold text-primary">{selectedClient.stage}</span>
+                    <Button variant="ghost" className="ml-auto h-11 w-11 shrink-0 p-0" aria-label="Fechar detalhes do cliente" onClick={() => setSelectedClientId(null)}><X className="h-5 w-5" /></Button>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <MapMini label="Perfil" value={selectedClient.profile} />
                     <MapMini label="Visitas feitas" value={selectedClientVisits.length} />
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <Button type="button" className="min-h-10" onClick={() => markVisit(selectedClient)}>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" className="min-h-11" disabled={marks.save.isPending || selectedVisitedToday || marks.loading || Boolean(marks.error)} onClick={() => markVisit(selectedClient)}>
                       <Check className="h-4 w-4" />
-                      {selectedVisitedToday ? "Visitado hoje" : "Marcar visita"}
+                      {selectedVisitedToday ? "Visitado hoje" : "Visitei"}
                     </Button>
+                    <Button type="button" variant="outline" className={cn("min-h-11", selectedClient.bought && "text-emerald-600")} aria-pressed={selectedClient.bought} disabled={marks.save.isPending || marks.loading || Boolean(marks.error)} onClick={() => markSold(selectedClient)}><Trophy className="h-4 w-4" />{selectedClient.bought ? "Vendido" : "Vendi"}</Button>
+                    <Button type="button" className="col-span-2 min-h-11" onClick={() => setScheduleClient(selectedClient)}><CalendarPlus className="h-4 w-4" />Agendar visita</Button>
                     <a
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/[0.08] px-4 text-sm font-semibold text-white"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold"
                       href={mapsUrl(selectedClient)}
                       target="_blank"
                       rel="noreferrer"
@@ -429,13 +526,14 @@ export function ClientsPage() {
                       Rota
                       <ExternalLink className="h-4 w-4" />
                     </a>
+                    <label className="relative inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium"><Camera className="h-4 w-4" />Foto<input aria-label={`Foto de ${selectedClient.name}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={marks.save.isPending || marks.loading || Boolean(marks.error)} className="absolute inset-0 w-full cursor-pointer opacity-0" onChange={(event) => { void changePhoto(selectedClient, event.target.files?.[0]); event.target.value = ""; }} /></label>
                   </div>
+                  {(scheduled.data ?? []).filter((event) => event.notes === `client-map:${selectedClient.id}`).map((event) => <div key={event.id} className="mt-3 flex items-center justify-between gap-2 border-t pt-3 text-sm"><span>Visita: {formatVisitDate(`${event.date}T${event.start_time}`)}</span><Button variant="ghost" disabled={calendar.updateEvent.isPending} aria-label="Cancelar visita" onClick={async () => { try { await calendar.updateEvent.mutateAsync({ id: event.id, input: { status: "cancelado" } }); toast({ title: "Visita cancelada." }); } catch { toast({ title: "Não foi possível cancelar.", variant: "error" }); } }}><X className="h-4 w-4" /></Button></div>)}
                   {selectedClientVisits[0] && (
-                    <p className="mt-2 text-xs text-white/52">Última visita: {formatVisitDate(selectedClientVisits[selectedClientVisits.length - 1].date)}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">Última visita: {formatVisitDate(selectedClientVisits[selectedClientVisits.length - 1].date)}</p>
                   )}
                 </div>
               )}
-            </div>
           </CardContent>
         </Card>
 
@@ -460,7 +558,7 @@ export function ClientsPage() {
                   <Mini label="Perfil" value={client.profile} />
                   <Mini label="Visitas" value={visitLog.filter((visit) => visit.clientId === client.id).length} />
                 </div>
-                <Button className="mt-3 w-full" variant="outline" size="sm" onClick={() => markVisit(client)}>
+                <Button className="mt-3 w-full" variant="outline" size="sm" disabled={marks.save.isPending || marks.loading || Boolean(marks.error) || visitLog.some((visit) => visit.clientId === client.id && isTodayKey(visit.date))} onClick={() => markVisit(client)}>
                   <Check className="h-4 w-4" />
                   Marcar visita feita
                 </Button>
@@ -469,6 +567,16 @@ export function ClientsPage() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={Boolean(scheduleClient)} onOpenChange={(open) => { if (!open && !calendar.createEvent.isPending) setScheduleClient(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Agendar visita</DialogTitle><DialogDescription>{scheduleClient?.name}</DialogDescription></DialogHeader>
+          <form onSubmit={scheduleVisit} className="space-y-4">
+            <div className="space-y-2"><Label htmlFor="visit-date">Data</Label><Input id="visit-date" name="date" type="date" min={format(new Date(), "yyyy-MM-dd")} defaultValue={format(new Date(), "yyyy-MM-dd")} required /></div>
+            <div className="space-y-2"><Label htmlFor="visit-time">Horário</Label><Input id="visit-time" name="time" type="time" required /></div>
+            <Button className="min-h-11 w-full" disabled={calendar.createEvent.isPending}>{calendar.createEvent.isPending ? "Salvando..." : "Confirmar visita"}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -480,7 +588,7 @@ function FilterSelect({ value, onValueChange, items, placeholder }: { value: str
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={allValue}>Todos</SelectItem>
+        <SelectItem value={allValue}>{placeholder}: todos</SelectItem>
         {items.map((item) => (
           <SelectItem key={item} value={item}>{item}</SelectItem>
         ))}
@@ -522,9 +630,9 @@ function Mini({ label, value }: { label: string; value: string | number }) {
 
 function MapMini({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-2.5">
-      <p className="text-[0.68rem] text-white/45">{label}</p>
-      <p className="mt-1 truncate font-semibold">{value}</p>
+    <div className="min-w-0 rounded-lg bg-muted p-2.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words font-semibold">{value}</p>
     </div>
   );
 }
