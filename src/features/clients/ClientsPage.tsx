@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Crown, ExternalLink, LocateFixed, MapPin, Navigation, Plus, Search, Trophy, Users } from "lucide-react";
+import { Check, Crown, ExternalLink, LocateFixed, MapPin, Navigation, Plus, Search, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,7 @@ const demoClients: ClientMapItem[] = [
 
 const allValue = "todos";
 const clientStorageKey = "mv-broker-clients";
+const visitStorageKey = "mv-broker-client-visits";
 const cityCoordinates: Record<string, { lat: number; lng: number }> = {
   "são paulo": { lat: -23.5558, lng: -46.6396 },
   "sao paulo": { lat: -23.5558, lng: -46.6396 },
@@ -72,10 +73,21 @@ export function ClientsPage() {
   const [stage, setStage] = useState(allValue);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [visitLog, setVisitLog] = useState<Array<{ clientId: string; date: string }>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(visitStorageKey) ?? "[]") as Array<{ clientId: string; date: string }>;
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem(clientStorageKey, JSON.stringify(customClients));
   }, [customClients]);
+
+  useEffect(() => {
+    localStorage.setItem(visitStorageKey, JSON.stringify(visitLog));
+  }, [visitLog]);
 
   const financeClients = finance.commissions
     .filter((commission) => commission.client)
@@ -110,6 +122,12 @@ export function ClientsPage() {
   const citySalesChampion = topBy(clients.filter((client) => client.bought), (client) => client.city);
   const mappedClients = positionClients(filtered);
   const selectedClient = mappedClients.find((client) => client.id === selectedClientId) ?? mappedClients[0];
+  const now = new Date();
+  const visitsThisMonth = visitLog.filter((visit) => isSameMonthKey(visit.date, now)).length;
+  const visitsThisYear = visitLog.filter((visit) => new Date(visit.date).getFullYear() === now.getFullYear()).length;
+  const visitedClientIds = new Set(visitLog.map((visit) => visit.clientId));
+  const selectedClientVisits = selectedClient ? visitLog.filter((visit) => visit.clientId === selectedClient.id) : [];
+  const selectedVisitedToday = selectedClient ? visitLog.some((visit) => visit.clientId === selectedClient.id && isTodayKey(visit.date)) : false;
 
   function addClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,6 +173,12 @@ export function ClientsPage() {
     );
   }
 
+  function markVisit(client: ClientMapItem) {
+    const date = new Date().toISOString();
+    setVisitLog((current) => [...current, { clientId: client.id, date }]);
+    toast({ title: `Visita ao cliente ${client.name} marcada no mapa.` });
+  }
+
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[1.75rem] bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.34),_transparent_36%),linear-gradient(135deg,_#050403,_#15100b_58%,_#050403)] p-4 text-white shadow-soft md:rounded-[2rem] md:p-8">
@@ -181,6 +205,12 @@ export function ClientsPage() {
         <ChampionCard icon={Crown} label="Perfil mais baixado" value={profileChampion?.label ?? "Dados insuficientes"} helper={`${profileChampion?.score ?? 0} interações`} />
         <ChampionCard icon={MapPin} label="Cidade campeã" value={cityChampion?.label ?? "Dados insuficientes"} helper={`${cityChampion?.score ?? 0} clientes`} />
         <ChampionCard icon={Trophy} label="Cidade que mais vendeu" value={citySalesChampion?.label ?? "Dados insuficientes"} helper={`${citySalesChampion?.score ?? 0} vendas`} />
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <ChampionCard icon={Check} label="Visitas feitas no mês" value={String(visitsThisMonth)} helper="clientes marcados como visitados" />
+        <ChampionCard icon={Navigation} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} />
+        <ChampionCard icon={Users} label="Clientes já visitados" value={String(visitedClientIds.size)} helper="clientes únicos com check" />
       </section>
 
       <Card>
@@ -274,7 +304,7 @@ export function ClientsPage() {
                   style={{ left: `${client.x}%`, top: `${client.y}%` }}
                   title={`${client.name} - ${client.city}`}
                 >
-                  <MapPin className="h-4 w-4" />
+                  {visitedClientIds.has(client.id) ? <Check className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
                 </button>
               ))}
               {selectedClient && (
@@ -288,17 +318,26 @@ export function ClientsPage() {
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <MapMini label="Perfil" value={selectedClient.profile} />
-                    <MapMini label="Interações" value={selectedClient.downloads} />
+                    <MapMini label="Visitas feitas" value={selectedClientVisits.length} />
                   </div>
-                  <a
-                    className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground"
-                    href={mapsUrl(selectedClient)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Abrir rota
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <Button type="button" className="min-h-10" onClick={() => markVisit(selectedClient)}>
+                      <Check className="h-4 w-4" />
+                      {selectedVisitedToday ? "Visitado hoje" : "Marcar visita"}
+                    </Button>
+                    <a
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/[0.08] px-4 text-sm font-semibold text-white"
+                      href={mapsUrl(selectedClient)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Rota
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                  {selectedClientVisits[0] && (
+                    <p className="mt-2 text-xs text-white/52">Última visita: {formatVisitDate(selectedClientVisits[selectedClientVisits.length - 1].date)}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -324,8 +363,12 @@ export function ClientsPage() {
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <Mini label="Perfil" value={client.profile} />
-                  <Mini label="Downloads" value={client.downloads} />
+                  <Mini label="Visitas" value={visitLog.filter((visit) => visit.clientId === client.id).length} />
                 </div>
+                <Button className="mt-3 w-full" variant="outline" size="sm" onClick={() => markVisit(client)}>
+                  <Check className="h-4 w-4" />
+                  Marcar visita feita
+                </Button>
               </article>
             ))}
           </CardContent>
@@ -469,4 +512,25 @@ function mapsUrl(client: ClientMapItem) {
     return `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`;
   }
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.name} ${client.neighborhood} ${client.city}`)}`;
+}
+
+function isSameMonthKey(date: string, reference: Date) {
+  const parsed = new Date(date);
+  return parsed.getFullYear() === reference.getFullYear() && parsed.getMonth() === reference.getMonth();
+}
+
+function isTodayKey(date: string) {
+  const parsed = new Date(date);
+  const now = new Date();
+  return parsed.toDateString() === now.toDateString();
+}
+
+function formatVisitDate(date: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(date));
 }
