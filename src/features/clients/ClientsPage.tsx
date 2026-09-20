@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Crown, ExternalLink, LocateFixed, MapPin, Navigation, Plus, Search, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,26 @@ type ClientMapItem = {
   lat?: number;
   lng?: number;
 };
+
+type MapTransform = {
+  x: number;
+  y: number;
+  scale: number;
+};
+
+type TouchGesture =
+  | {
+      mode: "pan";
+      startX: number;
+      startY: number;
+      originX: number;
+      originY: number;
+    }
+  | {
+      mode: "zoom";
+      startDistance: number;
+      startScale: number;
+    };
 
 const demoClients: ClientMapItem[] = [
   { id: "1", name: "Mariana Alves", city: "São Paulo", neighborhood: "Mooca", profile: "Apartamento 2 quartos", stage: "visita agendada", bought: false, downloads: 9, x: 58, y: 50, lat: -23.558, lng: -46.596 },
@@ -73,6 +93,8 @@ export function ClientsPage() {
   const [stage, setStage] = useState(allValue);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapTransform, setMapTransform] = useState<MapTransform>({ x: 0, y: 0, scale: 1 });
+  const touchGesture = useRef<TouchGesture | null>(null);
   const [visitLog, setVisitLog] = useState<Array<{ clientId: string; date: string }>>(() => {
     try {
       return JSON.parse(localStorage.getItem(visitStorageKey) ?? "[]") as Array<{ clientId: string; date: string }>;
@@ -179,6 +201,60 @@ export function ClientsPage() {
     toast({ title: `Visita ao cliente ${client.name} marcada no mapa.` });
   }
 
+  function handleMapTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      touchGesture.current = {
+        mode: "pan",
+        startX: touch.clientX,
+        startY: touch.clientY,
+        originX: mapTransform.x,
+        originY: mapTransform.y
+      };
+    }
+    if (event.touches.length === 2) {
+      touchGesture.current = {
+        mode: "zoom",
+        startDistance: touchDistance(event.touches[0], event.touches[1]),
+        startScale: mapTransform.scale
+      };
+    }
+  }
+
+  function handleMapTouchMove(event: React.TouchEvent<HTMLDivElement>) {
+    const gesture = touchGesture.current;
+    if (!gesture) return;
+    event.preventDefault();
+    if (gesture.mode === "pan" && event.touches.length === 1) {
+      const touch = event.touches[0];
+      setMapTransform((current) => ({
+        ...current,
+        x: clampPan(gesture.originX + touch.clientX - gesture.startX),
+        y: clampPan(gesture.originY + touch.clientY - gesture.startY)
+      }));
+    }
+    if (gesture.mode === "zoom" && event.touches.length === 2) {
+      const nextDistance = touchDistance(event.touches[0], event.touches[1]);
+      const nextScale = clampScale(gesture.startScale * (nextDistance / gesture.startDistance));
+      setMapTransform((current) => ({
+        ...current,
+        scale: nextScale
+      }));
+    }
+  }
+
+  function handleMapTouchEnd() {
+    touchGesture.current = null;
+  }
+
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setMapTransform((current) => ({
+      ...current,
+      scale: clampScale(current.scale + (event.deltaY > 0 ? -0.12 : 0.12))
+    }));
+  }
+
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[1.75rem] bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.34),_transparent_36%),linear-gradient(135deg,_#050403,_#15100b_58%,_#050403)] p-4 text-white shadow-soft md:rounded-[2rem] md:p-8">
@@ -279,34 +355,53 @@ export function ClientsPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="relative min-h-[430px] overflow-hidden rounded-[1.75rem] border bg-[radial-gradient(circle_at_18%_20%,_rgba(218,165,57,0.20),_transparent_18%),radial-gradient(circle_at_78%_76%,_rgba(255,255,255,0.12),_transparent_24%),linear-gradient(135deg,_#070604,_#17110b_48%,_#030201)] p-4 text-white">
-              <div className="absolute inset-x-8 top-1/2 h-px bg-white/10" />
-              <div className="absolute inset-y-8 left-1/2 w-px bg-white/10" />
-              <div className="absolute left-[12%] top-[28%] h-24 w-48 rotate-[-18deg] rounded-full border border-primary/20" />
-              <div className="absolute bottom-[18%] right-[12%] h-28 w-56 rotate-[22deg] rounded-full border border-white/10" />
-              <div className="absolute left-6 top-6 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur">
-                {mappedClients.length} clientes mapeados
+            <div
+              className="relative min-h-[430px] touch-none overflow-hidden rounded-[1.75rem] border bg-[radial-gradient(circle_at_18%_20%,_rgba(218,165,57,0.20),_transparent_18%),radial-gradient(circle_at_78%_76%,_rgba(255,255,255,0.12),_transparent_24%),linear-gradient(135deg,_#070604,_#17110b_48%,_#030201)] p-4 text-white"
+              onTouchStart={handleMapTouchStart}
+              onTouchMove={handleMapTouchMove}
+              onTouchEnd={handleMapTouchEnd}
+              onTouchCancel={handleMapTouchEnd}
+              onWheel={handleWheel}
+            >
+              <div
+                className="absolute inset-0 transition-transform duration-75 ease-out"
+                style={{ transform: `translate3d(${mapTransform.x}px, ${mapTransform.y}px, 0) scale(${mapTransform.scale})` }}
+              >
+                <div className="absolute inset-x-8 top-1/2 h-px bg-white/10" />
+                <div className="absolute inset-y-8 left-1/2 w-px bg-white/10" />
+                <div className="absolute left-[12%] top-[28%] h-24 w-48 rotate-[-18deg] rounded-full border border-primary/20" />
+                <div className="absolute bottom-[18%] right-[12%] h-28 w-56 rotate-[22deg] rounded-full border border-white/10" />
+                {currentLocation && (
+                  <div className="absolute left-1/2 top-1/2 z-10 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-sky-500 shadow-[0_0_0_8px_rgba(14,165,233,0.18)]" title="Sua localização">
+                    <Navigation className="h-4 w-4" />
+                  </div>
+                )}
+                {mappedClients.map((client) => (
+                  <button
+                    key={client.id}
+                    type="button"
+                    onClick={() => setSelectedClientId(client.id)}
+                    className={cn(
+                      "absolute z-20 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full p-2 text-primary-foreground shadow-[0_12px_30px_rgba(218,165,57,0.30)] transition hover:scale-110",
+                      selectedClient?.id === client.id ? "bg-white text-[#17120b] ring-4 ring-primary/40" : "bg-primary"
+                    )}
+                    style={{ left: `${client.x}%`, top: `${client.y}%` }}
+                    title={`${client.name} - ${client.city}`}
+                  >
+                    {visitedClientIds.has(client.id) ? <Check className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                  </button>
+                ))}
               </div>
-              {currentLocation && (
-                <div className="absolute left-1/2 top-1/2 z-10 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-sky-500 shadow-[0_0_0_8px_rgba(14,165,233,0.18)]" title="Sua localização">
-                  <Navigation className="h-4 w-4" />
-                </div>
-              )}
-              {mappedClients.map((client) => (
-                <button
-                  key={client.id}
-                  type="button"
-                  onClick={() => setSelectedClientId(client.id)}
-                  className={cn(
-                    "absolute z-20 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full p-2 text-primary-foreground shadow-[0_12px_30px_rgba(218,165,57,0.30)] transition hover:scale-110",
-                    selectedClient?.id === client.id ? "bg-white text-[#17120b] ring-4 ring-primary/40" : "bg-primary"
-                  )}
-                  style={{ left: `${client.x}%`, top: `${client.y}%` }}
-                  title={`${client.name} - ${client.city}`}
-                >
-                  {visitedClientIds.has(client.id) ? <Check className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
-                </button>
-              ))}
+              <div className="absolute left-4 top-4 z-30 rounded-full border border-white/10 bg-black/38 px-3 py-1 text-xs text-white/60 backdrop-blur">
+                1 dedo move • 2 dedos aproxima
+              </div>
+              <button
+                type="button"
+                onClick={() => setMapTransform({ x: 0, y: 0, scale: 1 })}
+                className="absolute right-4 top-4 z-30 rounded-full border border-white/10 bg-black/38 px-3 py-1 text-xs font-semibold text-white/72 backdrop-blur"
+              >
+                Resetar
+              </button>
               {selectedClient && (
                 <div className="absolute inset-x-4 bottom-4 z-30 rounded-3xl border border-white/10 bg-black/58 p-4 text-white shadow-2xl backdrop-blur md:left-auto md:w-[330px]">
                   <div className="flex items-start justify-between gap-3">
@@ -505,6 +600,18 @@ function coordinatesForCity(city: string, index: number) {
 
 function clampMap(value: number) {
   return Math.max(8, Math.min(92, value));
+}
+
+function clampPan(value: number) {
+  return Math.max(-240, Math.min(240, value));
+}
+
+function clampScale(value: number) {
+  return Math.max(1, Math.min(2.8, value));
+}
+
+function touchDistance(first: React.Touch, second: React.Touch) {
+  return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
 }
 
 function mapsUrl(client: ClientMapItem) {
