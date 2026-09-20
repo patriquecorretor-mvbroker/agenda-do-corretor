@@ -1,7 +1,22 @@
 import { useMemo, useState } from "react";
 import { format, isBefore, isToday, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarCheck2, CheckCircle2, CloudSun, Clock, ListChecks, Target, TrendingUp, WalletCards } from "lucide-react";
+import {
+  Building2,
+  CalendarCheck2,
+  CheckCircle2,
+  CloudSun,
+  Clock,
+  Handshake,
+  Home,
+  ListChecks,
+  Percent,
+  PhoneCall,
+  Target,
+  TrendingUp,
+  Users,
+  WalletCards
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +31,7 @@ import { useTasks } from "@/features/tasks/use-tasks";
 import { useProfile } from "@/features/profile/use-profile";
 import { useFinance } from "@/features/finance/use-finance";
 import { getWeather, weatherMessage } from "@/features/dashboard/weather-service";
+import { hasSupabaseConfig } from "@/lib/supabase";
 import type { AppView } from "@/types/ui";
 
 const phrases = [
@@ -50,6 +66,32 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
   const dailyGoalTotal = Math.max(events.length + todayTasks.length, 1);
   const dailyDone = completedEvents.length + todayTasks.filter((task) => task.status === "concluída").length;
   const dailyProgress = clampPercent((dailyDone / dailyGoalTotal) * 100);
+  const commercialMetrics = useMemo(() => {
+    const demoMode = !hasSupabaseConfig;
+    const visitedProperties = events.filter((event) => event.type === "visita" && event.status === "concluído").length;
+    const scheduledVisits = events.filter((event) => event.type === "visita" && event.status === "agendado").length;
+    const convertedSales = finance.commissions.filter((commission) =>
+      ["confirmada", "parcialmente recebida", "recebida"].includes(commission.status)
+    ).length;
+    const leadCount = demoMode ? 18 : 0;
+    const contactedLeads = demoMode ? 11 : 0;
+    const uniqueClients = new Set(finance.commissions.map((commission) => commission.client).filter(Boolean)).size;
+    const propertyProfile = mostServedPropertyProfile(finance.commissions.map((commission) => commission.property ?? commission.development).filter(Boolean) as string[]);
+    const conversionBase = leadCount || contactedLeads;
+    const conversionRate = conversionBase ? clampPercent((convertedSales / conversionBase) * 100) : null;
+
+    return {
+      demoMode,
+      visitedProperties: visitedProperties || (demoMode ? 3 : 0),
+      leadsReceived: leadCount,
+      contactedLeads,
+      scheduledVisits: scheduledVisits || (demoMode ? 4 : 0),
+      convertedSales,
+      conversionRate,
+      propertyProfile: propertyProfile ?? (demoMode ? "Apartamento 2 quartos" : "Dados insuficientes"),
+      clientPortfolio: uniqueClients || (demoMode ? 12 : 0)
+    };
+  }, [events, finance.commissions]);
 
   const priorities = useMemo(() => {
     return tasks
@@ -107,6 +149,34 @@ export function DashboardPage({ onNavigate }: { onNavigate: (view: AppView) => v
         <SummaryCard icon={TrendingUp} label="Progresso mensal" value="0%" onClick={() => onNavigate("goals")} />
         <SummaryCard icon={Clock} label="Atrasados" value={overdueEvents.length} />
       </section>
+
+      <Card className="overflow-hidden border-primary/20">
+        <CardHeader className="bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.16),_transparent_38%),linear-gradient(135deg,_hsl(var(--card)),_hsl(var(--muted)))]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Performance comercial</CardTitle>
+              <CardDescription>
+                Visitas, leads, conversão e carteira em leitura rápida.
+              </CardDescription>
+            </div>
+            {commercialMetrics.demoMode && (
+              <span className="w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                dados demo/local
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-3 sm:grid-cols-2 md:p-4 xl:grid-cols-4">
+          <CommercialCard icon={Building2} label="Imóveis visitados" value={commercialMetrics.visitedProperties} helper="visitas concluídas" />
+          <CommercialCard icon={Users} label="Leads recebidos" value={commercialMetrics.leadsReceived} helper={commercialMetrics.demoMode ? "visualização demo" : "aguardando módulo de leads"} />
+          <CommercialCard icon={PhoneCall} label="Leads em contato" value={commercialMetrics.contactedLeads} helper={commercialMetrics.demoMode ? "em acompanhamento" : "aguardando CRM"} />
+          <CommercialCard icon={CalendarCheck2} label="Visitas agendadas" value={commercialMetrics.scheduledVisits} helper="visitas abertas hoje" />
+          <CommercialCard icon={Handshake} label="Vendas convertidas" value={commercialMetrics.convertedSales} helper="comissões confirmadas" />
+          <CommercialCard icon={Percent} label="Aproveitamento" value={commercialMetrics.conversionRate === null ? "--" : `${commercialMetrics.conversionRate}%`} helper="vendas / leads" />
+          <CommercialCard icon={Home} label="Perfil mais atendido" value={commercialMetrics.propertyProfile} helper="baseado nas vendas" wide />
+          <CommercialCard icon={Target} label="Carteira de clientes" value={commercialMetrics.clientPortfolio} helper="clientes únicos" />
+        </CardContent>
+      </Card>
 
       <button
         type="button"
@@ -261,6 +331,51 @@ function SummaryCard({ icon: Icon, label, value, onClick }: { icon: React.Elemen
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </Comp>
   );
+}
+
+function CommercialCard({
+  icon: Icon,
+  label,
+  value,
+  helper,
+  wide
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: number | string;
+  helper: string;
+  wide?: boolean;
+}) {
+  return (
+    <div className={wide ? "rounded-3xl border bg-card p-4 shadow-sm sm:col-span-2 xl:col-span-1" : "rounded-3xl border bg-card p-4 shadow-sm"}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/12 text-primary">
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+    </div>
+  );
+}
+
+function mostServedPropertyProfile(properties: string[]) {
+  if (!properties.length) return null;
+  const profiles = properties.map((property) => {
+    const lower = property.toLowerCase();
+    if (lower.includes("apart")) return "Apartamento";
+    if (lower.includes("casa")) return "Casa";
+    if (lower.includes("terreno")) return "Terreno";
+    if (lower.includes("studio")) return "Studio";
+    if (lower.includes("cobertura")) return "Cobertura";
+    return property;
+  });
+  const counts = profiles.reduce<Record<string, number>>((acc, profile) => {
+    acc[profile] = (acc[profile] ?? 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
 function WeatherMini({ weather, loading }: { weather?: Awaited<ReturnType<typeof getWeather>>; loading: boolean }) {
