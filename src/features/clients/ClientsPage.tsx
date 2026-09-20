@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Crown, MapPin, Plus, Search, Trophy, Users } from "lucide-react";
+import { Crown, ExternalLink, LocateFixed, MapPin, Navigation, Plus, Search, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,23 +22,39 @@ type ClientMapItem = {
   downloads: number;
   x: number;
   y: number;
+  lat?: number;
+  lng?: number;
 };
 
 const demoClients: ClientMapItem[] = [
-  { id: "1", name: "Mariana Alves", city: "São Paulo", neighborhood: "Mooca", profile: "Apartamento 2 quartos", stage: "visita agendada", bought: false, downloads: 9, x: 58, y: 50 },
-  { id: "2", name: "Carlos Mendes", city: "São Paulo", neighborhood: "Tatuapé", profile: "Apartamento 2 quartos", stage: "comprador", bought: true, downloads: 12, x: 64, y: 44 },
-  { id: "3", name: "Renata Lima", city: "Guarulhos", neighborhood: "Centro", profile: "Casa em condomínio", stage: "em contato", bought: false, downloads: 5, x: 70, y: 31 },
-  { id: "4", name: "Felipe Rocha", city: "Santo André", neighborhood: "Campestre", profile: "Studio", stage: "lead", bought: false, downloads: 4, x: 62, y: 67 },
-  { id: "5", name: "Aline Souza", city: "São Bernardo", neighborhood: "Jardim do Mar", profile: "Apartamento 3 quartos", stage: "comprador", bought: true, downloads: 8, x: 52, y: 75 },
-  { id: "6", name: "Bruno Costa", city: "Osasco", neighborhood: "Centro", profile: "Apartamento 2 quartos", stage: "pós-venda", bought: true, downloads: 7, x: 34, y: 50 },
-  { id: "7", name: "Patrícia Gomes", city: "Barueri", neighborhood: "Alphaville", profile: "Casa em condomínio", stage: "em contato", bought: false, downloads: 11, x: 25, y: 42 },
-  { id: "8", name: "Eduardo Nunes", city: "Campinas", neighborhood: "Cambuí", profile: "Apartamento alto padrão", stage: "lead", bought: false, downloads: 6, x: 18, y: 28 },
-  { id: "9", name: "Bianca Reis", city: "Sorocaba", neighborhood: "Campolim", profile: "Casa em condomínio", stage: "visita agendada", bought: false, downloads: 10, x: 23, y: 78 },
-  { id: "10", name: "Rafael Martins", city: "Santos", neighborhood: "Ponta da Praia", profile: "Apartamento vista mar", stage: "comprador", bought: true, downloads: 14, x: 76, y: 84 }
+  { id: "1", name: "Mariana Alves", city: "São Paulo", neighborhood: "Mooca", profile: "Apartamento 2 quartos", stage: "visita agendada", bought: false, downloads: 9, x: 58, y: 50, lat: -23.558, lng: -46.596 },
+  { id: "2", name: "Carlos Mendes", city: "São Paulo", neighborhood: "Tatuapé", profile: "Apartamento 2 quartos", stage: "comprador", bought: true, downloads: 12, x: 64, y: 44, lat: -23.540, lng: -46.576 },
+  { id: "3", name: "Renata Lima", city: "Guarulhos", neighborhood: "Centro", profile: "Casa em condomínio", stage: "em contato", bought: false, downloads: 5, x: 70, y: 31, lat: -23.454, lng: -46.533 },
+  { id: "4", name: "Felipe Rocha", city: "Santo André", neighborhood: "Campestre", profile: "Studio", stage: "lead", bought: false, downloads: 4, x: 62, y: 67, lat: -23.654, lng: -46.536 },
+  { id: "5", name: "Aline Souza", city: "São Bernardo", neighborhood: "Jardim do Mar", profile: "Apartamento 3 quartos", stage: "comprador", bought: true, downloads: 8, x: 52, y: 75, lat: -23.695, lng: -46.552 },
+  { id: "6", name: "Bruno Costa", city: "Osasco", neighborhood: "Centro", profile: "Apartamento 2 quartos", stage: "pós-venda", bought: true, downloads: 7, x: 34, y: 50, lat: -23.532, lng: -46.792 },
+  { id: "7", name: "Patrícia Gomes", city: "Barueri", neighborhood: "Alphaville", profile: "Casa em condomínio", stage: "em contato", bought: false, downloads: 11, x: 25, y: 42, lat: -23.497, lng: -46.850 },
+  { id: "8", name: "Eduardo Nunes", city: "Campinas", neighborhood: "Cambuí", profile: "Apartamento alto padrão", stage: "lead", bought: false, downloads: 6, x: 18, y: 28, lat: -22.900, lng: -47.057 },
+  { id: "9", name: "Bianca Reis", city: "Sorocaba", neighborhood: "Campolim", profile: "Casa em condomínio", stage: "visita agendada", bought: false, downloads: 10, x: 23, y: 78, lat: -23.501, lng: -47.458 },
+  { id: "10", name: "Rafael Martins", city: "Santos", neighborhood: "Ponta da Praia", profile: "Apartamento vista mar", stage: "comprador", bought: true, downloads: 14, x: 76, y: 84, lat: -23.985, lng: -46.296 }
 ];
 
 const allValue = "todos";
 const clientStorageKey = "mv-broker-clients";
+const cityCoordinates: Record<string, { lat: number; lng: number }> = {
+  "são paulo": { lat: -23.5558, lng: -46.6396 },
+  "sao paulo": { lat: -23.5558, lng: -46.6396 },
+  guarulhos: { lat: -23.4543, lng: -46.5337 },
+  "santo andre": { lat: -23.6639, lng: -46.5383 },
+  "santo andré": { lat: -23.6639, lng: -46.5383 },
+  "são bernardo": { lat: -23.6914, lng: -46.5646 },
+  "sao bernardo": { lat: -23.6914, lng: -46.5646 },
+  osasco: { lat: -23.5329, lng: -46.7918 },
+  barueri: { lat: -23.5112, lng: -46.8764 },
+  campinas: { lat: -22.9056, lng: -47.0608 },
+  sorocaba: { lat: -23.5015, lng: -47.4526 },
+  santos: { lat: -23.9608, lng: -46.3336 }
+};
 
 export function ClientsPage() {
   const finance = useFinance();
@@ -54,6 +70,8 @@ export function ClientsPage() {
   const [city, setCity] = useState(allValue);
   const [profile, setProfile] = useState(allValue);
   const [stage, setStage] = useState(allValue);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     localStorage.setItem(clientStorageKey, JSON.stringify(customClients));
@@ -64,7 +82,7 @@ export function ClientsPage() {
     .map((commission, index) => ({
       id: `sale-${commission.id}`,
       name: commission.client ?? "Cliente",
-      city: "Carteira",
+      city: commission.builder ?? "Carteira",
       neighborhood: commission.builder ?? "Venda vinculada",
       profile: commission.property ?? commission.development ?? "Imóvel vendido",
       stage: "comprador" as ClientStage,
@@ -90,6 +108,8 @@ export function ClientsPage() {
   const profileChampion = topBy(clients, (client) => client.profile, (client) => client.downloads);
   const cityChampion = topBy(clients, (client) => client.city);
   const citySalesChampion = topBy(clients.filter((client) => client.bought), (client) => client.city);
+  const mappedClients = positionClients(filtered);
+  const selectedClient = mappedClients.find((client) => client.id === selectedClientId) ?? mappedClients[0];
 
   function addClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,6 +119,7 @@ export function ClientsPage() {
     const nextProfile = String(form.get("profile") || "").trim();
     if (!name || !nextCity || !nextProfile) return;
     const index = customClients.length + demoClients.length;
+    const coordinates = coordinatesForCity(nextCity, index);
     const next: ClientMapItem = {
       id: `custom-${Date.now()}`,
       name,
@@ -109,12 +130,29 @@ export function ClientsPage() {
       bought: form.get("bought") === "on",
       downloads: Number(form.get("downloads") || 1),
       x: 18 + (index * 13) % 66,
-      y: 24 + (index * 17) % 58
+      y: 24 + (index * 17) % 58,
+      ...coordinates
     };
     setCustomClients((current) => [...current, next]);
     setCity(nextCity);
+    setSelectedClientId(next.id);
     toast({ title: "Cliente cadastrado no mapa." });
     event.currentTarget.reset();
+  }
+
+  function locateMe() {
+    if (!navigator.geolocation) {
+      toast({ title: "Geolocalização indisponível neste navegador." });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCurrentLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        toast({ title: "Sua localização foi adicionada ao mapa." });
+      },
+      () => toast({ title: "Não foi possível acessar sua localização." }),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   }
 
   return (
@@ -200,26 +238,69 @@ export function ClientsPage() {
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="overflow-hidden">
-          <CardHeader>
-            <CardTitle>Mapa de clientes</CardTitle>
-            <CardDescription>Mapa visual preparado para integração com geolocalização real.</CardDescription>
+          <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Mapa de clientes</CardTitle>
+              <CardDescription>Pontos por coordenada, localização atual e rota rápida.</CardDescription>
+            </div>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={locateMe}>
+              <LocateFixed className="h-4 w-4" />
+              Minha localização
+            </Button>
           </CardHeader>
           <CardContent>
-            <div className="relative min-h-[360px] overflow-hidden rounded-[1.75rem] border bg-[radial-gradient(circle_at_20%_25%,_hsl(var(--primary)/0.18),_transparent_18%),radial-gradient(circle_at_75%_70%,_hsl(var(--primary)/0.14),_transparent_22%),linear-gradient(135deg,_hsl(var(--muted)),_hsl(var(--card)))] p-4">
-              <div className="absolute inset-x-8 top-1/2 h-px bg-border/70" />
-              <div className="absolute inset-y-8 left-1/2 w-px bg-border/70" />
-              <div className="absolute left-6 top-6 rounded-full bg-background/80 px-3 py-1 text-xs text-muted-foreground backdrop-blur">Região de atuação</div>
-              {filtered.map((client) => (
+            <div className="relative min-h-[430px] overflow-hidden rounded-[1.75rem] border bg-[radial-gradient(circle_at_18%_20%,_rgba(218,165,57,0.20),_transparent_18%),radial-gradient(circle_at_78%_76%,_rgba(255,255,255,0.12),_transparent_24%),linear-gradient(135deg,_#070604,_#17110b_48%,_#030201)] p-4 text-white">
+              <div className="absolute inset-x-8 top-1/2 h-px bg-white/10" />
+              <div className="absolute inset-y-8 left-1/2 w-px bg-white/10" />
+              <div className="absolute left-[12%] top-[28%] h-24 w-48 rotate-[-18deg] rounded-full border border-primary/20" />
+              <div className="absolute bottom-[18%] right-[12%] h-28 w-56 rotate-[22deg] rounded-full border border-white/10" />
+              <div className="absolute left-6 top-6 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur">
+                {mappedClients.length} clientes mapeados
+              </div>
+              {currentLocation && (
+                <div className="absolute left-1/2 top-1/2 z-10 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-sky-500 shadow-[0_0_0_8px_rgba(14,165,233,0.18)]" title="Sua localização">
+                  <Navigation className="h-4 w-4" />
+                </div>
+              )}
+              {mappedClients.map((client) => (
                 <button
                   key={client.id}
                   type="button"
-                  className="absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-primary p-2 text-primary-foreground shadow-[0_12px_30px_hsl(var(--primary)/0.30)] transition hover:scale-110"
+                  onClick={() => setSelectedClientId(client.id)}
+                  className={cn(
+                    "absolute z-20 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full p-2 text-primary-foreground shadow-[0_12px_30px_rgba(218,165,57,0.30)] transition hover:scale-110",
+                    selectedClient?.id === client.id ? "bg-white text-[#17120b] ring-4 ring-primary/40" : "bg-primary"
+                  )}
                   style={{ left: `${client.x}%`, top: `${client.y}%` }}
                   title={`${client.name} - ${client.city}`}
                 >
                   <MapPin className="h-4 w-4" />
                 </button>
               ))}
+              {selectedClient && (
+                <div className="absolute inset-x-4 bottom-4 z-30 rounded-3xl border border-white/10 bg-black/58 p-4 text-white shadow-2xl backdrop-blur md:left-auto md:w-[330px]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{selectedClient.name}</p>
+                      <p className="truncate text-sm text-white/62">{selectedClient.city} • {selectedClient.neighborhood}</p>
+                    </div>
+                    <span className="rounded-full border border-primary/30 bg-primary/15 px-2 py-1 text-[0.68rem] font-semibold text-primary">{selectedClient.stage}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <MapMini label="Perfil" value={selectedClient.profile} />
+                    <MapMini label="Interações" value={selectedClient.downloads} />
+                  </div>
+                  <a
+                    className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                    href={mapsUrl(selectedClient)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Abrir rota
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -301,6 +382,15 @@ function Mini({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+function MapMini({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-2.5">
+      <p className="text-[0.68rem] text-white/45">{label}</p>
+      <p className="mt-1 truncate font-semibold">{value}</p>
+    </div>
+  );
+}
+
 function Field({
   label,
   name,
@@ -330,4 +420,53 @@ function topBy(items: ClientMapItem[], labeler: (item: ClientMapItem) => string,
   }, {});
   const [label, score] = Object.entries(groups).sort((a, b) => b[1] - a[1])[0] ?? [];
   return label ? { label, score } : null;
+}
+
+function positionClients(clients: ClientMapItem[]) {
+  const withCoordinates = clients.map((client, index) => {
+    if (client.lat !== undefined && client.lng !== undefined) return client;
+    return { ...client, ...coordinatesForCity(client.city, index) };
+  });
+  const latValues = withCoordinates.map((client) => client.lat).filter((value): value is number => value !== undefined);
+  const lngValues = withCoordinates.map((client) => client.lng).filter((value): value is number => value !== undefined);
+  if (!latValues.length || !lngValues.length) return clients;
+
+  const minLat = Math.min(...latValues);
+  const maxLat = Math.max(...latValues);
+  const minLng = Math.min(...lngValues);
+  const maxLng = Math.max(...lngValues);
+  const latRange = Math.max(maxLat - minLat, 0.01);
+  const lngRange = Math.max(maxLng - minLng, 0.01);
+
+  return withCoordinates.map((client, index) => {
+    if (client.lat === undefined || client.lng === undefined) return client;
+    const x = 12 + ((client.lng - minLng) / lngRange) * 76;
+    const y = 14 + ((maxLat - client.lat) / latRange) * 72;
+    return {
+      ...client,
+      x: clampMap(x + ((index % 3) - 1) * 2),
+      y: clampMap(y + ((index % 2) ? 1.5 : -1.5))
+    };
+  });
+}
+
+function coordinatesForCity(city: string, index: number) {
+  const normalized = city.trim().toLowerCase();
+  const base = cityCoordinates[normalized];
+  if (!base) return {};
+  return {
+    lat: base.lat + ((index % 5) - 2) * 0.012,
+    lng: base.lng + ((index % 4) - 1.5) * 0.014
+  };
+}
+
+function clampMap(value: number) {
+  return Math.max(8, Math.min(92, value));
+}
+
+function mapsUrl(client: ClientMapItem) {
+  if (client.lat !== undefined && client.lng !== undefined) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.name} ${client.neighborhood} ${client.city}`)}`;
 }
