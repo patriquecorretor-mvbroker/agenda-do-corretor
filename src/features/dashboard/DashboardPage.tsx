@@ -22,6 +22,7 @@ import {
   Target,
   TimerReset,
   TrendingUp,
+  UserRoundCog,
   Users,
   WalletCards
 } from "lucide-react";
@@ -192,6 +193,21 @@ export function DashboardPage({
                   Escuro
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => onNavigate("profile")}
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/18 bg-black/15 px-2.5 pr-3 text-xs font-semibold text-white transition hover:bg-white/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                aria-label="Abrir configurações do perfil"
+              >
+                {profile?.foto ? (
+                  <img src={profile.foto} alt="" className="h-7 w-7 rounded-full border border-white/30 object-cover" />
+                ) : (
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15">
+                    <UserRoundCog className="h-4 w-4" />
+                  </span>
+                )}
+                Meu perfil
+              </button>
             </div>
             <p className="text-sm text-white/75">{format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
             <h1 className="mt-2 text-3xl font-semibold md:text-5xl">

@@ -21,7 +21,7 @@ const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; m
   { view: "clients", label: "Clientes", icon: Users },
   { view: "finance", label: "Financeiro", icon: WalletCards },
   { view: "goals", label: "Metas", icon: Target },
-  { view: "profile", label: "Perfil", icon: User },
+  { view: "profile", label: "Perfil", icon: User, mobile: false },
   { view: "settings", label: "Configurações", icon: Settings }
 ];
 
@@ -122,7 +122,7 @@ export function AppShell({
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/94 px-3 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-6 items-end gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-5 items-end gap-1">
           {mobileItems.slice(0, 2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
           ))}

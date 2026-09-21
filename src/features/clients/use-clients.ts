@@ -12,7 +12,9 @@ const demoClients: Client[] = [
   demoClient("crm-3", "Patrícia Gomes", "qualificado", "Barueri", "Casa em condomínio", 5),
   demoClient("crm-4", "Bianca Reis", "proposta", "Sorocaba", "Casa em condomínio", 2),
   { ...demoClient("crm-5", "Carlos Mendes", "venda realizada", "São Paulo", "Apartamento 2 quartos", 12), sale_date: "2025-10-05", next_follow_up: "2026-10-05" },
-  { ...demoClient("crm-6", "Aline Souza", "pós-venda", "São Bernardo", "Apartamento 3 quartos", 20), sale_date: "2025-09-25", next_follow_up: "2026-09-25" }
+  { ...demoClient("crm-6", "Aline Souza", "pós-venda", "São Bernardo", "Apartamento 3 quartos", 20), sale_date: "2025-09-25", next_follow_up: "2026-09-25" },
+  { ...demoClient("crm-7", "Marina Lopes", "pós-venda", "São Paulo", "Apartamento 2 quartos", 30), sale_date: new Date().toISOString().slice(0, 10) },
+  { ...demoClient("crm-8", "Rafael Andrade", "venda realizada", "Barueri", "Casa em condomínio", 45), sale_date: new Date().toISOString().slice(0, 10) }
 ];
 
 function readLocal(): Client[] {

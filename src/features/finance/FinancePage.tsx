@@ -7,9 +7,11 @@ import {
   Banknote,
   CalendarDays,
   Car,
+  Crown,
   Download,
   Home,
   LineChart,
+  MapPin,
   Plane,
   Plus,
   Receipt,
@@ -29,9 +31,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { clampPercent, cn, formatCurrency } from "@/lib/utils";
 import { useProfile } from "@/features/profile/use-profile";
+import { useClients } from "@/features/clients/use-clients";
 import { expenseCategories, incomeCategories, installmentBalance, paymentMethods, sum } from "@/features/finance/finance-utils";
 import { useFinance } from "@/features/finance/use-finance";
-import type { Commission, CommissionInstallment, FinancialTransaction } from "@/types/database";
+import type { Client, Commission, CommissionInstallment, FinancialTransaction } from "@/types/database";
 
 type FinanceTab = "dashboard" | "commissions" | "receivable" | "payable" | "cashflow" | "result" | "calendar";
 type FinanceForm = "income" | "expense" | "commission" | null;
@@ -48,6 +51,7 @@ const tabs: Array<{ id: FinanceTab; label: string }> = [
 
 export function FinancePage() {
   const finance = useFinance();
+  const { clients } = useClients();
   const { profile } = useProfile();
   const { toast } = useToast();
   const [tab, setTab] = useState<FinanceTab>("dashboard");
@@ -173,6 +177,7 @@ export function FinancePage() {
           avgGross={avgGross}
           avgNet={avgNet}
           ticketMonth={ticketMonth}
+          clients={clients}
           onOpen={(next) => setTab(next)}
         />
       )}
@@ -208,6 +213,7 @@ function DashboardFinance({
   avgGross,
   avgNet,
   ticketMonth,
+  clients,
   onOpen
 }: {
   finance: ReturnType<typeof useFinance>;
@@ -215,6 +221,7 @@ function DashboardFinance({
   avgGross: number | null;
   avgNet: number | null;
   ticketMonth: number | null;
+  clients: Client[];
   onOpen: (tab: FinanceTab) => void;
 }) {
   const commissionGoal = profile?.meta_comissao_mensal ?? 0;
@@ -223,7 +230,9 @@ function DashboardFinance({
   const vgvProgress = vgvGoal ? clampPercent((finance.metrics.vgvMonth / vgvGoal) * 100) : 0;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+    <div className="space-y-5">
+      <CommissionRankings commissions={finance.commissions} clients={clients} />
+      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
       <div className="space-y-5">
         <Card>
           <CardHeader>
@@ -308,8 +317,132 @@ function DashboardFinance({
           Ver resultado financeiro
         </Button>
       </div>
+      </div>
     </div>
   );
+}
+
+type RankedItem = {
+  label: string;
+  detail: string;
+  value: number;
+};
+
+function CommissionRankings({ commissions, clients }: { commissions: Commission[]; clients: Client[] }) {
+  const rankings = useMemo(() => {
+    const generated = commissions.filter((commission) =>
+      ["confirmada", "parcialmente recebida", "recebida", "atrasada"].includes(commission.status)
+    );
+    const cityByClient = new Map(
+      clients
+        .filter((client) => client.city)
+        .map((client) => [normalizeName(client.name), client.city!] as const)
+    );
+
+    const sales = generated
+      .map((commission) => ({
+        label: commission.property ?? commission.development ?? "Venda sem imóvel informado",
+        detail: commission.client ?? "Cliente não informado",
+        value: commission.net_commission
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3);
+
+    return {
+      sales,
+      customers: groupRanking(generated, (commission) => commission.client, "venda", "vendas"),
+      cities: groupRanking(generated, (commission) => {
+        if (!commission.client) return null;
+        return cityByClient.get(normalizeName(commission.client)) ?? null;
+      }, "comissão", "comissões")
+    };
+  }, [clients, commissions]);
+
+  return (
+    <Card className="overflow-hidden border-primary/25 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.2),_transparent_34%),linear-gradient(145deg,_#050403,_#110d09_58%,_#050403)] text-white shadow-[0_26px_80px_rgba(0,0,0,0.24)]">
+      <CardHeader className="border-b border-white/10">
+        <div className="flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_32px_hsl(var(--primary)/0.24)]">
+            <Crown className="h-5 w-5" />
+          </span>
+          <div>
+            <CardTitle>Ranking de comissões</CardTitle>
+            <CardDescription className="mt-1 text-white/58">
+              Somente vendas confirmadas, recebidas, parciais ou atrasadas entram no ranking.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-0 p-0 lg:grid-cols-3">
+        <RankingColumn title="Melhores vendas" icon={TrendingUp} items={rankings.sales} empty="Nenhuma comissão gerada ainda." />
+        <RankingColumn title="Melhores clientes" icon={Crown} items={rankings.customers} empty="Nenhum cliente com comissão gerada." />
+        <RankingColumn title="Melhores cidades" icon={MapPin} items={rankings.cities} empty="Cadastre a cidade do cliente para formar este ranking." />
+      </CardContent>
+    </Card>
+  );
+}
+
+function RankingColumn({ title, icon: Icon, items, empty }: { title: string; icon: React.ElementType; items: RankedItem[]; empty: string }) {
+  return (
+    <section className="border-b border-white/10 p-4 last:border-b-0 sm:p-5 lg:border-b-0 lg:border-r lg:last:border-r-0">
+      <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
+        <Icon className="h-4 w-4 text-primary" />
+        {title}
+      </div>
+      {items.length ? (
+        <ol className="space-y-3">
+          {items.map((item, index) => (
+            <li key={`${item.label}-${index}`} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2.5">
+              <span className={cn(
+                "grid h-8 w-8 place-items-center rounded-full border text-xs font-bold",
+                index === 0 ? "border-primary/50 bg-primary text-primary-foreground" : "border-white/15 bg-white/5 text-white/65"
+              )}>
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{item.label}</p>
+                <p className="truncate text-xs text-white/48">{item.detail}</p>
+              </div>
+              <p className="whitespace-nowrap text-xs font-semibold text-primary sm:text-sm">{formatCurrency(item.value)}</p>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="rounded-2xl border border-dashed border-white/14 bg-white/[0.03] p-4 text-sm leading-5 text-white/48">{empty}</p>
+      )}
+    </section>
+  );
+}
+
+function groupRanking(
+  commissions: Commission[],
+  keyFor: (commission: Commission) => string | null,
+  singular: string,
+  plural: string
+): RankedItem[] {
+  const grouped = new Map<string, { label: string; value: number; count: number }>();
+  commissions.forEach((commission) => {
+    const label = keyFor(commission)?.trim();
+    if (!label) return;
+    const key = normalizeName(label);
+    const current = grouped.get(key) ?? { label, value: 0, count: 0 };
+    current.value += commission.net_commission;
+    current.count += 1;
+    grouped.set(key, current);
+  });
+
+  return Array.from(grouped.values())
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3)
+    .map((item) => ({
+      label: item.label,
+      detail: `${item.count} ${item.count === 1 ? singular : plural}`,
+      value: item.value
+    }));
+}
+
+function normalizeName(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
 function CommissionList({
