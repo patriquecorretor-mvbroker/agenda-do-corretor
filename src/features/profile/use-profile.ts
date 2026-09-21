@@ -9,6 +9,8 @@ const demoProfile: Profile = {
   user_id: "demo-user",
   nome: "Patrick",
   foto: null,
+  logo: "/brand/mv-broker-logo.jpg",
+  nome_marca: "MV Broker",
   telefone: null,
   whatsapp: null,
   email: "demo@agenda.local",

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { CalendarDays, CirclePlus, Home, LogOut, Moon, Settings, Sun, Target, User, Users, WalletCards } from "lucide-react";
+import { CalendarDays, CirclePlus, Home, LayoutGrid, LogOut, Moon, Settings, Sun, Target, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/auth-context";
@@ -42,9 +43,11 @@ export function AppShell({
 }) {
   const [view, setView] = useState<AppView>("day");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
   const { toast } = useToast();
-  const mobileItems = navItems.filter((item) => item.mobile !== false && item.view !== "goals" && item.view !== "settings");
+  const mobileItems = navItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
+  const moreItems = navItems.filter((item) => ["finance", "goals", "profile", "settings"].includes(item.view));
 
   async function handleSignOut() {
     await signOut();
@@ -137,6 +140,7 @@ export function AppShell({
           {mobileItems.slice(2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
           ))}
+          <MobileNavItem active={moreItems.some((item) => item.view === view)} icon={LayoutGrid} label="Mais" onClick={() => setMoreOpen(true)} />
         </div>
       </nav>
 
@@ -150,6 +154,16 @@ export function AppShell({
       </button>
 
       <QuickAddDialog open={quickAddOpen} onOpenChange={setQuickAddOpen} />
+      <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Mais áreas</DialogTitle><DialogDescription>Acesse os demais módulos e configurações.</DialogDescription></DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            {moreItems.map((item) => <button key={item.view} type="button" onClick={() => { setView(item.view); setMoreOpen(false); }} className={cn("flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-4 text-left transition hover:border-primary/45 hover:bg-primary/5", view === item.view && "border-primary bg-primary/10")}>
+              <item.icon className="h-6 w-6 text-primary" /><span className="font-semibold">{item.label}</span>
+            </button>)}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

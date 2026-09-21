@@ -21,20 +21,24 @@ function createId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `local-${Date.now()}`;
 }
 
-export function useEvents(date = format(new Date(), "yyyy-MM-dd")) {
+export type EventPeriod = string | { from: string; to: string };
+
+export function useEvents(period: EventPeriod = format(new Date(), "yyyy-MM-dd")) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const from = typeof period === "string" ? period : period.from;
+  const to = typeof period === "string" ? period : period.to;
 
   const eventsQuery = useQuery({
-    queryKey: ["events", user?.id, date],
-    queryFn: () => (hasSupabaseConfig ? listEvents(user!.id, date) : readDemoEvents().filter((event) => event.date === date)),
+    queryKey: ["events", user?.id, from, to],
+    queryFn: () => (hasSupabaseConfig ? listEvents(user!.id, from, to === from ? undefined : to) : readDemoEvents().filter((event) => event.date >= from && event.date <= to)),
     enabled: Boolean(user)
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["events", user?.id] });
 
   return {
-    events: eventsQuery.data?.length ? eventsQuery.data : eventsQuery.data ?? demoEvents.filter((event) => event.date === date),
+    events: eventsQuery.data?.length ? eventsQuery.data : eventsQuery.data ?? demoEvents.filter((event) => event.date >= from && event.date <= to),
     isLoading: eventsQuery.isLoading,
     error: eventsQuery.error,
     createEvent: useMutation({

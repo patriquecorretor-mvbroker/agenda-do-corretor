@@ -1,9 +1,10 @@
 import { requireSupabase } from "@/lib/supabase";
 import type { CalendarEvent } from "@/types/database";
 
-export async function listEvents(userId: string, date?: string) {
+export async function listEvents(userId: string, date?: string, endDate?: string) {
   let query = (requireSupabase() as any).from("calendar_events").select("*").eq("user_id", userId).order("date").order("start_time");
-  if (date) query = query.eq("date", date);
+  if (date && endDate) query = query.gte("date", date).lte("date", endDate);
+  else if (date) query = query.eq("date", date);
   const { data, error } = await query;
   if (error) throw error;
   return data as CalendarEvent[];

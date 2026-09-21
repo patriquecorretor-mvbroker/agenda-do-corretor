@@ -3,6 +3,8 @@ export type Profile = {
   user_id: string;
   nome: string | null;
   foto: string | null;
+  logo: string | null;
+  nome_marca: string | null;
   telefone: string | null;
   whatsapp: string | null;
   email: string | null;

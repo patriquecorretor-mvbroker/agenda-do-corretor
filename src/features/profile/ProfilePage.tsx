@@ -49,11 +49,14 @@ export function ProfilePage({
       <div className="grid gap-5 xl:grid-cols-[0.7fr_1.3fr]">
         <Card>
           <CardHeader>
-            <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-3xl bg-muted">
-              {profile?.foto ? <img src={profile.foto} alt="" className="h-full w-full object-cover" /> : <UserRound className="h-8 w-8 text-muted-foreground" />}
+            <div className="flex items-center gap-3">
+              <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-3xl bg-muted">
+                {profile?.foto ? <img src={profile.foto} alt="" className="h-full w-full object-cover" /> : <UserRound className="h-8 w-8 text-muted-foreground" />}
+              </div>
+              {profile?.logo && <img src={profile.logo} alt={`Logo ${profile.nome_marca ?? profile.empresa ?? ""}`} className="h-16 w-16 rounded-2xl border object-cover" />}
             </div>
             <CardTitle>{profile?.nome}</CardTitle>
-            <CardDescription>{profile?.empresa} • {profile?.cidade}</CardDescription>
+            <CardDescription>{profile?.nome_marca || profile?.empresa} • {profile?.cidade}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>CRECI: {profile?.creci ?? "não informado"}</p>

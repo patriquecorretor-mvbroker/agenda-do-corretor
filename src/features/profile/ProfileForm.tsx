@@ -1,4 +1,5 @@
-import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,20 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
   const { user } = useAuth();
   const { profile, saveProfile } = useProfile();
   const { toast } = useToast();
+  const [logo, setLogo] = useState(profile?.logo ?? "");
+
+  useEffect(() => setLogo(profile?.logo ?? ""), [profile?.logo]);
+
+  function selectLogo(file?: File) {
+    if (!file) return;
+    if (file.size > 1_500_000) {
+      toast({ title: "Use uma imagem de até 1,5 MB.", variant: "error" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setLogo(String(reader.result));
+    reader.readAsDataURL(file);
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,6 +36,8 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
       email: user.email ?? null,
       nome: String(form.get("nome") || "").trim(),
       foto: String(form.get("foto") || "").trim() || null,
+      logo: String(form.get("logo") || "").trim() || null,
+      nome_marca: String(form.get("nome_marca") || "").trim() || null,
       telefone: String(form.get("telefone") || "").trim() || null,
       whatsapp: String(form.get("whatsapp") || "").trim() || null,
       creci: String(form.get("creci") || "").trim(),
@@ -47,6 +64,16 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
       <div className={compact ? "grid gap-4" : "grid gap-4 md:grid-cols-2"}>
         <Field label="Nome" name="nome" defaultValue={profile?.nome ?? ""} required />
         <Field label="Foto (URL)" name="foto" defaultValue={profile?.foto ?? ""} />
+        <Field label="Nome da marca" name="nome_marca" defaultValue={profile?.nome_marca ?? ""} />
+        <div className="space-y-2">
+          <Label>Logo da marca</Label>
+          <input type="hidden" name="logo" value={logo} />
+          <label className="flex min-h-24 cursor-pointer items-center gap-3 rounded-2xl border border-dashed p-3 transition hover:bg-muted/60">
+            {logo ? <img src={logo} alt="Prévia da logo" className="h-16 w-16 rounded-xl object-cover" /> : <span className="grid h-16 w-16 place-items-center rounded-xl bg-muted"><ImagePlus className="h-6 w-6 text-muted-foreground" /></span>}
+            <span><span className="block text-sm font-semibold">Escolher logo</span><span className="text-xs text-muted-foreground">PNG, JPG ou WebP até 1,5 MB</span></span>
+            <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { selectLogo(event.target.files?.[0]); event.target.value = ""; }} />
+          </label>
+        </div>
         <Field label="Telefone" name="telefone" defaultValue={profile?.telefone ?? ""} />
         <Field label="WhatsApp" name="whatsapp" defaultValue={profile?.whatsapp ?? ""} />
         <Field label="CRECI" name="creci" defaultValue={profile?.creci ?? ""} required />

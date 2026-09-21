@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
-import { format, isBefore, isToday, parseISO } from "date-fns";
+import { addDays, addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, isBefore, isSameDay, isSameMonth, isToday, parseISO, startOfMonth, startOfWeek } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
-  CalendarClock,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
   Check,
   CheckCircle2,
   Clock3,
   Edit3,
-  Flame,
   MapPin,
   MoreHorizontal,
+  Sparkles,
   StickyNote,
   Trash2
 } from "lucide-react";
@@ -18,26 +21,36 @@ import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { EventForm } from "@/features/calendar/EventForm";
 import { useEvents } from "@/features/calendar/use-events";
 import { useTasks } from "@/features/tasks/use-tasks";
 import { TaskForm } from "@/features/tasks/TaskForm";
+import { useProfile } from "@/features/profile/use-profile";
+import { DailyArtDialog } from "./DailyArtDialog";
+import { getSpecialDate, getUpcomingSpecialDate } from "./special-dates";
 import { cn, clampPercent } from "@/lib/utils";
 import type { CalendarEvent, Task } from "@/types/database";
 
 export function AgendaPage() {
-  const today = format(new Date(), "yyyy-MM-dd");
-  const { events, updateEvent, deleteEvent } = useEvents(today);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<"day" | "week" | "month">("day");
+  const selectedKey = format(selectedDate, "yyyy-MM-dd");
+  const periodStart = calendarView === "month" ? startOfMonth(selectedDate) : calendarView === "week" ? startOfWeek(selectedDate, { weekStartsOn: 1 }) : selectedDate;
+  const periodEnd = calendarView === "month" ? endOfMonth(selectedDate) : calendarView === "week" ? endOfWeek(selectedDate, { weekStartsOn: 1 }) : selectedDate;
+  const { events, updateEvent, deleteEvent } = useEvents({ from: format(periodStart, "yyyy-MM-dd"), to: format(periodEnd, "yyyy-MM-dd") });
   const { tasks, updateTask, deleteTask } = useTasks();
+  const { profile } = useProfile();
   const { toast } = useToast();
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [notesEvent, setNotesEvent] = useState<CalendarEvent | null>(null);
   const [rescheduleEvent, setRescheduleEvent] = useState<CalendarEvent | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "event" | "task"; id: string } | null>(null);
+  const [artOpen, setArtOpen] = useState(false);
+  const specialDate = getSpecialDate(selectedDate);
+  const upcomingSpecial = getUpcomingSpecialDate(selectedDate);
 
   const sortedEvents = useMemo(
     () => events.slice().sort((a, b) => a.start_time.localeCompare(b.start_time)),
@@ -47,7 +60,9 @@ export function AgendaPage() {
   const agendaStats = useMemo(() => {
     const completed = events.filter((event) => event.status === "concluído").length;
     const pending = events.filter((event) => event.status === "agendado").length;
-    const delayed = events.filter((event) => event.status === "agendado" && event.start_time < format(new Date(), "HH:mm")).length;
+    const now = new Date();
+    const todayKey = format(now, "yyyy-MM-dd");
+    const delayed = events.filter((event) => event.status === "agendado" && (event.date < todayKey || (event.date === todayKey && event.start_time < format(now, "HH:mm")))).length;
     const progress = events.length ? clampPercent((completed / events.length) * 100) : 0;
     return { completed, pending, delayed, progress };
   }, [events]);
@@ -55,14 +70,18 @@ export function AgendaPage() {
   const todayTasks = useMemo(
     () =>
       tasks
-        .filter((task) => task.due_date && isToday(parseISO(task.due_date)))
+        .filter((task) => task.due_date === selectedKey)
         .sort((a, b) => {
           if (a.status !== b.status) return a.status === "pendente" ? -1 : 1;
           if (a.priority !== b.priority) return a.priority === "alta" ? -1 : 1;
           return (a.due_time ?? "99:99").localeCompare(b.due_time ?? "99:99");
         }),
-    [tasks]
+    [tasks, selectedKey]
   );
+
+  function movePeriod(direction: -1 | 1) {
+    setSelectedDate((current) => calendarView === "month" ? addMonths(current, direction) : calendarView === "week" ? addWeeks(current, direction) : addDays(current, direction));
+  }
 
   const focusTasks = useMemo(
     () =>
@@ -96,36 +115,40 @@ export function AgendaPage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.38),_transparent_35%),linear-gradient(135deg,_#050403,_#15100b_58%,_#050403)] text-white shadow-soft">
-        <div className="relative p-5 md:p-8">
-          <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/35 blur-3xl" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/70">
-                <img src="/brand/mv-broker-logo.jpg" alt="" className="h-5 w-5 rounded-full object-cover" />
-                Agenda operacional
-              </div>
-              <h1 className="max-w-2xl text-3xl font-semibold leading-tight md:text-5xl">Sua rotina do dia, sem ruído.</h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-white/62">
-                Compromissos em linha do tempo, tarefas prioritárias e ações rápidas para tocar o dia com uma mão.
-              </p>
+      <section className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 pb-3 pt-1 shadow-sm backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground">Agenda</p>
+              <h1 className="truncate text-lg font-semibold capitalize sm:text-xl">{periodLabel(selectedDate, calendarView)}</h1>
             </div>
-            <div className="min-w-60 rounded-3xl border border-white/10 bg-white/[0.06] p-4">
-              <div className="flex items-center justify-between text-sm text-white/62">
-                <span>Progresso da agenda</span>
-                <span>{agendaStats.progress}%</span>
-              </div>
-              <Progress value={agendaStats.progress} className="mt-3 bg-white/10" />
-              <p className="mt-3 text-xs text-white/55">
-                {agendaStats.completed} concluídos de {events.length || 0} compromissos.
-              </p>
+            <div className="flex items-center gap-1">
+              <Button size="icon" variant="ghost" aria-label="Período anterior" onClick={() => movePeriod(-1)}><ChevronLeft className="h-5 w-5" /></Button>
+              <Button size="sm" variant="outline" onClick={() => setSelectedDate(new Date())}>Hoje</Button>
+              <Button size="icon" variant="ghost" aria-label="Próximo período" onClick={() => movePeriod(1)}><ChevronRight className="h-5 w-5" /></Button>
             </div>
           </div>
+          <div className="grid grid-cols-3 rounded-xl bg-muted p-1" aria-label="Visualização da agenda">
+            {(["day", "week", "month"] as const).map((mode) => (
+              <button key={mode} type="button" onClick={() => setCalendarView(mode)} className={cn("min-h-10 rounded-lg px-3 text-sm font-semibold transition", calendarView === mode ? "bg-background text-primary shadow-sm" : "text-muted-foreground")}>
+                {mode === "day" ? "Dia" : mode === "week" ? "Semana" : "Mês"}
+              </button>
+            ))}
+          </div>
+          <WeekStrip selectedDate={selectedDate} onSelect={setSelectedDate} events={events} />
         </div>
       </section>
 
+      {(specialDate || upcomingSpecial) && (() => {
+        const item = specialDate ? { date: selectedDate, special: specialDate } : upcomingSpecial!;
+        return <section className="flex flex-col gap-3 rounded-2xl border border-primary/25 bg-[linear-gradient(135deg,_hsl(var(--primary)/0.14),_transparent)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3"><CalendarRange className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div><p className="text-xs font-semibold uppercase text-primary">{specialDate ? item.special.kind : `Próxima data · ${format(item.date, "dd/MM")}`}</p><h2 className="font-semibold">{item.special.title}</h2><p className="mt-1 text-sm text-muted-foreground">{item.special.message}</p></div></div>
+          <Button variant="outline" className="shrink-0" onClick={() => { if (!specialDate) setSelectedDate(item.date); setArtOpen(true); }}><Sparkles className="h-4 w-4" />Criar arte</Button>
+        </section>;
+      })()}
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MetricCard label="Compromissos" value={events.length} helper="na agenda de hoje" />
+        <MetricCard label="Compromissos" value={events.length} helper={calendarView === "day" ? "neste dia" : "neste período"} />
         <MetricCard label="Concluídos" value={agendaStats.completed} helper="já resolvidos" />
         <MetricCard label="Pendentes" value={agendaStats.pending} helper="ainda em aberto" />
         <MetricCard label="Atrasados" value={agendaStats.delayed} helper="pedem atenção" tone={agendaStats.delayed ? "hot" : "normal"} />
@@ -136,17 +159,19 @@ export function AgendaPage() {
           <CardHeader className="border-b bg-white/70 dark:bg-white/[0.03]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <CardTitle className="text-xl">Linha do tempo</CardTitle>
-                <CardDescription>Toque em concluir, reagende ou registre uma observação sem sair da agenda.</CardDescription>
+                <CardTitle className="text-xl">{calendarView === "day" ? "Linha do tempo" : calendarView === "week" ? "Visão da semana" : "Calendário mensal"}</CardTitle>
+                <CardDescription>{calendarView === "day" ? "Conclua, reagende ou registre uma observação sem sair da agenda." : "Toque em um dia para abrir sua linha do tempo."}</CardDescription>
               </div>
               <div className="hidden rounded-2xl bg-[linear-gradient(135deg,_#050403,_hsl(var(--primary)/0.72))] px-4 py-3 text-right text-white shadow-[0_16px_36px_hsl(var(--primary)/0.20)] sm:block">
-                <p className="text-xs text-white/55">Hoje</p>
-                <p className="font-semibold">{format(new Date(), "dd/MM")}</p>
+                <p className="text-xs text-white/55">Selecionado</p>
+                <p className="font-semibold">{format(selectedDate, "dd/MM")}</p>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-0 p-0">
-            {sortedEvents.length ? (
+            {calendarView !== "day" ? (
+              <PeriodCalendar view={calendarView} selectedDate={selectedDate} events={events} onSelect={(date) => { setSelectedDate(date); setCalendarView("day"); }} />
+            ) : sortedEvents.length ? (
               sortedEvents.map((event, index) => (
                 <TimelineEvent
                   key={event.id}
@@ -165,7 +190,7 @@ export function AgendaPage() {
                 />
               ))
             ) : (
-              <Empty text="Nenhum compromisso cadastrado para hoje. Use o botão + para criar a primeira ação do dia." />
+              <Empty text="Nenhum compromisso cadastrado para este dia. Use o botão + para criar a primeira ação." />
             )}
           </CardContent>
         </Card>
@@ -189,7 +214,7 @@ export function AgendaPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Tarefas de hoje</CardTitle>
+              <CardTitle>Tarefas do dia</CardTitle>
               <CardDescription>Lista compacta para operar rápido no celular.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -209,7 +234,7 @@ export function AgendaPage() {
                   />
                 ))
               ) : (
-                <Empty text="Nenhuma tarefa para hoje." compact />
+                <Empty text="Nenhuma tarefa para esta data." compact />
               )}
             </CardContent>
           </Card>
@@ -299,8 +324,55 @@ export function AgendaPage() {
         description="Essa ação remove o registro da sua agenda."
         onConfirm={confirmDelete}
       />
+      {specialDate && <DailyArtDialog open={artOpen} onOpenChange={setArtOpen} special={specialDate} date={selectedDate} profile={profile} />}
     </div>
   );
+}
+
+function periodLabel(date: Date, view: "day" | "week" | "month") {
+  if (view === "day") return format(date, "EEEE, d 'de' MMMM", { locale: ptBR });
+  if (view === "month") return format(date, "MMMM 'de' yyyy", { locale: ptBR });
+  const start = startOfWeek(date, { weekStartsOn: 1 });
+  const end = endOfWeek(date, { weekStartsOn: 1 });
+  return `${format(start, "dd MMM", { locale: ptBR })} - ${format(end, "dd MMM", { locale: ptBR })}`;
+}
+
+function WeekStrip({ selectedDate, onSelect, events }: { selectedDate: Date; onSelect: (date: Date) => void; events: CalendarEvent[] }) {
+  const days = eachDayOfInterval({ start: startOfWeek(selectedDate, { weekStartsOn: 1 }), end: endOfWeek(selectedDate, { weekStartsOn: 1 }) });
+  return <div className="grid grid-cols-7 gap-1">
+    {days.map((day) => {
+      const count = events.filter((event) => event.date === format(day, "yyyy-MM-dd")).length;
+      return <button key={day.toISOString()} type="button" onClick={() => onSelect(day)} className={cn("relative grid min-h-14 place-items-center rounded-xl px-1 text-center transition", isSameDay(day, selectedDate) ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted", isToday(day) && !isSameDay(day, selectedDate) && "ring-1 ring-primary/45")}>
+        <span className="text-[10px] font-semibold uppercase">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span>
+        <span className="text-sm font-semibold">{format(day, "dd")}</span>
+        {count > 0 && <span className={cn("absolute bottom-1 h-1 w-1 rounded-full", isSameDay(day, selectedDate) ? "bg-primary-foreground" : "bg-primary")} />}
+      </button>;
+    })}
+  </div>;
+}
+
+function PeriodCalendar({ view, selectedDate, events, onSelect }: { view: "week" | "month"; selectedDate: Date; events: CalendarEvent[]; onSelect: (date: Date) => void }) {
+  const start = view === "month" ? startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 1 }) : startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const end = view === "month" ? endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 1 }) : endOfWeek(selectedDate, { weekStartsOn: 1 });
+  const days = eachDayOfInterval({ start, end });
+  return <div className="overflow-x-auto p-3 sm:p-5">
+    <div className="mb-2 grid min-w-[620px] grid-cols-7 gap-2 text-center text-xs font-semibold uppercase text-muted-foreground">
+      {eachDayOfInterval({ start: startOfWeek(new Date(), { weekStartsOn: 1 }), end: endOfWeek(new Date(), { weekStartsOn: 1 }) }).map((day) => <span key={day.toISOString()}>{format(day, "EEE", { locale: ptBR })}</span>)}
+    </div>
+    <div className="grid min-w-[620px] grid-cols-7 gap-2">
+      {days.map((day) => {
+        const key = format(day, "yyyy-MM-dd");
+        const dayEvents = events.filter((event) => event.date === key);
+        return <button key={key} type="button" onClick={() => onSelect(day)} className={cn("min-h-28 rounded-xl border p-2 text-left transition hover:border-primary/50 hover:bg-primary/5", view === "month" && !isSameMonth(day, selectedDate) && "opacity-35", isToday(day) && "border-primary/60")}>
+          <span className={cn("grid h-7 w-7 place-items-center rounded-lg text-sm font-semibold", isToday(day) && "bg-primary text-primary-foreground")}>{format(day, "dd")}</span>
+          <span className="mt-2 block space-y-1">
+            {dayEvents.slice(0, view === "week" ? 4 : 2).map((event) => <span key={event.id} className="block truncate rounded-md bg-primary/10 px-1.5 py-1 text-[11px] font-medium text-primary">{event.start_time.slice(0, 5)} {event.title}</span>)}
+            {dayEvents.length > (view === "week" ? 4 : 2) && <span className="block text-[10px] text-muted-foreground">+{dayEvents.length - (view === "week" ? 4 : 2)} itens</span>}
+          </span>
+        </button>;
+      })}
+    </div>
+  </div>;
 }
 
 function MetricCard({

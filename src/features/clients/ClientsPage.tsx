@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarPlus, Camera, Check, Crown, ExternalLink, MapPin, Navigation, Search, Trophy, Users, X, SlidersHorizontal } from "lucide-react";
+import { CalendarPlus, Camera, Check, Crown, ExternalLink, MapPin, MessageCircle, Navigation, Search, Trophy, Users, X, SlidersHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -37,12 +37,13 @@ type ClientMapItem = {
   lat?: number;
   lng?: number;
   photo?: string;
+  whatsapp?: string;
   locationPrecision?: "city" | "exact";
 };
 
 const demoClients: ClientMapItem[] = [
-  { id: "1", name: "Mariana Alves", city: "São Paulo", neighborhood: "Mooca", profile: "Apartamento 2 quartos", stage: "visita agendada", bought: false, downloads: 9, x: 58, y: 50, lat: -23.558, lng: -46.596 },
-  { id: "2", name: "Carlos Mendes", city: "São Paulo", neighborhood: "Tatuapé", profile: "Apartamento 2 quartos", stage: "comprador", bought: true, downloads: 12, x: 64, y: 44, lat: -23.540, lng: -46.576 },
+  { id: "1", name: "Mariana Alves", city: "São Paulo", neighborhood: "Mooca", profile: "Apartamento 2 quartos", stage: "visita agendada", bought: false, downloads: 9, x: 58, y: 50, lat: -23.558, lng: -46.596, whatsapp: "5511999990001" },
+  { id: "2", name: "Carlos Mendes", city: "São Paulo", neighborhood: "Tatuapé", profile: "Apartamento 2 quartos", stage: "comprador", bought: true, downloads: 12, x: 64, y: 44, lat: -23.540, lng: -46.576, whatsapp: "5511999990002" },
   { id: "3", name: "Renata Lima", city: "Guarulhos", neighborhood: "Centro", profile: "Casa em condomínio", stage: "em contato", bought: false, downloads: 5, x: 70, y: 31, lat: -23.454, lng: -46.533 },
   { id: "4", name: "Felipe Rocha", city: "Santo André", neighborhood: "Campestre", profile: "Studio", stage: "lead", bought: false, downloads: 4, x: 62, y: 67, lat: -23.654, lng: -46.536 },
   { id: "5", name: "Aline Souza", city: "São Bernardo", neighborhood: "Jardim do Mar", profile: "Apartamento 3 quartos", stage: "comprador", bought: true, downloads: 8, x: 52, y: 75, lat: -23.695, lng: -46.552 },
@@ -147,7 +148,8 @@ export function ClientsPage() {
     x: 50,
     y: 50,
     lat: client.lat ?? undefined,
-    lng: client.lng ?? undefined
+    lng: client.lng ?? undefined,
+    whatsapp: client.whatsapp ?? client.phone ?? undefined
   }));
   const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}` })) : []), ...crmClients, ...financeClients, ...customClients].map((client) => {
     const mark = marks.marks.find((item) => item.client_id === client.id);
@@ -322,8 +324,8 @@ export function ClientsPage() {
 
       <ClientHub />
 
-      <div className="order-2 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
-        <Card className="min-w-0 overflow-hidden">
+      <div className="order-5 flex min-w-0 flex-col gap-5">
+        <Card className="order-2 min-w-0 overflow-hidden">
           <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Mapa de clientes</CardTitle>
@@ -392,32 +394,22 @@ export function ClientsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="order-1">
           <CardHeader>
             <CardTitle>Clientes filtrados</CardTitle>
             <CardDescription>{visibleClients.length} cliente(s) encontrados.</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-[650px] space-y-3 overflow-y-auto">
+          <CardContent className="max-h-[520px] divide-y overflow-y-auto p-0">
             {!visibleClients.length && <div className="py-8 text-center text-sm text-muted-foreground"><p>Nenhum cliente encontrado.</p><Button className="mt-3" variant="outline" onClick={() => { setCity(allValue); setProfile(allValue); setStage(allValue); setQuery(""); setMapFilter(allValue); }}>Limpar filtros</Button></div>}
             {visibleClients.map((client) => (
-              <article key={client.id} className="rounded-3xl border bg-card p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <button className="flex min-h-11 items-center gap-3 text-left font-semibold hover:text-primary" onClick={() => setSelectedClientId(client.id)}><span className="h-10 w-10 shrink-0"><ClientAvatar name={client.name} photo={client.photo} /></span><span className="break-words">{client.name}</span></button>
-                    <p className="truncate text-sm text-muted-foreground">{client.city} • {client.neighborhood}</p>
-                  </div>
-                  <span className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", client.bought ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : "bg-primary/12 text-primary")}>
-                    {client.bought ? "Venda realizada" : scheduledIds.has(client.id) ? "Visita agendada" : client.stage}
-                  </span>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Mini label="Perfil" value={client.profile} />
-                  <Mini label="Visitas" value={visitLog.filter((visit) => visit.clientId === client.id).length} />
-                </div>
-                <Button className="mt-3 w-full" variant="outline" size="sm" disabled={marks.save.isPending || marks.loading || Boolean(marks.error) || visitLog.some((visit) => visit.clientId === client.id && isTodayKey(visit.date))} onClick={() => markVisit(client)}>
-                  <Check className="h-4 w-4" />
-                  Marcar visita feita
-                </Button>
+              <article key={client.id} className="flex min-h-[68px] items-center gap-3 px-3 py-2.5 transition hover:bg-muted/45 sm:px-4">
+                <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setSelectedClientId(client.id)}>
+                  <span className="h-10 w-10 shrink-0"><ClientAvatar name={client.name} photo={client.photo} /></span>
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold">{client.name}</span><span className="block truncate text-xs text-muted-foreground">{client.city} • {client.profile}</span></span>
+                </button>
+                <span className={cn("hidden shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold sm:block", client.bought ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : "bg-primary/12 text-primary")}>{client.bought ? "Vendido" : scheduledIds.has(client.id) ? "Visita" : client.stage}</span>
+                {client.whatsapp ? <a href={whatsappUrl(client.whatsapp, client.name)} target="_blank" rel="noreferrer" aria-label={`Falar com ${client.name} no WhatsApp`} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/12 text-emerald-600 transition hover:bg-emerald-500 hover:text-white"><MessageCircle className="h-5 w-5" /></a> : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground" title="WhatsApp não cadastrado"><MessageCircle className="h-5 w-5" /></span>}
+                <Button size="icon" variant="ghost" aria-label={`Marcar visita a ${client.name}`} disabled={marks.save.isPending || marks.loading || Boolean(marks.error) || visitLog.some((visit) => visit.clientId === client.id && isTodayKey(visit.date))} onClick={() => markVisit(client)}><Check className="h-4 w-4" /></Button>
               </article>
             ))}
           </CardContent>
@@ -539,6 +531,12 @@ function mapsUrl(client: ClientMapItem) {
     return `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`;
   }
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.neighborhood} ${client.city}`)}`;
+}
+
+function whatsappUrl(phone: string, name: string) {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.startsWith("55") ? digits : `55${digits}`;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(`Olá, ${name}! Tudo bem?`)}`;
 }
 
 function isSameMonthKey(date: string, reference: Date) {
