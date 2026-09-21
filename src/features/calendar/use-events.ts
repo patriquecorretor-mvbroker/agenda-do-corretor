@@ -52,6 +52,7 @@ export function useEvents(date = format(new Date(), "yyyy-MM-dd")) {
           location: input.location ?? null,
           status: input.status ?? "agendado",
           notes: input.notes ?? null,
+          client_id: input.client_id ?? null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };

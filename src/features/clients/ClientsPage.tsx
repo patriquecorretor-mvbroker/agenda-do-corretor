@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarPlus, Camera, Check, Crown, ExternalLink, MapPin, Navigation, Plus, Search, Trophy, Users, X, SlidersHorizontal } from "lucide-react";
+import { CalendarPlus, Camera, Check, Crown, ExternalLink, MapPin, Navigation, Search, Trophy, Users, X, SlidersHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -10,6 +10,8 @@ import type { CalendarEvent } from "@/types/database";
 import { useClientMarks } from "./use-client-marks";
 import { ClientAvatar } from "./ClientAvatar";
 import { ClientMap } from "./ClientMap";
+import { ClientHub } from "./ClientHub";
+import { useClients } from "./use-clients";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,9 +77,11 @@ export function ClientsPage() {
   const { user, isDemo } = useAuth();
   const marks = useClientMarks();
   const calendar = useEvents();
+  const crm = useClients();
   const [mapFilter, setMapFilter] = useState("todos");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [scheduleClient, setScheduleClient] = useState<ClientMapItem | null>(null);
+  const [saleClient, setSaleClient] = useState<ClientMapItem | null>(null);
   const scheduled = useQuery({
     queryKey: ["events", user?.id, "client-map"],
     enabled: Boolean(user),
@@ -131,9 +135,23 @@ export function ClientsPage() {
       y: 38 + (index % 3) * 12
     }));
 
-  const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}` })) : []), ...financeClients, ...customClients].map((client) => {
+  const crmClients: ClientMapItem[] = crm.clients.map((client) => ({
+    id: client.id,
+    name: client.name,
+    city: client.city ?? "Cidade não informada",
+    neighborhood: client.neighborhood ?? "Bairro não informado",
+    profile: client.property_profile ?? "Perfil não informado",
+    stage: clientStatusToMapStage(client.status),
+    bought: client.status === "venda realizada" || client.status === "pós-venda",
+    downloads: 0,
+    x: 50,
+    y: 50,
+    lat: client.lat ?? undefined,
+    lng: client.lng ?? undefined
+  }));
+  const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}` })) : []), ...crmClients, ...financeClients, ...customClients].map((client) => {
     const mark = marks.marks.find((item) => item.client_id === client.id);
-    const coordinates = client.id.startsWith("custom-") && (!("locationPrecision" in client) || client.locationPrecision !== "exact") ? coordinatesForCity(client.city) : {};
+    const coordinates = !("lat" in client) || !("lng" in client) || client.lat === undefined || client.lng === undefined ? coordinatesForCity(client.city) : {};
     return { ...client, ...coordinates, photo: mark?.photo ?? ("photo" in client ? client.photo as string : undefined), bought: mark?.sold ?? client.bought };
   });
   const cities = Array.from(new Set(clients.map((client) => client.city)));
@@ -200,10 +218,28 @@ export function ClientsPage() {
   }
 
   async function markSold(client: ClientMapItem) {
+    if (!client.bought) { setSaleClient(client); return; }
+    if (crm.clients.some((item) => item.id === client.id)) { toast({ title: "A venda está registrada. Edite o cliente no processo de vendas para alterar." }); return; }
     try {
       await marks.save.mutateAsync({ client_id: client.id, sold: !client.bought });
       toast({ title: client.bought ? "Marcação de venda removida." : "Cliente marcado como venda realizada." });
     } catch { toast({ title: "Não foi possível salvar a marcação.", variant: "error" }); }
+  }
+
+  async function completeSale(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!saleClient) return;
+    const saleDate = String(new FormData(event.currentTarget).get("sale_date") || "");
+    if (!saleDate || new Date(`${saleDate}T12:00:00`) > new Date()) { toast({ title: "Informe uma data de venda válida.", variant: "error" }); return; }
+    try {
+      let registered = crm.clients.find((client) => client.id === saleClient.id || client.name.toLocaleLowerCase("pt-BR") === saleClient.name.toLocaleLowerCase("pt-BR"));
+      const followUp = nextSaleAnniversary(saleDate);
+      if (!registered) registered = await crm.createClient.mutateAsync({ name: saleClient.name, city: saleClient.city, neighborhood: saleClient.neighborhood, property_profile: saleClient.profile, status: "venda realizada", sale_date: saleDate, next_follow_up: followUp, source: "Mapa de clientes" });
+      else registered = await crm.updateClient.mutateAsync({ id: registered.id, input: { status: "venda realizada", sale_date: saleDate, next_follow_up: followUp }, previousStatus: registered.status });
+      await marks.save.mutateAsync({ client_id: saleClient.id, sold: true });
+      setSaleClient(null);
+      toast({ title: "Venda registrada e follow-up de aniversário programado." });
+    } catch { toast({ title: "Não foi possível registrar a venda.", variant: "error" }); }
   }
 
   async function changePhoto(client: ClientMapItem, file?: File) {
@@ -234,9 +270,15 @@ export function ClientsPage() {
       toast({ title: "Escolha uma data e horário futuros.", variant: "error" }); return;
     }
     try {
-      await calendar.createEvent.mutateAsync({ title: `Visita: ${scheduleClient.name}`, date, start_time: time, type: "visita", status: "agendado", location: `${scheduleClient.neighborhood}, ${scheduleClient.city}`, notes: `client-map:${scheduleClient.id}` });
+      let registered = crm.clients.find((client) => client.id === scheduleClient.id || client.name.toLocaleLowerCase("pt-BR") === scheduleClient.name.toLocaleLowerCase("pt-BR"));
+      if (!registered) {
+        registered = await crm.createClient.mutateAsync({ name: scheduleClient.name, city: scheduleClient.city, neighborhood: scheduleClient.neighborhood, property_profile: scheduleClient.profile, status: "visita agendada", next_follow_up: date, source: "Mapa de clientes", lat: scheduleClient.locationPrecision === "exact" ? scheduleClient.lat : null, lng: scheduleClient.locationPrecision === "exact" ? scheduleClient.lng : null });
+      } else if (registered.status !== "visita agendada") {
+        registered = await crm.updateClient.mutateAsync({ id: registered.id, input: { status: "visita agendada", next_follow_up: date }, previousStatus: registered.status });
+      }
+      await calendar.createEvent.mutateAsync({ title: `Visita: ${scheduleClient.name}`, date, start_time: time, type: "visita", status: "agendado", location: `${scheduleClient.neighborhood}, ${scheduleClient.city}`, notes: `client-map:${scheduleClient.id}`, client_id: registered.id });
       setScheduleClient(null);
-      toast({ title: "Visita adicionada à agenda." });
+      toast({ title: "Cliente cadastrado e visita adicionada à agenda." });
     } catch { toast({ title: "Não foi possível agendar. Seus dados foram mantidos.", variant: "error" }); }
   }
 
@@ -278,42 +320,7 @@ export function ClientsPage() {
         </Dialog>
       </section>
 
-      <Card className="order-5 overflow-hidden border-primary/20">
-        <CardHeader className="bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.14),_transparent_38%),hsl(var(--card))]">
-          <CardTitle>Cadastrar cliente de teste</CardTitle>
-          <CardDescription>Cidades reconhecidas aparecem com localização aproximada.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_0.8fr_0.8fr_0.9fr_0.7fr_auto]" onSubmit={addClient}>
-            <Field name="name" label="Cliente" placeholder="Nome do cliente" required />
-            <Field name="city" label="Cidade" placeholder="Ex.: São Paulo" required />
-            <Field name="neighborhood" label="Bairro" placeholder="Ex.: Mooca" />
-            <Field name="profile" label="Perfil de imóvel" placeholder="Ex.: Casa em condomínio" required />
-            <div className="space-y-2">
-              <Label>Etapa</Label>
-              <Select name="stage" defaultValue="lead">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(["lead", "em contato", "visita agendada", "comprador", "pós-venda"] as ClientStage[]).map((item) => (
-                    <SelectItem key={item} value={item}>{item}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button className="min-h-11 w-full" type="submit">
-                <Plus className="h-4 w-4" />
-                Salvar
-              </Button>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border p-3 md:col-span-2 xl:col-span-2">
-              <input id="bought" name="bought" type="checkbox" className="h-4 w-4" />
-              <Label htmlFor="bought">Cliente já comprou</Label>
-            </div>
-            <Field name="downloads" label="Interações/downloads" type="number" placeholder="1" />
-          </form>
-        </CardContent>
-      </Card>
+      <ClientHub />
 
       <div className="order-2 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
         <Card className="min-w-0 overflow-hidden">
@@ -347,7 +354,7 @@ export function ClientsPage() {
               <Dialog open={Boolean(selectedClient)} onOpenChange={(open) => { if (!open) setSelectedClientId(null); }}>
                 {selectedClient && <DialogContent className="sm:max-w-md">
                   <DialogHeader><DialogTitle>{selectedClient.name}</DialogTitle><DialogDescription>{selectedClient.city} • {selectedClient.neighborhood}</DialogDescription></DialogHeader>
-                  <p className="mb-3 text-xs text-muted-foreground">{selectedClient.id.startsWith("custom-") && selectedClient.locationPrecision !== "exact" ? "Localização aproximada: centro da cidade." : isDemo && !selectedClient.id.startsWith("sale-") ? "Localização demonstrativa." : ""}</p>
+                  <p className="mb-3 text-xs text-muted-foreground">{selectedClient.locationPrecision === "city" ? "Localização aproximada: centro da cidade." : isDemo && !selectedClient.id.startsWith("sale-") ? "Localização demonstrativa." : ""}</p>
                 <div aria-label={`Detalhes de ${selectedClient.name}`}>
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 shrink-0"><ClientAvatar name={selectedClient.name} photo={selectedClient.photo} /></div>
@@ -424,6 +431,12 @@ export function ClientsPage() {
             <div className="space-y-2"><Label htmlFor="visit-time">Horário</Label><Input id="visit-time" name="time" type="time" required /></div>
             <Button className="min-h-11 w-full" disabled={calendar.createEvent.isPending}>{calendar.createEvent.isPending ? "Salvando..." : "Confirmar visita"}</Button>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(saleClient)} onOpenChange={(open) => { if (!open) setSaleClient(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Registrar venda</DialogTitle><DialogDescription>{saleClient?.name}. A data será usada no follow-up anual.</DialogDescription></DialogHeader>
+          <form className="space-y-4" onSubmit={completeSale}><div className="space-y-2"><Label htmlFor="sale-date">Data da venda</Label><Input id="sale-date" name="sale_date" type="date" max={format(new Date(), "yyyy-MM-dd")} required /></div><Button className="w-full" disabled={crm.createClient.isPending || crm.updateClient.isPending}>Confirmar venda</Button></form>
         </DialogContent>
       </Dialog>
     </div>
@@ -508,6 +521,14 @@ function topBy(items: ClientMapItem[], labeler: (item: ClientMapItem) => string,
   return label ? { label, score } : null;
 }
 
+function clientStatusToMapStage(status: import("@/types/database").ClientStatus): ClientStage {
+  if (status === "venda realizada") return "comprador";
+  if (status === "pós-venda") return "pós-venda";
+  if (status === "visita agendada") return "visita agendada";
+  if (status === "lead") return "lead";
+  return "em contato";
+}
+
 function coordinatesForCity(city: string) {
   const base = cityCoordinates[city.trim().toLowerCase()];
   return { lat: base?.lat, lng: base?.lng, locationPrecision: "city" as const };
@@ -539,4 +560,12 @@ function formatVisitDate(date: string) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(date));
+}
+
+function nextSaleAnniversary(saleDate: string) {
+  const sold = new Date(`${saleDate}T12:00:00`);
+  const today = new Date();
+  let next = new Date(today.getFullYear(), sold.getMonth(), sold.getDate(), 12);
+  if (next <= today) next = new Date(today.getFullYear() + 1, sold.getMonth(), sold.getDate(), 12);
+  return next.toISOString().slice(0, 10);
 }

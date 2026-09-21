@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { useEvents } from "@/features/calendar/use-events";
+import { useClients } from "@/features/clients/use-clients";
 import type { CalendarEvent, EventType } from "@/types/database";
 
 const types: EventType[] = ["visita", "reunião", "ligação", "follow-up", "captação", "plantão", "documentação", "conteúdo", "pessoal", "outro"];
@@ -14,25 +16,39 @@ const types: EventType[] = ["visita", "reunião", "ligação", "follow-up", "cap
 export function EventForm({ event, onSaved }: { event?: CalendarEvent; onSaved?: () => void }) {
   const today = format(new Date(), "yyyy-MM-dd");
   const { createEvent, updateEvent } = useEvents(event?.date ?? today);
+  const clients = useClients();
   const { toast } = useToast();
-  const loading = createEvent.isPending || updateEvent.isPending;
+  const [eventType, setEventType] = useState<EventType>(event?.type ?? "visita");
+  const [clientChoice, setClientChoice] = useState(event?.client_id ?? "new");
+  const loading = createEvent.isPending || updateEvent.isPending || clients.createClient.isPending;
 
   async function handleSubmit(formEvent: React.FormEvent<HTMLFormElement>) {
     formEvent.preventDefault();
     const form = new FormData(formEvent.currentTarget);
-    const input = {
+    try {
+      let clientId = clientChoice !== "new" ? clientChoice : null;
+      if (eventType === "visita" && clientChoice === "new") {
+        const clientName = String(form.get("client_name") || "").trim();
+        if (!clientName) { toast({ title: "Informe o nome do novo cliente.", variant: "error" }); return; }
+        const created = await clients.createClient.mutateAsync({ name: clientName, whatsapp: String(form.get("client_whatsapp") || "").trim() || null, city: String(form.get("client_city") || "").trim() || null, property_profile: String(form.get("client_profile") || "").trim() || null, status: "visita agendada", next_follow_up: String(form.get("date") || today), source: "Agenda" });
+        clientId = created.id;
+      }
+      if (eventType === "visita" && clientId) {
+        const current = clients.clients.find((client) => client.id === clientId);
+        if (current && current.status !== "visita agendada") await clients.updateClient.mutateAsync({ id: current.id, input: { status: "visita agendada", next_follow_up: String(form.get("date") || today) }, previousStatus: current.status });
+      }
+      const input = {
       title: String(form.get("title") || "").trim(),
       description: String(form.get("description") || "").trim() || null,
       date: String(form.get("date") || today),
       start_time: String(form.get("start_time") || "09:00"),
       end_time: String(form.get("end_time") || "") || null,
-      type: String(form.get("type") || "outro") as EventType,
+      type: eventType,
       location: String(form.get("location") || "").trim() || null,
       status: event?.status ?? "agendado",
-      notes: event?.notes ?? null
-    };
-
-    try {
+      notes: event?.notes ?? null,
+      client_id: clientId
+      };
       if (event) await updateEvent.mutateAsync({ id: event.id, input });
       else await createEvent.mutateAsync(input);
       toast({ title: event ? "Compromisso atualizado." : "Compromisso criado." });
@@ -55,7 +71,7 @@ export function EventForm({ event, onSaved }: { event?: CalendarEvent; onSaved?:
         </div>
         <div className="space-y-2">
           <Label htmlFor="type">Tipo</Label>
-          <Select name="type" defaultValue={event?.type ?? "visita"}>
+          <Select name="type" value={eventType} onValueChange={(value) => setEventType(value as EventType)}>
             <SelectTrigger id="type">
               <SelectValue />
             </SelectTrigger>
@@ -69,6 +85,11 @@ export function EventForm({ event, onSaved }: { event?: CalendarEvent; onSaved?:
           </Select>
         </div>
       </div>
+      {eventType === "visita" && <div className="space-y-3 rounded-lg border bg-muted/35 p-3">
+        <div className="flex items-center gap-2 font-medium"><UserPlus className="h-4 w-4 text-primary" />Cliente da visita</div>
+        <Select value={clientChoice} onValueChange={setClientChoice}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="new">Cadastrar novo cliente</SelectItem>{clients.clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select>
+        {clientChoice === "new" && <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="event-client-name">Nome</Label><Input id="event-client-name" name="client_name" placeholder="Nome do cliente" required /></div><div className="space-y-2"><Label htmlFor="event-client-whatsapp">WhatsApp</Label><Input id="event-client-whatsapp" name="client_whatsapp" inputMode="tel" /></div><div className="space-y-2"><Label htmlFor="event-client-city">Cidade</Label><Input id="event-client-city" name="client_city" /></div><div className="space-y-2"><Label htmlFor="event-client-profile">Perfil do imóvel</Label><Input id="event-client-profile" name="client_profile" placeholder="Ex.: apartamento 3 quartos" /></div></div>}
+      </div>}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label htmlFor="start_time">Início</Label>

@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { Banknote, CalendarPlus, CheckSquare, Receipt, WalletCards } from "lucide-react";
+import { Banknote, CalendarPlus, CheckSquare, Receipt, UserPlus, WalletCards } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { EventForm } from "@/features/calendar/EventForm";
 import { TaskForm } from "@/features/tasks/TaskForm";
 import { CommissionForm, TransactionForm } from "@/features/finance/FinancePage";
+import { ClientForm } from "@/features/clients/ClientForm";
+import { useClients } from "@/features/clients/use-clients";
+import { useToast } from "@/components/ui/toast";
+import type { ClientInput } from "@/features/clients/client-service";
 
-type QuickAddMode = "event" | "task" | "income" | "expense" | "commission";
+type QuickAddMode = "event" | "task" | "client" | "income" | "expense" | "commission";
 
 export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [mode, setMode] = useState<QuickAddMode>("event");
@@ -18,7 +22,7 @@ export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <DialogTitle>Adicionar</DialogTitle>
           <DialogDescription>Cadastre rotina, receita, despesa ou comissão em poucos toques.</DialogDescription>
         </DialogHeader>
-        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Button type="button" variant={mode === "event" ? "default" : "outline"} onClick={() => setMode("event")}>
             <CalendarPlus className="h-4 w-4" />
             Compromisso
@@ -26,6 +30,10 @@ export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <Button type="button" variant={mode === "task" ? "default" : "outline"} onClick={() => setMode("task")}>
             <CheckSquare className="h-4 w-4" />
             Tarefa
+          </Button>
+          <Button type="button" variant={mode === "client" ? "default" : "outline"} onClick={() => setMode("client")}>
+            <UserPlus className="h-4 w-4" />
+            Cliente
           </Button>
           <Button type="button" variant={mode === "income" ? "default" : "outline"} onClick={() => setMode("income")}>
             <Banknote className="h-4 w-4" />
@@ -42,10 +50,21 @@ export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
         {mode === "event" && <EventForm onSaved={() => onOpenChange(false)} />}
         {mode === "task" && <TaskForm onSaved={() => onOpenChange(false)} />}
+        {mode === "client" && <QuickClientForm onSaved={() => onOpenChange(false)} />}
         {mode === "income" && <TransactionForm type="income" onSaved={() => onOpenChange(false)} />}
         {mode === "expense" && <TransactionForm type="expense" onSaved={() => onOpenChange(false)} />}
         {mode === "commission" && <CommissionForm onSaved={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   );
+}
+
+function QuickClientForm({ onSaved }: { onSaved: () => void }) {
+  const clients = useClients();
+  const { toast } = useToast();
+  async function save(input: ClientInput) {
+    try { await clients.createClient.mutateAsync(input); toast({ title: "Cliente cadastrado." }); onSaved(); }
+    catch { toast({ title: "Não foi possível cadastrar o cliente.", variant: "error" }); }
+  }
+  return <ClientForm saving={clients.createClient.isPending} onSave={save} />;
 }

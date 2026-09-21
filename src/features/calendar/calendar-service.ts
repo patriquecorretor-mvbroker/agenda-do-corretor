@@ -43,4 +43,5 @@ export type CalendarEventInsert = {
   location?: string | null;
   status?: CalendarEvent["status"];
   notes?: string | null;
+  client_id?: string | null;
 };

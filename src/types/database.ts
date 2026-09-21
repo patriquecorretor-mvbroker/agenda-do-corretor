@@ -32,6 +32,32 @@ export type EventType =
 
 export type EventStatus = "agendado" | "concluído" | "cancelado";
 
+export type ClientStatus = "lead" | "em contato" | "qualificado" | "visita agendada" | "proposta" | "negociação" | "venda realizada" | "pós-venda" | "perdido";
+
+export type Client = {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  city: string | null;
+  neighborhood: string | null;
+  property_profile: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  bedrooms: number | null;
+  notes: string | null;
+  source: string | null;
+  status: ClientStatus;
+  sale_date: string | null;
+  next_follow_up: string | null;
+  lat: number | null;
+  lng: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CalendarEvent = {
   id: string;
   user_id: string;
@@ -44,6 +70,7 @@ export type CalendarEvent = {
   location: string | null;
   status: EventStatus;
   notes: string | null;
+  client_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -202,6 +229,11 @@ export type Database = {
           start_time: string;
         };
         Update: Partial<CalendarEvent>;
+      };
+      clients: {
+        Row: Client;
+        Insert: Omit<Partial<Client>, "id" | "created_at" | "updated_at"> & { user_id: string; name: string };
+        Update: Partial<Client>;
       };
       tasks: {
         Row: Task;
