@@ -3,6 +3,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import type { Client } from "@/types/database";
 import { createClient, listClients, updateClient, type ClientInput } from "./client-service";
+import { appendLocalClientActivity } from "./use-client-activities";
 
 const demoKey = "mv-broker-crm-clients";
 
@@ -42,6 +43,7 @@ export function useClients() {
       const now = new Date().toISOString();
       const client: Client = { id: localId(), user_id: user!.id, phone: null, whatsapp: null, email: null, city: null, neighborhood: null, property_profile: null, budget_min: null, budget_max: null, bedrooms: null, notes: null, source: null, status: "lead", sale_date: null, next_follow_up: null, lat: null, lng: null, created_at: now, updated_at: now, ...input };
       writeLocal([client, ...readLocal()]);
+      appendLocalClientActivity(user!.id, { client_id: client.id, type: "cadastro", title: "Cliente cadastrado", details: client.source ? `Origem: ${client.source}` : null });
       return client;
     }, onSuccess: invalidate
   });
@@ -51,6 +53,7 @@ export function useClients() {
       let updated: Client | undefined;
       writeLocal(readLocal().map((client) => client.id === id ? (updated = { ...client, ...input, updated_at: new Date().toISOString() }) : client));
       if (!updated) throw new Error("Cliente não encontrado.");
+      if (input.status && input.status !== previousStatus) appendLocalClientActivity(user!.id, { client_id: id, type: input.status === "venda realizada" ? "venda" : "mudança de etapa", title: `Etapa alterada para ${input.status}`, details: input.sale_date ? `Venda em ${input.sale_date}` : null });
       return updated;
     }, onSuccess: invalidate
   });

@@ -58,6 +58,19 @@ export type Client = {
   updated_at: string;
 };
 
+export type ClientActivityType = "cadastro" | "mudança de etapa" | "ligação" | "mensagem" | "visita" | "proposta" | "venda" | "follow-up" | "observação";
+
+export type ClientActivity = {
+  id: string;
+  user_id: string;
+  client_id: string;
+  type: ClientActivityType;
+  title: string;
+  details: string | null;
+  occurred_at: string;
+  created_at: string;
+};
+
 export type CalendarEvent = {
   id: string;
   user_id: string;
@@ -234,6 +247,16 @@ export type Database = {
         Row: Client;
         Insert: Omit<Partial<Client>, "id" | "created_at" | "updated_at"> & { user_id: string; name: string };
         Update: Partial<Client>;
+      };
+      client_activities: {
+        Row: ClientActivity;
+        Insert: Omit<Partial<ClientActivity>, "id" | "created_at"> & {
+          user_id: string;
+          client_id: string;
+          type: ClientActivityType;
+          title: string;
+        };
+        Update: Partial<ClientActivity>;
       };
       tasks: {
         Row: Task;
