@@ -1,4 +1,4 @@
-const CACHE_NAME = "agenda-corretor-v1";
+const CACHE_NAME = "agenda-corretor-v20";
 const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -32,10 +32,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request)
+  const isCode = ["script", "style", "worker"].includes(request.destination);
+  if (isCode) {
+    event.respondWith(
+      fetch(request)
         .then((response) => {
           if (response.ok && new URL(request.url).origin === self.location.origin) {
             const copy = response.clone();
@@ -43,8 +43,21 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match("/offline.html"));
-    })
+        .catch(async () => (await caches.match(request)) ?? Response.error())
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then((cached) =>
+      cached ?? fetch(request).then((response) => {
+        if (response.ok && new URL(request.url).origin === self.location.origin) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+    )
   );
 });
 

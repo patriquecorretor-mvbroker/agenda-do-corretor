@@ -19,16 +19,30 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [demoEnabled, setDemoEnabled] = useState(() => localStorage.getItem("agenda-demo-session") === "true");
+  const [demoEnabled, setDemoEnabled] = useState(() => safeStorageGet("agenda-demo-session") === "true");
   const [loading, setLoading] = useState(hasSupabaseConfig);
 
   useEffect(() => {
-    if (!supabase) return;
-
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    if (!supabase) {
       setLoading(false);
-    });
+      return;
+    }
+
+    let active = true;
+    const loadingTimeout = window.setTimeout(() => {
+      if (active) setLoading(false);
+    }, 5000);
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (active) setLoading(false);
+      });
 
     const {
       data: { subscription }
@@ -37,7 +51,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      window.clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -48,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isDemo: !hasSupabaseConfig && demoEnabled,
       async signIn(email, password) {
         if (!supabase) {
-          localStorage.setItem("agenda-demo-session", "true");
+          safeStorageSet("agenda-demo-session", "true");
           setDemoEnabled(true);
           return;
         }
@@ -57,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       async signUp(email, password) {
         if (!supabase) {
-          localStorage.setItem("agenda-demo-session", "true");
+          safeStorageSet("agenda-demo-session", "true");
           setDemoEnabled(true);
           return;
         }
@@ -73,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       async signOut() {
         if (!supabase) {
-          localStorage.removeItem("agenda-demo-session");
+          safeStorageRemove("agenda-demo-session");
           setDemoEnabled(false);
           return;
         }
@@ -85,6 +103,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function safeStorageGet(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Alguns navegadores bloqueiam armazenamento em contexto incorporado.
+  }
+}
+
+function safeStorageRemove(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Mantém a interface utilizável mesmo sem acesso ao armazenamento local.
+  }
 }
 
 export function useAuth() {

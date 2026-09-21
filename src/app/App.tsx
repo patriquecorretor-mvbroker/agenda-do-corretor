@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Component, type ErrorInfo, type ReactNode, useEffect, useState } from "react";
+import { Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
 import { AuthPage } from "@/features/auth/AuthPage";
@@ -11,15 +12,15 @@ import { getPalette, hexToHsl, primaryForegroundFor, type PaletteId } from "@/li
 function AppContent() {
   const { user, loading } = useAuth();
   const { profile, isLoading } = useProfile();
-  const [dark, setDark] = useState(() => localStorage.getItem("theme") !== "light");
-  const [palette, setPalette] = useState<PaletteId>(() => (localStorage.getItem("palette") as PaletteId | null) ?? "mv-gold");
-  const [customColor, setCustomColor] = useState(() => localStorage.getItem("custom-color") ?? "#f47c20");
+  const [dark, setDark] = useState(() => safeStorageGet("theme") !== "light");
+  const [palette, setPalette] = useState<PaletteId>(() => (safeStorageGet("palette") as PaletteId | null) ?? "mv-gold");
+  const [customColor, setCustomColor] = useState(() => safeStorageGet("custom-color") ?? "#f47c20");
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("theme", dark ? "dark" : "light");
-    localStorage.setItem("palette", palette);
-    localStorage.setItem("custom-color", customColor);
+    safeStorageSet("theme", dark ? "dark" : "light");
+    safeStorageSet("palette", palette);
+    safeStorageSet("custom-color", customColor);
 
     const selected = getPalette(palette);
     const primary = palette === "custom" ? hexToHsl(customColor) : dark ? selected.dark : selected.light;
@@ -74,10 +75,71 @@ function AppContent() {
 
 export function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ToastProvider>
+    <AppErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ToastProvider>
+    </AppErrorBoundary>
   );
+}
+
+function safeStorageGet(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // O aplicativo continua funcional mesmo quando o navegador bloqueia armazenamento local.
+  }
+}
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Falha ao iniciar a aplicação", error, info);
+  }
+
+  async recover() {
+    try {
+      const registrations = await navigator.serviceWorker?.getRegistrations();
+      await Promise.all((registrations ?? []).map((registration) => registration.unregister()));
+      const keys = await caches?.keys();
+      await Promise.all((keys ?? []).map((key) => caches.delete(key)));
+    } finally {
+      window.location.reload();
+    }
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+
+    return (
+      <main className="grid min-h-screen place-items-center bg-background px-5 text-foreground">
+        <section className="w-full max-w-md rounded-3xl border bg-card p-6 text-center shadow-soft">
+          <img src="/brand/mv-broker-logo.jpg" alt="MV Broker" className="mx-auto h-16 w-16 rounded-2xl object-cover" />
+          <h1 className="mt-5 text-2xl font-semibold">Vamos atualizar o aplicativo</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Uma versão antiga ficou salva neste dispositivo. Atualize para carregar a versão mais recente.
+          </p>
+          <Button className="mt-5 w-full" onClick={() => this.recover()}>
+            <RefreshCw className="h-4 w-4" />
+            Atualizar aplicativo
+          </Button>
+        </section>
+      </main>
+    );
+  }
 }
