@@ -855,7 +855,9 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
     const form = new FormData(event.currentTarget);
     const selectedCategory = String(form.get("category") || "").trim() || "outro";
     if (!categories.some((item) => item.toLowerCase() === selectedCategory.toLowerCase())) {
-      setCustomCategories((current) => [...current, selectedCategory]);
+      const nextCustomCategories = [...customCategories, selectedCategory];
+      setCustomCategories(nextCustomCategories);
+      localStorage.setItem(storageKey, JSON.stringify(nextCustomCategories));
     }
     await finance.createTransaction.mutateAsync({
       type,
@@ -871,7 +873,9 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
       recurrence_rule: String(form.get("recurrence_rule") || "") || null
     });
     const normalizedCategory = selectedCategory.toLocaleLowerCase("pt-BR");
-    setCategoryUsage((current) => ({ ...current, [normalizedCategory]: (current[normalizedCategory] ?? 0) + 1 }));
+    const nextUsage = { ...categoryUsage, [normalizedCategory]: (categoryUsage[normalizedCategory] ?? 0) + 1 };
+    setCategoryUsage(nextUsage);
+    localStorage.setItem(usageKey, JSON.stringify(nextUsage));
     toast({ title: type === "income" ? "Receita salva." : "Despesa salva." });
     onSaved();
   }
