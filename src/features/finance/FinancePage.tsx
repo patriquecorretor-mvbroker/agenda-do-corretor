@@ -799,7 +799,10 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
   const finance = useFinance();
   const { toast } = useToast();
   const storageKey = `mv-broker-${type}-categories`;
+  const usageKey = `mv-broker-${type}-category-usage`;
   const baseCategories = type === "income" ? incomeCategories : expenseCategories;
+  const [category, setCategory] = useState("");
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(storageKey) ?? "[]") as string[];
@@ -807,24 +810,58 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
       return [];
     }
   });
-  const categories = Array.from(new Set([...baseCategories, ...customCategories])).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const [categoryUsage, setCategoryUsage] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(usageKey) ?? "{}") as Record<string, number>;
+    } catch {
+      return {};
+    }
+  });
+  const categories = useMemo(() => {
+    const transactionUsage = finance.transactions
+      .filter((item) => item.type === type)
+      .reduce<Record<string, number>>((counts, item) => {
+        const key = item.category.toLocaleLowerCase("pt-BR");
+        counts[key] = (counts[key] ?? 0) + 1;
+        return counts;
+      }, {});
+    return Array.from(new Set([...baseCategories, ...customCategories])).sort((a, b) => {
+      const aKey = a.toLocaleLowerCase("pt-BR");
+      const bKey = b.toLocaleLowerCase("pt-BR");
+      const aScore = (transactionUsage[aKey] ?? 0) * 10 + (categoryUsage[aKey] ?? 0);
+      const bScore = (transactionUsage[bKey] ?? 0) * 10 + (categoryUsage[bKey] ?? 0);
+      if (aScore !== bScore) return bScore - aScore;
+      const aIndex = baseCategories.indexOf(a);
+      const bIndex = baseCategories.indexOf(b);
+      if (aIndex !== bIndex) return (aIndex < 0 ? 999 : aIndex) - (bIndex < 0 ? 999 : bIndex);
+      return a.localeCompare(b, "pt-BR");
+    });
+  }, [baseCategories, categoryUsage, customCategories, finance.transactions, type]);
+
+  useEffect(() => {
+    if (!category && categories[0]) setCategory(categories[0]);
+  }, [categories, category]);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(customCategories));
   }, [customCategories, storageKey]);
 
+  useEffect(() => {
+    localStorage.setItem(usageKey, JSON.stringify(categoryUsage));
+  }, [categoryUsage, usageKey]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const category = String(form.get("category") || "").trim() || "outro";
-    if (!categories.some((item) => item.toLowerCase() === category.toLowerCase())) {
-      setCustomCategories((current) => [...current, category]);
+    const selectedCategory = String(form.get("category") || "").trim() || "outro";
+    if (!categories.some((item) => item.toLowerCase() === selectedCategory.toLowerCase())) {
+      setCustomCategories((current) => [...current, selectedCategory]);
     }
     await finance.createTransaction.mutateAsync({
       type,
       amount: Number(form.get("amount") || 0),
-      category,
-      description: category,
+      category: selectedCategory,
+      description: selectedCategory,
       due_date: String(form.get("date") || format(new Date(), "yyyy-MM-dd")),
       paid_date: type === "income" ? String(form.get("date") || format(new Date(), "yyyy-MM-dd")) : null,
       status: type === "income" ? "recebido" : "pendente",
@@ -833,6 +870,8 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
       is_recurring: form.get("is_recurring") === "on",
       recurrence_rule: String(form.get("recurrence_rule") || "") || null
     });
+    const normalizedCategory = selectedCategory.toLocaleLowerCase("pt-BR");
+    setCategoryUsage((current) => ({ ...current, [normalizedCategory]: (current[normalizedCategory] ?? 0) + 1 }));
     toast({ title: type === "income" ? "Receita salva." : "Despesa salva." });
     onSaved();
   }
@@ -844,21 +883,38 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
         <Field name="date" label="Data" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor={`${type}-category`}>Categoria</Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor={`${type}-category`}>Categoria</Label>
+          <span className="text-[11px] text-muted-foreground">Mais usadas primeiro</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {(showAllCategories ? categories : categories.slice(0, 8)).map((item) => (
+            <button
+              key={item}
+              type="button"
+              title={item}
+              aria-pressed={category.toLocaleLowerCase("pt-BR") === item.toLocaleLowerCase("pt-BR")}
+              onClick={() => setCategory(item)}
+              className={cn(
+                "min-h-11 min-w-0 truncate rounded-xl border px-2.5 text-left text-xs font-semibold transition sm:text-sm",
+                category.toLocaleLowerCase("pt-BR") === item.toLocaleLowerCase("pt-BR") ? "border-primary bg-primary/12 text-primary ring-1 ring-primary/40" : "bg-card hover:border-primary/40 hover:bg-primary/5"
+              )}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        {categories.length > 8 && <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setShowAllCategories((current) => !current)}>{showAllCategories ? "Mostrar principais" : `Ver todas as ${categories.length} categorias`}</Button>}
+        <Label htmlFor={`${type}-category`} className="pt-1 text-xs text-muted-foreground">Outra categoria</Label>
         <Input
           id={`${type}-category`}
           name="category"
-          list={`${type}-category-list`}
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
           placeholder={type === "income" ? "Ex.: comissão, indicação..." : "Ex.: combustível, anúncios..."}
-          defaultValue={baseCategories[0]}
           required
         />
-        <datalist id={`${type}-category-list`}>
-          {categories.map((item) => (
-            <option key={item} value={item} />
-          ))}
-        </datalist>
-        <p className="text-xs text-muted-foreground">Digite uma nova categoria e ela ficará disponível nos próximos lançamentos.</p>
+        <p className="text-xs text-muted-foreground">Ao digitar um novo nome, a categoria ficará salva para os próximos lançamentos.</p>
       </div>
       <div className="space-y-2">
         <Label>Forma de pagamento</Label>

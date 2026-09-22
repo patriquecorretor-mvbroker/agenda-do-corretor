@@ -55,7 +55,7 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
+    <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-primary/20 bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.18),_transparent_35%),linear-gradient(180deg,_#050403,_#0f0b08)] p-5 text-white backdrop-blur-xl lg:flex lg:flex-col">
         <div className="mb-8 flex items-center gap-3">
           <img
@@ -96,7 +96,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="mx-auto min-h-screen max-w-7xl px-4 pb-28 pt-5 sm:px-6 lg:ml-72 lg:px-8 lg:pb-8">
+      <main className="mx-auto min-h-screen w-full min-w-0 max-w-7xl overflow-x-hidden px-4 pb-28 pt-5 sm:px-6 lg:ml-72 lg:w-auto lg:px-8 lg:pb-8">
         {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
         {view === "agenda" && <AgendaPage />}
         {view === "clients" && <ClientsPage />}
