@@ -97,9 +97,9 @@ export function ClientMap({ clients, onSelect, emptyMessage }: {
       }
       content.appendChild(badges);
       const title = `${client.name}, ${client.city}${client.bought ? ", vendido" : ""}${client.visited ? ", visitado" : ""}${client.scheduled ? ", visita agendada" : ""}`;
-      const marker = L.marker([client.lat, client.lng], { title, alt: title, keyboard: true, riseOnHover: true, icon: L.divIcon({ html: content, className: "client-map-marker", iconSize: [48, 48], iconAnchor: [24, 24] }) });
+      const marker = L.marker([client.lat, client.lng], { title, alt: title, keyboard: true, riseOnHover: true, icon: L.divIcon({ html: content, className: "client-map-marker", iconSize: [34, 34], iconAnchor: [17, 17] }) });
       const tooltip = document.createElement("span"); tooltip.textContent = client.name;
-      marker.bindTooltip(tooltip, { direction: "top", offset: [0, -26] });
+      marker.bindTooltip(tooltip, { direction: "top", offset: [0, -20] });
       marker.on("click", () => { dialog.current?.close(); setExpanded(false); select.current(client.id); });
       group.addLayer(marker);
     });
@@ -162,5 +162,5 @@ export function ClientMap({ clients, onSelect, emptyMessage }: {
 }
 
 function MapControl({ label, icon: Icon, onClick, disabled }: { label: string; icon: React.ElementType; onClick: () => void; disabled?: boolean }) {
-  return <button type="button" title={label} aria-label={label} onClick={onClick} disabled={disabled}><Icon className="h-5 w-5" /></button>;
+  return <button type="button" title={label} aria-label={label} onClick={onClick} disabled={disabled}><Icon className="h-4 w-4" /></button>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, CalendarClock, CalendarPlus, Camera, Check, CircleDollarSign, Crown, ExternalLink, Grid2X2, LayoutList, Map, MapPin, MessageCircle, Navigation, Phone, Plus, Search, SlidersHorizontal, Trophy, UserRoundSearch, Users, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -108,6 +108,7 @@ export function ClientsPage() {
   const [selectedCrmId, setSelectedCrmId] = useState<string>();
   const [editingClient, setEditingClient] = useState<Client>();
   const [clientView, setClientView] = useState<ClientView>("list");
+  const clientViewBeforeDialog = useRef<ClientView>("list");
   const [funnelStage, setFunnelStage] = useState<ClientStatus | "all">("all");
   const [scheduleClient, setScheduleClient] = useState<ClientMapItem | null>(null);
   const [saleClient, setSaleClient] = useState<ClientMapItem | null>(null);
@@ -276,7 +277,11 @@ export function ClientsPage() {
 
   function openClient(client: ClientMapItem) {
     if (crm.clients.some((item) => item.id === client.id)) setSelectedCrmId(client.id);
-    else { setClientView("map"); setSelectedClientId(client.id); }
+    else {
+      clientViewBeforeDialog.current = clientView;
+      setClientView("map");
+      setSelectedClientId(client.id);
+    }
   }
 
   function addClient(event: React.FormEvent<HTMLFormElement>) {
@@ -473,7 +478,12 @@ export function ClientsPage() {
               emptyMessage={visibleClients.length ? "Clientes sem localização conhecida. Consulte a lista." : "Nenhum cliente corresponde aos filtros."}
             />
             {visibleClients.length > mappedClients.length && <p className="mt-3 text-sm text-muted-foreground">{visibleClients.length - mappedClients.length} cliente(s) sem localização conhecida na lista.</p>}
-              <Dialog open={Boolean(selectedClient)} onOpenChange={(open) => { if (!open) setSelectedClientId(null); }}>
+              <Dialog open={Boolean(selectedClient)} onOpenChange={(open) => {
+                if (!open) {
+                  setSelectedClientId(null);
+                  setClientView(clientViewBeforeDialog.current);
+                }
+              }}>
                 {selectedClient && <DialogContent className="sm:max-w-md">
                   <DialogHeader><DialogTitle>{selectedClient.name}</DialogTitle><DialogDescription>{selectedClient.city} • {selectedClient.neighborhood}</DialogDescription></DialogHeader>
                   <p className="mb-3 text-xs text-muted-foreground">{selectedClient.locationPrecision === "city" ? "Localização aproximada: centro da cidade." : isDemo && !selectedClient.id.startsWith("sale-") ? "Localização demonstrativa." : ""}</p>
