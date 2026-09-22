@@ -1,24 +1,27 @@
 import { useEffect, useState } from "react";
-import { CalendarPlus, Camera, Check, Crown, ExternalLink, MapPin, MessageCircle, Navigation, Search, Trophy, Users, X, SlidersHorizontal } from "lucide-react";
+import { Bot, CalendarClock, CalendarPlus, Camera, Check, CircleDollarSign, Crown, ExternalLink, Grid2X2, LayoutList, Map, MapPin, MessageCircle, Navigation, Phone, Plus, Search, SlidersHorizontal, Trophy, UserRoundSearch, Users, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useEvents } from "@/features/calendar/use-events";
 import { useAuth } from "@/features/auth/auth-context";
 import { hasSupabaseConfig, requireSupabase } from "@/lib/supabase";
-import type { CalendarEvent } from "@/types/database";
+import type { CalendarEvent, Client, ClientStatus } from "@/types/database";
 import { useClientMarks } from "./use-client-marks";
 import { ClientAvatar } from "./ClientAvatar";
 import { ClientMap } from "./ClientMap";
-import { ClientHub } from "./ClientHub";
 import { useClients } from "./use-clients";
+import { AiClientIntake } from "./AiClientIntake";
+import { ClientDetailDialog } from "./ClientDetailDialog";
+import { ClientForm } from "./ClientForm";
+import type { ClientInput } from "./client-service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useFinance } from "@/features/finance/use-finance";
 
 type ClientStage = "lead" | "em contato" | "visita agendada" | "comprador" | "pós-venda";
@@ -39,7 +42,27 @@ type ClientMapItem = {
   photo?: string;
   whatsapp?: string;
   locationPrecision?: "city" | "exact";
+  crmStatus?: ClientStatus;
+  budgetMin?: number;
+  budgetMax?: number;
+  bedrooms?: number;
+  nextFollowUp?: string;
+  phone?: string;
 };
+
+type ClientView = "list" | "cards" | "map";
+
+const funnelStatuses: Array<{ value: ClientStatus | "all"; label: string }> = [
+  { value: "all", label: "Todos" },
+  { value: "lead", label: "Lead" },
+  { value: "em contato", label: "Em contato" },
+  { value: "qualificado", label: "Qualificado" },
+  { value: "visita agendada", label: "Visita" },
+  { value: "proposta", label: "Proposta" },
+  { value: "negociação", label: "Negociação" },
+  { value: "venda realizada", label: "Venda" },
+  { value: "pós-venda", label: "Pós-venda" }
+];
 
 const demoClients: ClientMapItem[] = [
   { id: "1", name: "Mariana Alves", city: "São Paulo", neighborhood: "Mooca", profile: "Apartamento 2 quartos", stage: "visita agendada", bought: false, downloads: 9, x: 58, y: 50, lat: -23.558, lng: -46.596, whatsapp: "5511999990001" },
@@ -81,6 +104,11 @@ export function ClientsPage() {
   const crm = useClients();
   const [mapFilter, setMapFilter] = useState("todos");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<"manual" | "ai" | null>(null);
+  const [selectedCrmId, setSelectedCrmId] = useState<string>();
+  const [editingClient, setEditingClient] = useState<Client>();
+  const [clientView, setClientView] = useState<ClientView>("list");
+  const [funnelStage, setFunnelStage] = useState<ClientStatus | "all">("all");
   const [scheduleClient, setScheduleClient] = useState<ClientMapItem | null>(null);
   const [saleClient, setSaleClient] = useState<ClientMapItem | null>(null);
   const scheduled = useQuery({
@@ -149,7 +177,13 @@ export function ClientsPage() {
     y: 50,
     lat: client.lat ?? undefined,
     lng: client.lng ?? undefined,
-    whatsapp: client.whatsapp ?? client.phone ?? undefined
+    whatsapp: client.whatsapp ?? client.phone ?? undefined,
+    phone: client.phone ?? undefined,
+    crmStatus: client.status,
+    budgetMin: client.budget_min ?? undefined,
+    budgetMax: client.budget_max ?? undefined,
+    bedrooms: client.bedrooms ?? undefined,
+    nextFollowUp: client.next_follow_up ?? undefined
   }));
   const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}` })) : []), ...crmClients, ...financeClients, ...customClients].map((client) => {
     const mark = marks.marks.find((item) => item.client_id === client.id);
@@ -165,7 +199,8 @@ export function ClientsPage() {
     const matchesCity = city === allValue || client.city === city;
     const matchesProfile = profile === allValue || client.profile === profile;
     const matchesStage = stage === allValue || client.stage === stage;
-    return matchesQuery && matchesCity && matchesProfile && matchesStage;
+    const matchesFunnel = funnelStage === "all" || client.crmStatus === funnelStage;
+    return matchesQuery && matchesCity && matchesProfile && matchesStage && matchesFunnel;
   });
 
   const profileChampion = topBy(clients, (client) => client.profile, (client) => client.downloads);
@@ -180,6 +215,69 @@ export function ClientsPage() {
   const visitsThisYear = visitLog.filter((visit) => new Date(visit.date).getFullYear() === now.getFullYear()).length;
   const selectedClientVisits = selectedClient ? visitLog.filter((visit) => visit.clientId === selectedClient.id) : [];
   const selectedVisitedToday = selectedClient ? visitLog.some((visit) => visit.clientId === selectedClient.id && isTodayKey(visit.date)) : false;
+  const selectedCrmClient = crm.clients.find((client) => client.id === selectedCrmId);
+  const activeClients = crm.clients.filter((client) => !["venda realizada", "pós-venda", "perdido"].includes(client.status)).length;
+  const todayKey = format(now, "yyyy-MM-dd");
+  const followUpsToday = crm.clients.filter((client) => client.next_follow_up === todayKey).length;
+  const scheduledVisits = crm.clients.filter((client) => client.status === "visita agendada").length;
+  const negotiations = crm.clients.filter((client) => ["proposta", "negociação"].includes(client.status)).length;
+  const attentionClients = crm.clients
+    .filter((client) => !["venda realizada", "pós-venda", "perdido"].includes(client.status))
+    .sort((a, b) => attentionScore(b, now) - attentionScore(a, now))
+    .slice(0, 5);
+
+  async function createCrmClient(input: ClientInput) {
+    try {
+      await crm.createClient.mutateAsync(withAnniversaryFollowUp(input));
+      setCreateMode(null);
+      toast({ title: "Cliente cadastrado." });
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Não foi possível salvar.", variant: "error" });
+    }
+  }
+
+  async function editCrmClient(input: ClientInput) {
+    if (!editingClient) return;
+    try {
+      await crm.updateClient.mutateAsync({ id: editingClient.id, input: withAnniversaryFollowUp(input), previousStatus: editingClient.status });
+      setEditingClient(undefined);
+      toast({ title: "Cliente atualizado." });
+    } catch {
+      toast({ title: "Não foi possível atualizar.", variant: "error" });
+    }
+  }
+
+  async function changeCrmStatus(client: Client, next: ClientStatus) {
+    if (next === "venda realizada" && !client.sale_date) {
+      setSelectedCrmId(undefined);
+      setEditingClient(client);
+      toast({ title: "Informe a data da venda para concluir esta etapa." });
+      return false;
+    }
+    try {
+      await crm.updateClient.mutateAsync({ id: client.id, input: { status: next }, previousStatus: client.status });
+      toast({ title: `${client.name}: ${next}.` });
+      return true;
+    } catch {
+      toast({ title: "Não foi possível alterar a etapa.", variant: "error" });
+      return false;
+    }
+  }
+
+  async function changeFollowUp(client: Client, date: string | null) {
+    try {
+      await crm.updateClient.mutateAsync({ id: client.id, input: { next_follow_up: date }, previousStatus: client.status });
+      return true;
+    } catch {
+      toast({ title: "Não foi possível atualizar o follow-up.", variant: "error" });
+      return false;
+    }
+  }
+
+  function openClient(client: ClientMapItem) {
+    if (crm.clients.some((item) => item.id === client.id)) setSelectedCrmId(client.id);
+    else { setClientView("map"); setSelectedClientId(client.id); }
+  }
 
   function addClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -285,30 +383,21 @@ export function ClientsPage() {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold">Meus clientes</h1><p className="mt-1 text-sm text-muted-foreground">{clients.length} clientes · {clients.filter((client) => client.bought).length} compradores</p></div>
-        {isDemo && <span className="rounded-lg border px-3 py-1 text-xs text-muted-foreground">Demonstração</span>}
+    <div className="flex min-w-0 flex-col gap-5 text-[#0B1220] dark:text-foreground">
+      <header className="flex items-center justify-between gap-3">
+        <div className="min-w-0"><div className="flex items-center gap-2"><h1 className="text-3xl font-semibold tracking-normal">Clientes</h1>{isDemo && <span className="rounded-full bg-[#B89A6A]/12 px-2 py-1 text-[11px] font-semibold text-[#8A6E42]">Demo</span>}</div><p className="mt-1 text-sm text-[#667085] dark:text-muted-foreground">{clients.length} clientes • {clients.filter((client) => client.bought).length} compradores</p></div>
+        <div className="flex shrink-0 gap-2">
+          <Button size="icon" variant="outline" aria-label="Cadastrar cliente com IA" onClick={() => setCreateMode("ai")}><Bot className="h-4 w-4" /></Button>
+          <Button className="bg-[#0B1220] px-3 text-white shadow-[0_8px_20px_rgba(11,18,32,0.14)] hover:bg-[#172033] sm:px-4" onClick={() => setCreateMode("manual")}><Plus className="h-4 w-4" /><span className="hidden sm:inline">Novo cliente</span><span className="sm:hidden">Novo</span></Button>
+        </div>
       </header>
 
-      <section className="order-3 grid gap-3 md:grid-cols-3">
-        <ChampionCard icon={Crown} label="Perfil mais baixado" value={profileChampion?.label ?? "Dados insuficientes"} helper={`${profileChampion?.score ?? 0} interações`} />
-        <ChampionCard icon={MapPin} label="Cidade campeã" value={cityChampion?.label ?? "Dados insuficientes"} helper={`${cityChampion?.score ?? 0} clientes`} />
-        <ChampionCard icon={Trophy} label="Cidade que mais vendeu" value={citySalesChampion?.label ?? "Dados insuficientes"} helper={`${citySalesChampion?.score ?? 0} vendas`} />
-      </section>
-
-      <section className="order-4 grid gap-3 md:grid-cols-3">
-        <ChampionCard icon={Check} label="Visitas feitas no mês" value={String(visitsThisMonth)} helper="clientes marcados como visitados" />
-        <ChampionCard icon={Navigation} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} />
-        <ChampionCard icon={Users} label="Clientes já visitados" value={String(visitedClientIds.size)} helper="clientes únicos com check" />
-      </section>
-
-      <section className="order-1 flex min-w-0 items-center gap-2">
+      <section className="flex min-w-0 items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input aria-label="Buscar clientes" className="pl-11" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedClientId(null); }} placeholder="Cliente, cidade ou bairro..." />
+          <Input aria-label="Buscar clientes" className="h-12 rounded-2xl border-[#EAECF0] bg-white pl-11 shadow-[0_1px_3px_rgba(16,24,40,0.04)] dark:border-border dark:bg-card" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedClientId(null); }} placeholder="Buscar cliente, cidade, bairro ou perfil" />
         </div>
-        <Button variant="outline" className="min-h-11 shrink-0" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="h-4 w-4" />Filtros{[city, profile, stage].filter((value) => value !== allValue).length > 0 && <span>{[city, profile, stage].filter((value) => value !== allValue).length}</span>}</Button>
+        <Button variant="outline" className="h-12 shrink-0 rounded-2xl border-[#EAECF0] bg-white px-3 dark:border-border dark:bg-card" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">Filtros</span>{[city, profile, stage].filter((value) => value !== allValue).length > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#0B1220] px-1 text-[11px] text-white">{[city, profile, stage].filter((value) => value !== allValue).length}</span>}</Button>
         <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
           <DialogContent>
             <DialogHeader><DialogTitle>Filtrar clientes</DialogTitle><DialogDescription>Cidade, perfil de imóvel e etapa.</DialogDescription></DialogHeader>
@@ -322,14 +411,45 @@ export function ClientsPage() {
         </Dialog>
       </section>
 
-      <ClientHub />
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <CommercialMetric icon={UserRoundSearch} label="Clientes ativos" value={activeClients} />
+        <CommercialMetric icon={CalendarClock} label="Follow-ups hoje" value={followUpsToday} attention={followUpsToday > 0} />
+        <CommercialMetric icon={CalendarPlus} label="Visitas agendadas" value={scheduledVisits} />
+        <CommercialMetric icon={CircleDollarSign} label="Negociações" value={negotiations} />
+      </section>
 
-      <div className="order-5 flex min-w-0 flex-col gap-5">
-        <Card className="order-2 min-w-0 overflow-hidden">
+      <Card className="overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]">
+        <CardHeader className="pb-3"><CardTitle className="text-lg">Precisa da minha atenção</CardTitle><CardDescription>Clientes com retorno ou decisão próxima.</CardDescription></CardHeader>
+        <CardContent className="divide-y divide-[#EAECF0] p-0 dark:divide-border">
+          {attentionClients.length ? attentionClients.map((client) => <AttentionRow key={client.id} client={client} now={now} onOpen={() => setSelectedCrmId(client.id)} />) : <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum cliente exige atenção imediata.</div>}
+        </CardContent>
+      </Card>
+
+      <section className="space-y-3">
+        <div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-semibold">Funil comercial</h2><p className="text-sm text-[#667085] dark:text-muted-foreground">Selecione uma etapa para filtrar a carteira.</p></div></div>
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <div className="flex w-max gap-2">
+            {funnelStatuses.map((item) => {
+              const count = item.value === "all" ? crm.clients.length : crm.clients.filter((client) => client.status === item.value).length;
+              return <button key={item.value} type="button" onClick={() => setFunnelStage(item.value)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-2xl border border-[#EAECF0] bg-white px-3.5 text-sm font-semibold text-[#475467] transition duration-200 hover:-translate-y-0.5 hover:border-[#98A2B3] dark:border-border dark:bg-card dark:text-muted-foreground", funnelStage === item.value && "border-[#0B1220] bg-[#0B1220] text-white shadow-[0_8px_20px_rgba(11,18,32,0.16)] hover:border-[#0B1220]")}><span>{item.label}</span><span className={cn("tabular-nums", funnelStage === item.value ? "text-white/65" : "text-[#98A2B3]")}>{count}</span></button>;
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div><h2 className="text-lg font-semibold">Carteira de clientes</h2><p className="text-sm text-[#667085] dark:text-muted-foreground">{visibleClients.length} cliente(s) encontrados</p></div>
+          <div className="grid grid-cols-3 rounded-2xl bg-[#EAECF0]/70 p-1 dark:bg-muted" aria-label="Visualização dos clientes">
+            {([['list', 'Lista', LayoutList], ['cards', 'Cards', Grid2X2], ['map', 'Mapa', Map]] as const).map(([value, label, Icon]) => <button key={value} type="button" aria-label={label} title={label} onClick={() => setClientView(value)} className={cn("grid h-10 w-10 place-items-center rounded-xl text-[#667085] transition sm:w-auto sm:grid-cols-[auto_auto] sm:gap-2 sm:px-3", clientView === value && "bg-white text-[#0B1220] shadow-sm dark:bg-card dark:text-foreground")}><Icon className="h-4 w-4" /><span className="hidden text-sm font-semibold sm:inline">{label}</span></button>)}
+          </div>
+        </div>
+
+        {clientView === "map" && <Card className="min-w-0 overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]">
           <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle>Mapa de clientes</CardTitle>
-              <CardDescription>{mappedClients.length} clientes{isDemo ? " · Demonstração" : ""}</CardDescription>
+              <CardTitle>Mapa</CardTitle>
+              <CardDescription>{mappedClients.length} clientes com localização</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -341,7 +461,7 @@ export function ClientsPage() {
                 ["agendadas", "Agendadas", CalendarPlus, "text-amber-600 dark:text-amber-400"],
                 ["sem-visita", "Sem visita", MapPin, "text-muted-foreground"]
               ] as const).map(([value, label, Icon, color]) => (
-                <button key={value} type="button" aria-pressed={mapFilter === value} onClick={() => { setMapFilter(value); setSelectedClientId(null); }} className={cn("inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-medium transition-colors", mapFilter === value ? "border-primary bg-primary/10 ring-1 ring-primary" : "border-border bg-background hover:bg-muted")}>
+                <button key={value} type="button" aria-pressed={mapFilter === value} onClick={() => { setMapFilter(value); setSelectedClientId(null); }} className={cn("inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-medium transition-colors", mapFilter === value ? "border-[#0B1220] bg-[#0B1220] text-white" : "border-[#EAECF0] bg-white text-[#475467] hover:bg-[#F7F8FA] dark:border-border dark:bg-card dark:text-muted-foreground")}>
                   <Icon className={cn("h-4 w-4", color)} />{label}<span className="text-xs tabular-nums text-muted-foreground">{filtered.filter((client) => matchesMapFilter(client, value)).length}</span>
                 </button>
               ))}
@@ -392,29 +512,24 @@ export function ClientsPage() {
                 </DialogContent>}
               </Dialog>
           </CardContent>
-        </Card>
+        </Card>}
 
-        <Card className="order-1">
-          <CardHeader>
-            <CardTitle>Clientes filtrados</CardTitle>
-            <CardDescription>{visibleClients.length} cliente(s) encontrados.</CardDescription>
-          </CardHeader>
-          <CardContent className="max-h-[520px] divide-y overflow-y-auto p-0">
-            {!visibleClients.length && <div className="py-8 text-center text-sm text-muted-foreground"><p>Nenhum cliente encontrado.</p><Button className="mt-3" variant="outline" onClick={() => { setCity(allValue); setProfile(allValue); setStage(allValue); setQuery(""); setMapFilter(allValue); }}>Limpar filtros</Button></div>}
-            {visibleClients.map((client) => (
-              <article key={client.id} className="flex min-h-[68px] items-center gap-3 px-3 py-2.5 transition hover:bg-muted/45 sm:px-4">
-                <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setSelectedClientId(client.id)}>
-                  <span className="h-10 w-10 shrink-0"><ClientAvatar name={client.name} photo={client.photo} /></span>
-                  <span className="min-w-0"><span className="block truncate text-sm font-semibold">{client.name}</span><span className="block truncate text-xs text-muted-foreground">{client.city} • {client.profile}</span></span>
-                </button>
-                <span className={cn("hidden shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold sm:block", client.bought ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : "bg-primary/12 text-primary")}>{client.bought ? "Vendido" : scheduledIds.has(client.id) ? "Visita" : client.stage}</span>
-                {client.whatsapp ? <a href={whatsappUrl(client.whatsapp, client.name)} target="_blank" rel="noreferrer" aria-label={`Falar com ${client.name} no WhatsApp`} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/12 text-emerald-600 transition hover:bg-emerald-500 hover:text-white"><MessageCircle className="h-5 w-5" /></a> : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground" title="WhatsApp não cadastrado"><MessageCircle className="h-5 w-5" /></span>}
-                <Button size="icon" variant="ghost" aria-label={`Marcar visita a ${client.name}`} disabled={marks.save.isPending || marks.loading || Boolean(marks.error) || visitLog.some((visit) => visit.clientId === client.id && isTodayKey(visit.date))} onClick={() => markVisit(client)}><Check className="h-4 w-4" /></Button>
-              </article>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+        {clientView === "list" && <Card className="overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]"><CardContent className="divide-y divide-[#EAECF0] p-0 dark:divide-border"><ClientEmpty visible={visibleClients.length === 0} onClear={() => { setCity(allValue); setProfile(allValue); setStage(allValue); setFunnelStage("all"); setQuery(""); setMapFilter(allValue); }} />{visibleClients.map((client) => <PremiumClientRow key={client.id} client={client} onOpen={() => openClient(client)} />)}</CardContent></Card>}
+        {clientView === "cards" && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"><ClientEmpty visible={visibleClients.length === 0} onClear={() => { setCity(allValue); setProfile(allValue); setStage(allValue); setFunnelStage("all"); setQuery(""); setMapFilter(allValue); }} />{visibleClients.map((client) => <PremiumClientCard key={client.id} client={client} onOpen={() => openClient(client)} />)}</div>}
+      </section>
+
+      <section className="space-y-3"><div><h2 className="text-lg font-semibold">Panorama da carteira</h2><p className="text-sm text-[#667085] dark:text-muted-foreground">Indicadores de perfil, localização e visitas.</p></div><div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <ChampionCard icon={Crown} label="Perfil mais procurado" value={profileChampion?.label ?? "Dados insuficientes"} helper={`${profileChampion?.score ?? 0} interações`} />
+        <ChampionCard icon={MapPin} label="Cidade campeã" value={cityChampion?.label ?? "Dados insuficientes"} helper={`${cityChampion?.score ?? 0} clientes`} />
+        <ChampionCard icon={Trophy} label="Cidade que mais vendeu" value={citySalesChampion?.label ?? "Dados insuficientes"} helper={`${citySalesChampion?.score ?? 0} vendas`} />
+        <ChampionCard icon={Check} label="Visitas no mês" value={String(visitsThisMonth)} helper="visitas registradas" />
+        <ChampionCard icon={Navigation} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} />
+        <ChampionCard icon={Users} label="Clientes visitados" value={String(visitedClientIds.size)} helper="clientes únicos" />
+      </div></section>
+
+      <Dialog open={createMode !== null} onOpenChange={(open) => !open && setCreateMode(null)}><DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{createMode === "ai" ? "Cadastro com IA" : "Novo cliente"}</DialogTitle><DialogDescription>{createMode === "ai" ? "Envie a conversa e revise os dados encontrados." : "Informações para acompanhar a jornada de compra."}</DialogDescription></DialogHeader>{createMode === "ai" ? <AiClientIntake saving={crm.createClient.isPending} onSave={createCrmClient} /> : <ClientForm saving={crm.createClient.isPending} onSave={createCrmClient} />}</DialogContent></Dialog>
+      <ClientDetailDialog client={selectedCrmClient} open={Boolean(selectedCrmClient)} onOpenChange={(open) => !open && setSelectedCrmId(undefined)} onEdit={(client) => { setSelectedCrmId(undefined); setEditingClient(client); }} onStatus={changeCrmStatus} onFollowUp={changeFollowUp} />
+      <Dialog open={Boolean(editingClient)} onOpenChange={(open) => !open && setEditingClient(undefined)}>{editingClient && <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{editingClient.name}</DialogTitle><DialogDescription>Atualize etapa, follow-up e informações do cliente.</DialogDescription></DialogHeader><ClientForm initial={editingClient} saving={crm.updateClient.isPending} onSave={editCrmClient} /></DialogContent>}</Dialog>
       <Dialog open={Boolean(scheduleClient)} onOpenChange={(open) => { if (!open && !calendar.createEvent.isPending) setScheduleClient(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Agendar visita</DialogTitle><DialogDescription>{scheduleClient?.name}</DialogDescription></DialogHeader>
@@ -435,6 +550,142 @@ export function ClientsPage() {
   );
 }
 
+function CommercialMetric({ icon: Icon, label, value, attention }: { icon: React.ElementType; label: string; value: number; attention?: boolean }) {
+  return <div className="min-w-0 rounded-[20px] bg-white p-4 shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 transition duration-200 hover:-translate-y-0.5 dark:bg-card dark:ring-border">
+    <div className="flex items-start justify-between gap-2"><p className="text-sm font-medium leading-5 text-[#667085] dark:text-muted-foreground">{label}</p><span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#F2F4F7] text-[#475467] dark:bg-muted dark:text-muted-foreground", attention && "bg-[#0F8A65]/10 text-[#0F8A65]")}><Icon className="h-4 w-4" /></span></div>
+    <p className="mt-4 text-3xl font-semibold tabular-nums text-[#0B1220] dark:text-foreground">{value}</p>
+  </div>;
+}
+
+function AttentionRow({ client, now, onOpen }: { client: Client; now: Date; onOpen: () => void }) {
+  const phone = client.whatsapp || client.phone;
+  return <article className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-[#F7F8FA] dark:hover:bg-muted/40 sm:px-5">
+    <span className="h-11 w-11 shrink-0"><ClientAvatar name={client.name} /></span>
+    <button type="button" className="min-w-0 flex-1 text-left" onClick={onOpen}>
+      <span className="block truncate text-sm font-semibold text-[#0B1220] dark:text-foreground">{client.name}</span>
+      <span className="mt-0.5 block truncate text-xs text-[#667085] dark:text-muted-foreground">{clientObjective(client)} • {budgetRange(client)}</span>
+      <span className="mt-1 block truncate text-xs font-semibold text-[#8A6E42] dark:text-primary">{attentionReason(client, now)}</span>
+    </button>
+    <div className="flex shrink-0 gap-1">
+      {client.whatsapp && <a href={whatsappUrl(client.whatsapp, client.name)} target="_blank" rel="noreferrer" className="grid h-10 w-10 place-items-center rounded-xl text-[#0F8A65] transition hover:bg-[#0F8A65]/10" aria-label={`WhatsApp de ${client.name}`}><MessageCircle className="h-4 w-4" /></a>}
+      {phone && <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="grid h-10 w-10 place-items-center rounded-xl text-[#475467] transition hover:bg-[#F2F4F7] dark:text-muted-foreground dark:hover:bg-muted" aria-label={`Ligar para ${client.name}`}><Phone className="h-4 w-4" /></a>}
+      <Button size="icon" variant="ghost" onClick={onOpen} aria-label={`Abrir ${client.name}`}><ExternalLink className="h-4 w-4" /></Button>
+    </div>
+  </article>;
+}
+
+function PremiumClientRow({ client, onOpen }: { client: ClientMapItem; onOpen: () => void }) {
+  const phone = client.whatsapp || client.phone;
+  return <article className="flex min-h-[76px] items-center gap-3 px-4 py-3 transition duration-200 hover:bg-[#F7F8FA] dark:hover:bg-muted/40 sm:px-5">
+    <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <span className="h-11 w-11 shrink-0"><ClientAvatar name={client.name} photo={client.photo} /></span>
+      <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-semibold text-[#0B1220] dark:text-foreground">{client.name}</span><StatusPill client={client} /></span><span className="mt-1 block truncate text-xs text-[#667085] dark:text-muted-foreground">{client.profile} • {client.city}</span><span className="mt-1 block text-xs font-medium text-[#475467] dark:text-muted-foreground">{budgetRangeFromMap(client)}</span></span>
+    </button>
+    <div className="flex shrink-0 items-center gap-1">
+      {client.whatsapp && <a href={whatsappUrl(client.whatsapp, client.name)} target="_blank" rel="noreferrer" className="grid h-10 w-10 place-items-center rounded-xl text-[#0F8A65] hover:bg-[#0F8A65]/10" aria-label={`WhatsApp de ${client.name}`}><MessageCircle className="h-4 w-4" /></a>}
+      {phone && <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="hidden h-10 w-10 place-items-center rounded-xl text-[#475467] hover:bg-[#F2F4F7] sm:grid dark:text-muted-foreground dark:hover:bg-muted" aria-label={`Ligar para ${client.name}`}><Phone className="h-4 w-4" /></a>}
+      <Button size="icon" variant="ghost" onClick={onOpen} aria-label={`Abrir ${client.name}`}><ExternalLink className="h-4 w-4" /></Button>
+    </div>
+  </article>;
+}
+
+function PremiumClientCard({ client, onOpen }: { client: ClientMapItem; onOpen: () => void }) {
+  const phone = client.whatsapp || client.phone;
+  return <article className="rounded-[22px] bg-white p-4 shadow-[0_8px_30px_rgba(16,24,40,0.055)] ring-1 ring-[#EAECF0]/80 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_34px_rgba(16,24,40,0.09)] dark:bg-card dark:ring-border">
+    <div className="flex items-start gap-3"><span className="h-12 w-12 shrink-0"><ClientAvatar name={client.name} photo={client.photo} /></span><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><h3 className="truncate font-semibold text-[#0B1220] dark:text-foreground">{client.name}</h3><StatusPill client={client} /></div><p className="mt-1 truncate text-sm text-[#667085] dark:text-muted-foreground">{client.profile}</p><p className="truncate text-sm text-[#667085] dark:text-muted-foreground">{client.city}</p></div></div>
+    <p className="mt-4 text-base font-semibold text-[#0B1220] dark:text-foreground">{budgetRangeFromMap(client)}</p>
+    <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-[#F7F8FA] p-3 text-xs dark:bg-muted/55"><div><p className="text-[#98A2B3]">Último contato</p><p className="mt-1 font-semibold text-[#475467] dark:text-foreground">{client.crmStatus ? "Dados no histórico" : "Não informado"}</p></div><div><p className="text-[#98A2B3]">Próxima ação</p><p className="mt-1 truncate font-semibold text-[#475467] dark:text-foreground">{nextActionFromMap(client)}</p></div></div>
+    <div className="mt-3 grid grid-cols-3 gap-2">
+      {client.whatsapp ? <a href={whatsappUrl(client.whatsapp, client.name)} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#EAECF0] text-xs font-semibold text-[#0F8A65] hover:bg-[#0F8A65]/5 dark:border-border"><MessageCircle className="h-4 w-4" />WhatsApp</a> : <span className="min-h-10" />}
+      {phone ? <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#EAECF0] text-xs font-semibold text-[#475467] hover:bg-[#F7F8FA] dark:border-border dark:text-muted-foreground"><Phone className="h-4 w-4" />Ligar</a> : <span className="min-h-10" />}
+      <Button size="sm" variant="outline" className="min-h-10 px-2 text-xs" onClick={onOpen}>Abrir</Button>
+    </div>
+  </article>;
+}
+
+function StatusPill({ client }: { client: ClientMapItem }) {
+  const sold = client.bought;
+  return <span className={cn("shrink-0 rounded-full bg-[#F2F4F7] px-2 py-1 text-[11px] font-semibold capitalize text-[#667085] dark:bg-muted dark:text-muted-foreground", sold && "bg-[#0F8A65]/10 text-[#0F8A65]")}>{sold ? "Venda" : client.crmStatus ?? client.stage}</span>;
+}
+
+function ClientEmpty({ visible, onClear }: { visible: boolean; onClear: () => void }) {
+  if (!visible) return null;
+  return <div className="col-span-full grid min-h-44 place-items-center rounded-[22px] bg-white p-6 text-center shadow-[0_8px_30px_rgba(16,24,40,0.05)] dark:bg-card"><div><Users className="mx-auto h-6 w-6 text-[#98A2B3]" /><p className="mt-3 font-semibold">Nenhum cliente encontrado</p><Button className="mt-3" variant="outline" onClick={onClear}>Limpar filtros</Button></div></div>;
+}
+
+function attentionScore(client: Client, now: Date) {
+  let score = ["proposta", "negociação"].includes(client.status) ? 30 : client.status === "visita agendada" ? 20 : 5;
+  if (client.next_follow_up) {
+    const days = Math.floor((new Date(`${client.next_follow_up}T12:00:00`).getTime() - now.getTime()) / 86400000);
+    if (days < 0) score += 100 + Math.abs(days);
+    else if (days === 0) score += 90;
+    else if (days === 1) score += 50;
+  }
+  return score;
+}
+
+function attentionReason(client: Client, now: Date) {
+  if (client.next_follow_up) {
+    const days = Math.round((new Date(`${client.next_follow_up}T12:00:00`).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12).getTime()) / 86400000);
+    if (days < 0) return `Follow-up atrasado há ${Math.abs(days)} dia${Math.abs(days) === 1 ? "" : "s"}`;
+    if (days === 0) return "Retorno hoje";
+    if (days === 1 && client.status === "visita agendada") return "Visita amanhã";
+  }
+  if (client.status === "proposta") return "Proposta aguardando resposta";
+  if (client.status === "negociação") return "Negociação em andamento";
+  if (client.status === "visita agendada") return "Visita agendada";
+  return "Próxima ação pendente";
+}
+
+function clientObjective(client: Client) {
+  return [client.bedrooms ? `${client.bedrooms} dorm` : null, client.city || client.property_profile].filter(Boolean).join(" • ") || "Perfil não informado";
+}
+
+function budgetRange(client: Client) {
+  if (client.budget_min && client.budget_max) return `${formatCompactCurrency(client.budget_min)} – ${formatCompactCurrency(client.budget_max)}`;
+  if (client.budget_max) return `Até ${formatCompactCurrency(client.budget_max)}`;
+  if (client.budget_min) return `A partir de ${formatCompactCurrency(client.budget_min)}`;
+  return "Faixa não informada";
+}
+
+function budgetRangeFromMap(client: ClientMapItem) {
+  if (client.budgetMin && client.budgetMax) return `${formatCompactCurrency(client.budgetMin)} – ${formatCompactCurrency(client.budgetMax)}`;
+  if (client.budgetMax) return `Até ${formatCompactCurrency(client.budgetMax)}`;
+  if (client.budgetMin) return `A partir de ${formatCompactCurrency(client.budgetMin)}`;
+  return client.bought ? "Venda realizada" : "Faixa não informada";
+}
+
+function formatCompactCurrency(value: number) {
+  if (value >= 1000000) return `R$ ${(value / 1000000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
+  if (value >= 1000) return `R$ ${(value / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil`;
+  return formatCurrency(value);
+}
+
+function nextActionFromMap(client: ClientMapItem) {
+  if (client.nextFollowUp) return `Follow-up ${formatShortDate(client.nextFollowUp)}`;
+  if (client.crmStatus === "proposta") return "Retornar proposta";
+  if (client.crmStatus === "visita agendada") return "Preparar visita";
+  return "Definir follow-up";
+}
+
+function formatShortDate(date: string) {
+  const target = new Date(`${date}T12:00:00`);
+  const today = new Date();
+  const days = Math.round((target.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12).getTime()) / 86400000);
+  if (days === 0) return "hoje";
+  if (days === 1) return "amanhã";
+  return target.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+function withAnniversaryFollowUp(input: ClientInput): ClientInput {
+  if (!input.sale_date || input.next_follow_up || !["venda realizada", "pós-venda"].includes(input.status ?? "")) return input;
+  const sale = new Date(`${input.sale_date}T12:00:00`);
+  const today = new Date();
+  let anniversary = new Date(today.getFullYear(), sale.getMonth(), sale.getDate(), 12);
+  if (anniversary <= today) anniversary = new Date(today.getFullYear() + 1, sale.getMonth(), sale.getDate(), 12);
+  return { ...input, next_follow_up: anniversary.toISOString().slice(0, 10) };
+}
+
 function FilterSelect({ value, onValueChange, items, placeholder }: { value: string; onValueChange: (value: string) => void; items: string[]; placeholder: string }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
@@ -453,12 +704,12 @@ function FilterSelect({ value, onValueChange, items, placeholder }: { value: str
 
 function ChampionCard({ icon: Icon, label, value, helper }: { icon: React.ElementType; label: string; value: string; helper: string }) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border-0 shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 dark:ring-border">
       <CardContent className="p-4">
-        <Icon className="mb-4 h-5 w-5 text-primary" />
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 truncate text-xl font-semibold">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+        <Icon className="mb-4 h-5 w-5 text-[#B89A6A]" />
+        <p className="text-xs text-[#667085] dark:text-muted-foreground">{label}</p>
+        <p className="mt-1 truncate text-lg font-semibold text-[#0B1220] dark:text-foreground sm:text-xl">{value}</p>
+        <p className="mt-1 text-xs text-[#98A2B3]">{helper}</p>
       </CardContent>
     </Card>
   );
