@@ -5,13 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Client, ClientStatus } from "@/types/database";
+import type { Client, ClientStatus, ClientTemperature } from "@/types/database";
 import type { ClientInput } from "./client-service";
 
 export const clientStatuses: ClientStatus[] = ["lead", "em contato", "qualificado", "visita agendada", "proposta", "negociação", "venda realizada", "pós-venda", "perdido"];
+export const clientTemperatures: ClientTemperature[] = ["quente", "morno", "frio"];
+const acquisitionSources = ["Instagram", "Facebook", "WhatsApp", "Indicação", "Portal imobiliário", "Site", "Google", "Placa", "Evento", "Construtora", "Cliente antigo", "Outro"];
 
 export function ClientForm({ initial, saving, onSave }: { initial?: Partial<Client>; saving?: boolean; onSave: (input: ClientInput) => Promise<void> | void }) {
   const [status, setStatus] = useState<ClientStatus>(initial?.status ?? "lead");
+  const [temperature, setTemperature] = useState<ClientTemperature>(initial?.temperature ?? "morno");
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -20,7 +23,7 @@ export function ClientForm({ initial, saving, onSave }: { initial?: Partial<Clie
       name: String(form.get("name") ?? "").trim(), phone: String(form.get("phone") ?? "").trim() || null, whatsapp: String(form.get("whatsapp") ?? "").trim() || null,
       email: String(form.get("email") ?? "").trim() || null, city: String(form.get("city") ?? "").trim() || null, neighborhood: String(form.get("neighborhood") ?? "").trim() || null,
       property_profile: String(form.get("property_profile") ?? "").trim() || null, budget_min: number("budget_min"), budget_max: number("budget_max"), bedrooms: number("bedrooms"),
-      source: String(form.get("source") ?? "").trim() || null, notes: String(form.get("notes") ?? "").trim() || null, status,
+      source: String(form.get("source") ?? "").trim() || null, temperature, notes: String(form.get("notes") ?? "").trim() || null, status,
       sale_date: String(form.get("sale_date") ?? "") || null, next_follow_up: String(form.get("next_follow_up") ?? "") || null
     });
   }
@@ -30,7 +33,8 @@ export function ClientForm({ initial, saving, onSave }: { initial?: Partial<Clie
     <div className="grid gap-3 sm:grid-cols-2"><FormField label="Cidade" name="city" defaultValue={initial?.city} /><FormField label="Bairro" name="neighborhood" defaultValue={initial?.neighborhood} /></div>
     <div className="grid gap-3 sm:grid-cols-2"><FormField label="Perfil do imóvel" name="property_profile" defaultValue={initial?.property_profile} placeholder="Ex.: apartamento, 3 quartos" /><FormField label="Quartos" name="bedrooms" defaultValue={initial?.bedrooms} type="number" min="0" /></div>
     <div className="grid gap-3 sm:grid-cols-2"><FormField label="Orçamento mínimo" name="budget_min" defaultValue={initial?.budget_min} type="number" min="0" /><FormField label="Orçamento máximo" name="budget_max" defaultValue={initial?.budget_max} type="number" min="0" /></div>
-    <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label>Etapa</Label><Select value={status} onValueChange={(value) => setStatus(value as ClientStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{clientStatuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div><FormField label="Origem" name="source" defaultValue={initial?.source} placeholder="Instagram, indicação..." /></div>
+    <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label>Etapa</Label><Select value={status} onValueChange={(value) => setStatus(value as ClientStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{clientStatuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Temperatura</Label><Select value={temperature} onValueChange={(value) => setTemperature(value as ClientTemperature)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{clientTemperatures.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div></div>
+    <div className="space-y-2"><Label htmlFor="client-source">Fonte de captação</Label><Input id="client-source" name="source" list="client-acquisition-sources" defaultValue={initial?.source ?? ""} placeholder="Instagram, indicação, portal..." /><datalist id="client-acquisition-sources">{acquisitionSources.map((source) => <option key={source} value={source} />)}</datalist><p className="text-xs text-muted-foreground">Essa informação alimenta os relatórios de origem e conversão.</p></div>
     {(status === "venda realizada" || status === "pós-venda" || initial?.sale_date) && <div className="grid gap-3 sm:grid-cols-2"><FormField label="Data da venda" name="sale_date" defaultValue={initial?.sale_date} type="date" required /><FormField label="Próximo follow-up" name="next_follow_up" defaultValue={initial?.next_follow_up} type="date" /></div>}
     <div className="space-y-2"><Label htmlFor="client-notes">Observações</Label><Textarea id="client-notes" name="notes" defaultValue={initial?.notes ?? ""} rows={4} placeholder="Preferências, objeções e próximos passos" /></div>
     <Button className="w-full" disabled={saving}>{saving && <Loader2 className="h-4 w-4 animate-spin" />}Salvar cliente</Button>

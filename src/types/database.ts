@@ -35,6 +35,7 @@ export type EventType =
 export type EventStatus = "agendado" | "concluído" | "cancelado";
 
 export type ClientStatus = "lead" | "em contato" | "qualificado" | "visita agendada" | "proposta" | "negociação" | "venda realizada" | "pós-venda" | "perdido";
+export type ClientTemperature = "quente" | "morno" | "frio";
 
 export type Client = {
   id: string;
@@ -51,6 +52,7 @@ export type Client = {
   bedrooms: number | null;
   notes: string | null;
   source: string | null;
+  temperature: ClientTemperature | null;
   status: ClientStatus;
   sale_date: string | null;
   next_follow_up: string | null;

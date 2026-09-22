@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarClock, Check, CircleDollarSign, History, MapPin, MessageCircle, Pencil, Phone, Plus, UserRound } from "lucide-react";
+import { Check, CircleDollarSign, History, MapPin, Megaphone, MessageCircle, Pencil, Phone, Plus, Thermometer, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/utils";
 import { ClientAvatar } from "./ClientAvatar";
-import { clientStatuses } from "./ClientForm";
+import { clientStatuses, clientTemperatures } from "./ClientForm";
 import { useClientActivities } from "./use-client-activities";
-import type { Client, ClientActivityType, ClientStatus } from "@/types/database";
+import type { Client, ClientActivityType, ClientStatus, ClientTemperature } from "@/types/database";
 
 const activityOptions: Array<{ value: ClientActivityType; label: string }> = [
   { value: "ligação", label: "Ligação" },
@@ -22,25 +22,27 @@ const activityOptions: Array<{ value: ClientActivityType; label: string }> = [
   { value: "observação", label: "Observação" }
 ];
 
-export function ClientDetailDialog({ client, open, onOpenChange, onEdit, onStatus, onFollowUp }: {
+export function ClientDetailDialog({ client, open, onOpenChange, onEdit, onStatus, onFollowUp, onTemperature }: {
   client?: Client;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit: (client: Client) => void;
   onStatus: (client: Client, status: ClientStatus) => Promise<boolean>;
   onFollowUp: (client: Client, date: string | null) => Promise<boolean>;
+  onTemperature: (client: Client, temperature: ClientTemperature) => Promise<boolean>;
 }) {
   if (!client) return null;
-  return <ClientDetailContent client={client} open={open} onOpenChange={onOpenChange} onEdit={onEdit} onStatus={onStatus} onFollowUp={onFollowUp} />;
+  return <ClientDetailContent client={client} open={open} onOpenChange={onOpenChange} onEdit={onEdit} onStatus={onStatus} onFollowUp={onFollowUp} onTemperature={onTemperature} />;
 }
 
-function ClientDetailContent({ client, open, onOpenChange, onEdit, onStatus, onFollowUp }: {
+function ClientDetailContent({ client, open, onOpenChange, onEdit, onStatus, onFollowUp, onTemperature }: {
   client: Client;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit: (client: Client) => void;
   onStatus: (client: Client, status: ClientStatus) => Promise<boolean>;
   onFollowUp: (client: Client, date: string | null) => Promise<boolean>;
+  onTemperature: (client: Client, temperature: ClientTemperature) => Promise<boolean>;
 }) {
   const { toast } = useToast();
   const timeline = useClientActivities(client);
@@ -91,13 +93,14 @@ function ClientDetailContent({ client, open, onOpenChange, onEdit, onStatus, onF
         </div>
 
         <div className="space-y-5 p-4 sm:p-6">
-          <section className="grid gap-3 sm:grid-cols-3">
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Info icon={UserRound} label="Interesse" value={client.property_profile || "Não informado"} />
             <Info icon={MapPin} label="Localização" value={[client.neighborhood, client.city].filter(Boolean).join(", ") || "Não informada"} />
             <Info icon={CircleDollarSign} label="Faixa de investimento" value={budgetLabel(client)} />
+            <Info icon={Megaphone} label="Fonte de captação" value={client.source || "Não informada"} />
           </section>
 
-          <section className="grid gap-4 rounded-lg border bg-muted/25 p-4 sm:grid-cols-2">
+          <section className="grid gap-4 rounded-lg border bg-muted/25 p-4 lg:grid-cols-[1fr_1fr_1.2fr]">
             <div className="space-y-2">
               <Label>Etapa atual</Label>
               <Select value={client.status} disabled={savingStatus} onValueChange={(value) => changeStatus(value as ClientStatus)}>
@@ -110,6 +113,14 @@ function ClientDetailContent({ client, open, onOpenChange, onEdit, onStatus, onF
               <div className="grid grid-cols-[1fr_3rem] gap-2">
                 <Input id="detail-follow-up" className="rounded-lg" type="date" value={followUp} onChange={(event) => setFollowUp(event.target.value)} />
                 <Button size="icon" variant="outline" onClick={saveFollowUp} aria-label="Salvar follow-up"><Check className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5"><Thermometer className="h-3.5 w-3.5" />Temperatura do cliente</Label>
+              <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+                {clientTemperatures.map((temperature) => (
+                  <button key={temperature} type="button" onClick={() => onTemperature(client, temperature)} className={temperatureButtonClass(temperature, client.temperature === temperature)}>{temperature}</button>
+                ))}
               </div>
             </div>
           </section>
@@ -143,6 +154,11 @@ function ClientDetailContent({ client, open, onOpenChange, onEdit, onStatus, onF
       </DialogContent>
     </Dialog>
   );
+}
+
+function temperatureButtonClass(temperature: ClientTemperature, active: boolean) {
+  const tone = temperature === "quente" ? "text-red-600" : temperature === "morno" ? "text-amber-600" : "text-sky-600";
+  return `min-h-9 rounded-md px-2 text-xs font-semibold capitalize transition ${active ? `bg-card shadow-sm ${tone}` : "text-muted-foreground hover:text-foreground"}`;
 }
 
 function Info({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
