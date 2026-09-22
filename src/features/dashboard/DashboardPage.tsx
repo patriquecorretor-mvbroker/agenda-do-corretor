@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { format, isBefore, isToday, parseISO } from "date-fns";
+import { endOfMonth, format, isBefore, isToday, parseISO, startOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Building2,
+  Activity,
+  BarChart3,
   CalendarCheck2,
   CheckCircle2,
   Cloud,
@@ -34,11 +36,12 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
-import { clampPercent, formatCurrency } from "@/lib/utils";
+import { clampPercent, cn, formatCurrency } from "@/lib/utils";
 import { useEvents } from "@/features/calendar/use-events";
 import { useTasks } from "@/features/tasks/use-tasks";
 import { useProfile } from "@/features/profile/use-profile";
 import { useFinance } from "@/features/finance/use-finance";
+import { useClients } from "@/features/clients/use-clients";
 import { getWeather, weatherMessage } from "@/features/dashboard/weather-service";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import type { AppView } from "@/types/ui";
@@ -65,12 +68,19 @@ export function DashboardPage({
   const { profile } = useProfile();
   const { events, isLoading: loadingEvents, updateEvent } = useEvents(today);
   const { tasks, isLoading: loadingTasks, updateTask } = useTasks();
+  const { clients } = useClients();
   const finance = useFinance();
   const { toast } = useToast();
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [tomorrowNotes, setTomorrowNotes] = useState("");
   const [focusSeconds, setFocusSeconds] = useState(25 * 60);
   const [focusRunning, setFocusRunning] = useState(false);
+  const [performanceMonth, setPerformanceMonth] = useState(format(new Date(), "yyyy-MM"));
+  const performanceDate = parseISO(`${performanceMonth}-01`);
+  const { events: performanceEvents, isLoading: loadingPerformance } = useEvents({
+    from: format(startOfMonth(subMonths(performanceDate, 5)), "yyyy-MM-dd"),
+    to: format(endOfMonth(performanceDate), "yyyy-MM-dd")
+  });
   const focusProgress = clampPercent(((25 * 60 - focusSeconds) / (25 * 60)) * 100);
 
   const weatherQuery = useQuery({
@@ -88,31 +98,29 @@ export function DashboardPage({
   const dailyDone = completedEvents.length + todayTasks.filter((task) => task.status === "concluída").length;
   const dailyProgress = clampPercent((dailyDone / dailyGoalTotal) * 100);
   const commercialMetrics = useMemo(() => {
-    const demoMode = !hasSupabaseConfig;
     const visitedProperties = events.filter((event) => event.type === "visita" && event.status === "concluído").length;
     const scheduledVisits = events.filter((event) => event.type === "visita" && event.status === "agendado").length;
     const convertedSales = finance.commissions.filter((commission) =>
       ["confirmada", "parcialmente recebida", "recebida"].includes(commission.status)
     ).length;
-    const leadCount = demoMode ? 18 : 0;
-    const contactedLeads = demoMode ? 11 : 0;
-    const uniqueClients = new Set(finance.commissions.map((commission) => commission.client).filter(Boolean)).size;
-    const propertyProfile = mostServedPropertyProfile(finance.commissions.map((commission) => commission.property ?? commission.development).filter(Boolean) as string[]);
+    const leadCount = clients.filter((client) => client.status === "lead").length;
+    const contactedLeads = clients.filter((client) => ["em contato", "qualificado"].includes(client.status)).length;
+    const propertyProfile = mostServedPropertyProfile(clients.map((client) => client.property_profile).filter(Boolean) as string[]);
     const conversionBase = leadCount || contactedLeads;
     const conversionRate = conversionBase ? clampPercent((convertedSales / conversionBase) * 100) : null;
 
     return {
-      demoMode,
-      visitedProperties: visitedProperties || (demoMode ? 3 : 0),
+      demoMode: !hasSupabaseConfig,
+      visitedProperties,
       leadsReceived: leadCount,
       contactedLeads,
-      scheduledVisits: scheduledVisits || (demoMode ? 4 : 0),
+      scheduledVisits,
       convertedSales,
       conversionRate,
-      propertyProfile: propertyProfile ?? (demoMode ? "Apartamento 2 quartos" : "Dados insuficientes"),
-      clientPortfolio: uniqueClients || (demoMode ? 12 : 0)
+      propertyProfile: propertyProfile ?? "Dados insuficientes",
+      clientPortfolio: clients.length
     };
-  }, [events, finance.commissions]);
+  }, [clients, events, finance.commissions]);
 
   const priorities = useMemo(() => {
     return tasks
@@ -231,33 +239,15 @@ export function DashboardPage({
         <SummaryCard icon={Clock} label="Atrasados" value={overdueEvents.length} />
       </section>
 
-      <Card className="overflow-hidden border-primary/20">
-        <CardHeader className="bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.16),_transparent_38%),linear-gradient(135deg,_hsl(var(--card)),_hsl(var(--muted)))]">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>Performance comercial</CardTitle>
-              <CardDescription>
-                Visitas, leads, conversão e carteira em leitura rápida.
-              </CardDescription>
-            </div>
-            {commercialMetrics.demoMode && (
-              <span className="w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                dados demo/local
-              </span>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 p-3 sm:grid-cols-2 md:p-4 xl:grid-cols-4">
-          <CommercialCard icon={Building2} label="Imóveis visitados" value={commercialMetrics.visitedProperties} helper="visitas concluídas" />
-          <CommercialCard icon={Users} label="Leads recebidos" value={commercialMetrics.leadsReceived} helper={commercialMetrics.demoMode ? "visualização demo" : "aguardando módulo de leads"} />
-          <CommercialCard icon={PhoneCall} label="Leads em contato" value={commercialMetrics.contactedLeads} helper={commercialMetrics.demoMode ? "em acompanhamento" : "aguardando CRM"} />
-          <CommercialCard icon={CalendarCheck2} label="Visitas agendadas" value={commercialMetrics.scheduledVisits} helper="visitas abertas hoje" />
-          <CommercialCard icon={Handshake} label="Vendas convertidas" value={commercialMetrics.convertedSales} helper="comissões confirmadas" />
-          <CommercialCard icon={Percent} label="Aproveitamento" value={commercialMetrics.conversionRate === null ? "--" : `${commercialMetrics.conversionRate}%`} helper="vendas / leads" />
-          <CommercialCard icon={Home} label="Perfil mais atendido" value={commercialMetrics.propertyProfile} helper="baseado nas vendas" wide />
-          <CommercialCard icon={Target} label="Carteira de clientes" value={commercialMetrics.clientPortfolio} helper="clientes únicos" />
-        </CardContent>
-      </Card>
+      <CommercialGrowthPanel
+        month={performanceMonth}
+        onMonthChange={setPerformanceMonth}
+        events={performanceEvents}
+        tasks={tasks}
+        clients={clients}
+        commissions={finance.commissions}
+        loading={loadingPerformance || loadingTasks}
+      />
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <ProductivityFocusCard
@@ -479,6 +469,203 @@ function SummaryCard({ icon: Icon, label, value, onClick }: { icon: React.Elemen
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </Comp>
   );
+}
+
+type CommercialSnapshot = {
+  attendances: number;
+  visits: number;
+  beachClients: number;
+  proposals: number;
+  closings: number;
+  completedTasks: number;
+  visitedProperties: number;
+};
+
+function CommercialGrowthPanel({
+  month,
+  onMonthChange,
+  events,
+  tasks,
+  clients,
+  commissions,
+  loading
+}: {
+  month: string;
+  onMonthChange: (month: string) => void;
+  events: ReturnType<typeof useEvents>["events"];
+  tasks: ReturnType<typeof useTasks>["tasks"];
+  clients: ReturnType<typeof useClients>["clients"];
+  commissions: ReturnType<typeof useFinance>["commissions"];
+  loading: boolean;
+}) {
+  const selected = parseISO(`${month}-01`);
+  const previousMonth = format(subMonths(selected, 1), "yyyy-MM");
+  const current = buildCommercialSnapshot(month, events, tasks, clients, commissions);
+  const previous = buildCommercialSnapshot(previousMonth, events, tasks, clients, commissions);
+  const months = Array.from({ length: 6 }, (_, index) => subMonths(selected, 5 - index));
+  const series = months.map((date) => ({
+    key: format(date, "yyyy-MM"),
+    label: format(date, "MMM", { locale: ptBR }).replace(".", ""),
+    ...buildCommercialSnapshot(format(date, "yyyy-MM"), events, tasks, clients, commissions)
+  }));
+  const maxChart = Math.max(...series.flatMap((item) => [item.attendances, item.visits, item.closings]), 1);
+  const selectedTasks = tasks.filter((task) => task.due_date?.startsWith(month));
+  const completionRate = selectedTasks.length ? clampPercent((current.completedTasks / selectedTasks.length) * 100) : null;
+  const insights = commercialInsights(current, completionRate);
+  const cards = [
+    { label: "Atendimentos", value: current.attendances, before: previous.attendances, icon: Activity },
+    { label: "Visitas", value: current.visits, before: previous.visits, icon: CalendarCheck2 },
+    { label: "Clientes na praia", value: current.beachClients, before: previous.beachClients, icon: Users },
+    { label: "Propostas", value: current.proposals, before: previous.proposals, icon: Handshake },
+    { label: "Fechamentos", value: current.closings, before: previous.closings, icon: Target },
+    { label: "Tarefas concluídas", value: current.completedTasks, before: previous.completedTasks, icon: CheckCircle2 },
+    { label: "Imóveis visitados", value: current.visitedProperties, before: previous.visitedProperties, icon: Building2 }
+  ];
+
+  return (
+    <Card className="overflow-hidden border-border/70 shadow-[0_18px_55px_rgba(11,18,32,0.07)]">
+      <CardHeader className="border-b bg-card">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              Controle de crescimento
+            </div>
+            <CardTitle>Performance comercial</CardTitle>
+            <CardDescription>Compare atividade, execução e conversão sem misturar períodos.</CardDescription>
+          </div>
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            Mês analisado
+            <input
+              type="month"
+              value={month}
+              max={format(new Date(), "yyyy-MM")}
+              onChange={(event) => onMonthChange(event.target.value)}
+              className="h-11 min-w-44 rounded-2xl border bg-background px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 p-3 sm:p-5">
+        {loading ? <Skeleton className="h-56" /> : (
+          <>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+              {cards.map((card) => (
+                <PerformanceMetric key={card.label} {...card} />
+              ))}
+              <div className="col-span-2 rounded-[1.4rem] bg-[#0B1220] p-4 text-white lg:col-span-1">
+                <p className="text-xs text-white/55">Conclusão de tarefas</p>
+                <p className="mt-2 text-2xl font-semibold">{completionRate === null ? "--" : `${completionRate}%`}</p>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${completionRate ?? 0}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.5fr_0.7fr]">
+              <div className="rounded-[1.4rem] border bg-muted/25 p-4">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Evolução em 6 meses</p>
+                    <p className="text-xs text-muted-foreground">Atendimentos, visitas e fechamentos registrados.</p>
+                  </div>
+                  <div className="flex gap-3 text-[0.68rem] text-muted-foreground">
+                    <ChartLegend tone="bg-primary" label="Atendimentos" />
+                    <ChartLegend tone="bg-[#0F8A65]" label="Visitas" />
+                    <ChartLegend tone="bg-[#B89A6A]" label="Fechamentos" />
+                  </div>
+                </div>
+                <div className="grid h-44 grid-cols-6 items-end gap-2 sm:gap-4">
+                  {series.map((item) => (
+                    <div key={item.key} className="flex h-full min-w-0 flex-col justify-end gap-2">
+                      <div className="flex h-32 items-end justify-center gap-1">
+                        <ChartColumn value={item.attendances} max={maxChart} tone="bg-primary" />
+                        <ChartColumn value={item.visits} max={maxChart} tone="bg-[#0F8A65]" />
+                        <ChartColumn value={item.closings} max={maxChart} tone="bg-[#B89A6A]" />
+                      </div>
+                      <span className="truncate text-center text-[0.65rem] font-medium uppercase text-muted-foreground">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[1.4rem] bg-[#0B1220] p-4 text-white">
+                <p className="text-sm font-semibold">Leitura do período</p>
+                <div className="mt-4 space-y-3">
+                  {insights.map((insight) => (
+                    <div key={insight} className="flex gap-2 text-xs leading-5 text-white/70">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                      {insight}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PerformanceMetric({ label, value, before, icon: Icon }: { label: string; value: number; before: number; icon: React.ElementType }) {
+  const delta = before ? Math.round(((value - before) / before) * 100) : null;
+  return (
+    <div className="min-w-0 rounded-[1.4rem] border bg-card p-3.5 shadow-[0_8px_24px_rgba(11,18,32,0.04)] sm:p-4">
+      <div className="flex items-start justify-between gap-2">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-foreground"><Icon className="h-4 w-4" /></span>
+        <span className={cn("text-[0.68rem] font-semibold", delta === null ? "text-muted-foreground" : delta >= 0 ? "text-emerald-600" : "text-red-500")}>
+          {delta === null ? "sem base" : `${delta >= 0 ? "+" : ""}${delta}%`}
+        </span>
+      </div>
+      <p className="mt-4 text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 truncate text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function ChartLegend({ tone, label }: { tone: string; label: string }) {
+  return <span className="inline-flex items-center gap-1.5"><span className={cn("h-2 w-2 rounded-full", tone)} />{label}</span>;
+}
+
+function ChartColumn({ value, max, tone }: { value: number; max: number; tone: string }) {
+  const height = value ? Math.max((value / max) * 100, 8) : 2;
+  return <div title={String(value)} className={cn("w-2 rounded-t-sm transition-all sm:w-3", tone)} style={{ height: `${height}%` }} />;
+}
+
+function buildCommercialSnapshot(
+  month: string,
+  events: ReturnType<typeof useEvents>["events"],
+  tasks: ReturnType<typeof useTasks>["tasks"],
+  clients: ReturnType<typeof useClients>["clients"],
+  commissions: ReturnType<typeof useFinance>["commissions"]
+): CommercialSnapshot {
+  const monthEvents = events.filter((event) => event.date.startsWith(month) && event.status !== "cancelado");
+  const monthClients = clients.filter((client) => client.updated_at.startsWith(month));
+  const commissionClosings = commissions.filter((commission) => commission.sale_date?.startsWith(month) && commission.status !== "cancelada").length;
+  const clientClosings = clients.filter((client) => client.sale_date?.startsWith(month)).length;
+  const coastalCities = ["santos", "guaruja", "guarujá", "praia grande", "sao vicente", "são vicente", "bertioga", "ubatuba", "caraguatatuba", "ilhabela", "navegantes", "itajai", "itajaí", "balneario camboriu", "balneário camboriú", "florianopolis", "florianópolis", "xangri-la", "xangri-lá", "capao da canoa", "capão da canoa", "torres"];
+  const visits = monthEvents.filter((event) => event.type === "visita");
+  return {
+    attendances: monthEvents.filter((event) => ["visita", "reunião", "ligação", "follow-up"].includes(event.type)).length,
+    visits: visits.length,
+    beachClients: monthClients.filter((client) => coastalCities.some((city) => client.city?.toLocaleLowerCase("pt-BR").includes(city))).length,
+    proposals: monthClients.filter((client) => ["proposta", "negociação"].includes(client.status)).length,
+    closings: commissionClosings || clientClosings,
+    completedTasks: tasks.filter((task) => task.due_date?.startsWith(month) && task.status === "concluída").length,
+    visitedProperties: visits.filter((event) => event.status === "concluído").length
+  };
+}
+
+function commercialInsights(metrics: CommercialSnapshot, completionRate: number | null) {
+  const insights: string[] = [];
+  if (!metrics.attendances && !metrics.proposals && !metrics.closings) return ["Ainda não há dados suficientes neste mês. Registre atendimentos, visitas e propostas para liberar o diagnóstico."];
+  if (metrics.visits > 0 && metrics.proposals === 0) insights.push("Há visitas, mas nenhuma proposta registrada. Revise o retorno após a visita e a aderência dos imóveis apresentados.");
+  if (metrics.proposals > 0 && metrics.closings === 0) insights.push("As propostas ainda não viraram fechamento. Acompanhe objeções, prazo de resposta e condição comercial.");
+  if (completionRate !== null && completionRate < 60) insights.push(`A execução das tarefas está em ${completionRate}%. Reduzir pendências pode melhorar a velocidade dos follow-ups.`);
+  if (metrics.closings > 0) insights.push(`${metrics.closings} fechamento(s) no período. Compare a origem e a cidade desses clientes para repetir o canal mais eficiente.`);
+  if (!insights.length) insights.push("O período está equilibrado. Continue registrando cada etapa para tornar o comparativo mais preciso.");
+  return insights.slice(0, 3);
 }
 
 function CommercialCard({

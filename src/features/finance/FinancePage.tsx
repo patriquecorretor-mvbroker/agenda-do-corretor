@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { addDays, format, isSameMonth, parseISO } from "date-fns";
+import { addDays, format, isSameMonth, parseISO, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -235,6 +236,7 @@ function DashboardFinance({
 
   return (
     <div className="space-y-5">
+      <FinancialPerformance transactions={finance.transactions} installments={finance.installments} />
       <CommissionRankings commissions={finance.commissions} clients={clients} />
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
       <div className="space-y-5">
@@ -324,6 +326,104 @@ function DashboardFinance({
       </div>
     </div>
   );
+}
+
+function FinancialPerformance({ transactions, installments }: { transactions: FinancialTransaction[]; installments: CommissionInstallment[] }) {
+  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
+  const selectedDate = parseISO(`${month}-01`);
+  const current = financialMonthSnapshot(month, transactions, installments);
+  const previous = financialMonthSnapshot(format(subMonths(selectedDate, 1), "yyyy-MM"), transactions, installments);
+  const chart = Array.from({ length: 6 }, (_, index) => {
+    const date = subMonths(selectedDate, 5 - index);
+    return {
+      key: format(date, "yyyy-MM"),
+      label: format(date, "MMM", { locale: ptBR }).replace(".", ""),
+      ...financialMonthSnapshot(format(date, "yyyy-MM"), transactions, installments)
+    };
+  });
+  const allMonths = new Set<string>();
+  transactions.forEach((item) => {
+    const date = item.paid_date ?? item.due_date;
+    if (date) allMonths.add(date.slice(0, 7));
+  });
+  installments.forEach((item) => item.received_date && allMonths.add(item.received_date.slice(0, 7)));
+  const ranked = [...allMonths].map((key) => ({ key, ...financialMonthSnapshot(key, transactions, installments) })).filter((item) => item.income || item.expenses).sort((a, b) => b.result - a.result);
+  const best = ranked[0];
+  const comparison = previous.result ? Math.round(((current.result - previous.result) / Math.abs(previous.result)) * 100) : null;
+  const maxChart = Math.max(...chart.flatMap((item) => [item.income, item.expenses]), 1);
+
+  return (
+    <Card className="overflow-hidden border-primary/25 bg-[#070A0F] text-white shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
+      <CardHeader className="border-b border-white/10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary"><LineChart className="h-4 w-4" /> Desempenho financeiro</div>
+            <CardTitle>Resultado por mês</CardTitle>
+            <CardDescription className="text-white/55">Somente receitas recebidas e despesas efetivamente pagas.</CardDescription>
+          </div>
+          <label className="grid gap-1 text-xs text-white/55">
+            Período
+            <input type="month" value={month} max={format(new Date(), "yyyy-MM")} onChange={(event) => setMonth(event.target.value)} className="h-11 rounded-2xl border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-white outline-none focus:ring-2 focus:ring-primary/35" />
+          </label>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 p-3 sm:p-5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <DarkMetric label="Resultado filtrado" value={formatCurrency(current.result)} helper={`${formatCurrency(current.income)} recebidos`} featured />
+          <DarkMetric label="Melhor mês" value={best ? formatCurrency(best.result) : "Sem dados"} helper={best ? format(parseISO(`${best.key}-01`), "MMMM 'de' yyyy", { locale: ptBR }) : "Registre movimentos"} />
+          <DarkMetric label="Comparativo anterior" value={comparison === null ? "Sem base" : `${comparison >= 0 ? "+" : ""}${comparison}%`} helper={`Anterior: ${formatCurrency(previous.result)}`} positive={comparison !== null && comparison >= 0} />
+          <DarkMetric label="Despesas do período" value={formatCurrency(current.expenses)} helper={`${current.movements} movimento(s)`} />
+        </div>
+        <div className="rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-4">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div><p className="font-semibold">Receitas x despesas</p><p className="text-xs text-white/45">Últimos seis meses até o período selecionado.</p></div>
+            <div className="flex gap-3 text-[0.68rem] text-white/55"><ChartKey tone="bg-emerald-500" label="Receitas" /><ChartKey tone="bg-primary" label="Despesas" /></div>
+          </div>
+          <div className="grid h-48 grid-cols-6 items-end gap-2 sm:gap-5">
+            {chart.map((item) => (
+              <div key={item.key} className="flex h-full min-w-0 flex-col justify-end gap-2">
+                <div className="flex h-36 items-end justify-center gap-1.5">
+                  <FinanceChartColumn value={item.income} max={maxChart} tone="bg-emerald-500" />
+                  <FinanceChartColumn value={item.expenses} max={maxChart} tone="bg-primary" />
+                </div>
+                <span className="truncate text-center text-[0.65rem] font-semibold uppercase text-white/45">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DarkMetric({ label, value, helper, featured, positive }: { label: string; value: string; helper: string; featured?: boolean; positive?: boolean }) {
+  return (
+    <div className={cn("min-w-0 rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-4", featured && "border-primary/35 bg-primary/10")}>
+      <p className="text-xs text-white/48">{label}</p>
+      <p className={cn("mt-2 truncate text-xl font-semibold sm:text-2xl", positive && "text-emerald-400")}>{value}</p>
+      <p className="mt-2 truncate text-[0.68rem] text-white/42">{helper}</p>
+    </div>
+  );
+}
+
+function ChartKey({ tone, label }: { tone: string; label: string }) {
+  return <span className="inline-flex items-center gap-1.5"><span className={cn("h-2 w-2 rounded-full", tone)} />{label}</span>;
+}
+
+function FinanceChartColumn({ value, max, tone }: { value: number; max: number; tone: string }) {
+  const height = value ? Math.max((value / max) * 100, 6) : 2;
+  return <div title={formatCurrency(value)} className={cn("w-3 rounded-t-sm sm:w-5", tone)} style={{ height: `${height}%` }} />;
+}
+
+function financialMonthSnapshot(month: string, transactions: FinancialTransaction[], installments: CommissionInstallment[]) {
+  const paidTransactions = transactions.filter((item) => {
+    const settled = item.type === "income" ? item.status === "recebido" : item.status === "pago";
+    return settled && (item.paid_date ?? item.due_date)?.startsWith(month);
+  });
+  const receivedInstallments = installments.filter((item) => item.received_amount > 0 && item.received_date?.startsWith(month));
+  const income = sum(paidTransactions.filter((item) => item.type === "income").map((item) => item.amount)) + sum(receivedInstallments.map((item) => item.received_amount));
+  const expenses = sum(paidTransactions.filter((item) => item.type === "expense").map((item) => item.amount));
+  return { income, expenses, result: income - expenses, movements: paidTransactions.length + receivedInstallments.length };
 }
 
 type RankedItem = {
@@ -656,54 +756,66 @@ function TransactionList({
 }
 
 function CashFlow({ transactions, installments }: { transactions: FinancialTransaction[]; installments: CommissionInstallment[] }) {
+  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
   const rows = useMemo(() => {
     const entries = [
-      ...transactions.map((item) => ({
+      ...transactions.filter((item) => item.type === "income" ? item.status === "recebido" : item.status === "pago").map((item) => ({
         date: item.paid_date ?? item.due_date ?? format(new Date(), "yyyy-MM-dd"),
         description: item.description,
-        in: item.type === "income" ? item.amount : 0,
-        out: item.type === "expense" ? item.amount : 0
+        category: item.category,
+        type: item.type,
+        amount: item.type === "income" ? item.amount : -item.amount
       })),
-      ...installments.map((item) => ({
+      ...installments.filter((item) => item.received_amount > 0 && item.received_date).map((item) => ({
         date: item.received_date ?? item.due_date,
         description: `Comissão parcela ${item.installment_number}`,
-        in: item.received_amount || (item.status === "recebida" ? item.expected_amount : 0),
-        out: 0
+        category: "comissão",
+        type: "income" as const,
+        amount: item.received_amount
       }))
-    ].sort((a, b) => a.date.localeCompare(b.date));
-    let accumulated = 0;
-    return entries.map((item) => {
-      const balance = item.in - item.out;
-      accumulated += balance;
-      return { ...item, balance, accumulated };
-    });
-  }, [transactions, installments]);
+    ].filter((item) => item.date.startsWith(month)).sort((a, b) => b.date.localeCompare(a.date));
+    return entries;
+  }, [transactions, installments, month]);
+  const balance = sum(rows.map((row) => row.amount));
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
-        <CardTitle>Fluxo de caixa</CardTitle>
-        <CardDescription>Entrada, saída, saldo diário e saldo acumulado.</CardDescription>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardTitle>Fluxo de caixa</CardTitle>
+            <CardDescription>Cada linha mostra somente o movimento que realmente entrou ou saiu.</CardDescription>
+          </div>
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+            Mês
+            <input type="month" value={month} max={format(new Date(), "yyyy-MM")} onChange={(event) => setMonth(event.target.value)} className="h-11 rounded-2xl border bg-background px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/30" />
+          </label>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {rows.map((row, index) => (
-          <div key={`${row.date}-${index}`} className="rounded-2xl border bg-card p-3 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <strong className="text-sm">{row.date}</strong>
-                <p className="mt-1 truncate text-sm text-muted-foreground">{row.description}</p>
-              </div>
-              <span className={cn("shrink-0 text-sm font-semibold", row.balance >= 0 ? "text-emerald-600" : "text-red-600")}>
-                {formatCurrency(row.balance)}
-              </span>
+        <div className="flex items-center justify-between rounded-[1.4rem] bg-[#0B1220] p-4 text-white">
+          <div><p className="text-xs text-white/50">Resultado do período</p><p className="mt-1 text-2xl font-semibold">{formatCurrency(balance)}</p></div>
+          <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-white/60">{rows.length} movimentos</span>
+        </div>
+        {rows.length ? rows.map((row, index) => (
+          <div key={`${row.date}-${index}`} className="flex items-center gap-3 rounded-[1.35rem] border bg-card p-3 shadow-[0_8px_24px_rgba(11,18,32,0.04)] sm:p-4">
+            <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-2xl", row.amount >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600")}>
+              {row.amount >= 0 ? <ArrowDownCircle className="h-5 w-5" /> : <ArrowUpCircle className="h-5 w-5" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{row.description}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{row.category} • {format(parseISO(row.date), "dd MMM yyyy", { locale: ptBR })}</p>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <MiniAmount label="Entrada" value={row.in} />
-              <MiniAmount label="Saída" value={row.out} />
-              <MiniAmount label="Acumulado" value={row.accumulated} />
+            <div className="shrink-0 text-right">
+              <span className={cn("text-sm font-semibold tabular-nums sm:text-base", row.amount >= 0 ? "text-emerald-600" : "text-red-600")}>
+                {row.amount >= 0 ? "+" : "-"}{formatCurrency(Math.abs(row.amount))}
+              </span>
+              <p className="mt-1 text-[0.65rem] text-muted-foreground">{row.type === "income" ? "entrada" : "saída"}</p>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="rounded-[1.35rem] border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhum movimento realizado neste mês.</div>
+        )}
       </CardContent>
     </Card>
   );
@@ -722,27 +834,49 @@ function FinancialResult({
   avgNet: number | null;
   ticketMonth: number | null;
 }) {
-  const expenseGroups = groupByCategory(finance.transactions.filter((item) => item.type === "expense"));
-  const incomeGroups = groupByCategory(finance.transactions.filter((item) => item.type === "income"));
-  const salesCount = finance.commissions.filter((item) => item.status === "recebida").length;
-  const costPerSale = salesCount ? finance.metrics.expensesMonth / salesCount : null;
+  const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
+  const settledTransactions = finance.transactions.filter((item) => {
+    const settled = item.type === "income" ? item.status === "recebido" : item.status === "pago";
+    return settled && (item.paid_date ?? item.due_date)?.startsWith(month);
+  });
+  const receivedInstallments = finance.installments.filter((item) => item.received_amount > 0 && item.received_date?.startsWith(month));
+  const expenseGroups = groupByCategory(settledTransactions.filter((item) => item.type === "expense"));
+  const incomeGroups = groupByCategory(settledTransactions.filter((item) => item.type === "income"));
+  const sales = finance.commissions.filter((item) => item.sale_date?.startsWith(month) && item.status !== "cancelada");
+  const salesCount = sales.length;
+  const totalExpenses = sum(settledTransactions.filter((item) => item.type === "expense").map((item) => item.amount));
+  const totalIncome = sum(settledTransactions.filter((item) => item.type === "income").map((item) => item.amount)) + sum(receivedInstallments.map((item) => item.received_amount));
+  const result = totalIncome - totalExpenses;
+  const vgv = sum(sales.map((item) => item.vgv));
+  const filteredAvgGross = salesCount ? sum(sales.map((item) => item.gross_commission)) / salesCount : null;
+  const filteredAvgNet = salesCount ? sum(sales.map((item) => item.net_commission)) / salesCount : null;
+  const filteredTicket = salesCount ? vgv / salesCount : null;
+  const costPerSale = salesCount ? totalExpenses / salesCount : null;
   const visits = 0;
   const captures = 0;
   const leads = 0;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+          Resultado do mês
+          <input type="month" value={month} max={format(new Date(), "yyyy-MM")} onChange={(event) => setMonth(event.target.value)} className="h-11 rounded-2xl border bg-background px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/30" />
+        </label>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>DRE simplificada do corretor</CardTitle>
-          <CardDescription>Mês atual.</CardDescription>
+          <CardDescription>{format(parseISO(`${month}-01`), "MMMM 'de' yyyy", { locale: ptBR })}.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <DreSection title="Receitas" groups={incomeGroups} />
+          {receivedInstallments.length > 0 && <DataLine label="Comissões recebidas" value={formatCurrency(sum(receivedInstallments.map((item) => item.received_amount)))} />}
           <DreSection title="Despesas" groups={expenseGroups} negative />
           <div className="rounded-3xl bg-[#050403] p-5 text-white">
             <p className="text-sm text-white/60">Resultado líquido</p>
-            <p className="mt-1 text-3xl font-semibold">{formatCurrency(finance.metrics.netResultMonth)}</p>
+            <p className="mt-1 text-3xl font-semibold">{formatCurrency(result)}</p>
           </div>
         </CardContent>
       </Card>
@@ -753,18 +887,19 @@ function FinancialResult({
           <CardDescription>Indicadores calculados somente com dados suficientes.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
-          <DataLine label="Custo total do mês" value={formatCurrency(finance.metrics.expensesMonth)} />
+          <DataLine label="Custo total do mês" value={formatCurrency(totalExpenses)} />
           <DataLine label="Custo por venda" value={costPerSale === null ? "Dados insuficientes para calcular." : formatCurrency(costPerSale)} />
-          <DataLine label="Custo por lead" value={leads ? formatCurrency(finance.metrics.expensesMonth / leads) : "Dados insuficientes para calcular."} />
-          <DataLine label="Custo por visita" value={visits ? formatCurrency(finance.metrics.expensesMonth / visits) : "Dados insuficientes para calcular."} />
-          <DataLine label="Custo por captação" value={captures ? formatCurrency(finance.metrics.expensesMonth / captures) : "Dados insuficientes para calcular."} />
-          <DataLine label="VGV mês" value={formatCurrency(finance.metrics.vgvMonth)} />
+          <DataLine label="Custo por lead" value={leads ? formatCurrency(totalExpenses / leads) : "Dados insuficientes para calcular."} />
+          <DataLine label="Custo por visita" value={visits ? formatCurrency(totalExpenses / visits) : "Dados insuficientes para calcular."} />
+          <DataLine label="Custo por captação" value={captures ? formatCurrency(totalExpenses / captures) : "Dados insuficientes para calcular."} />
+          <DataLine label="VGV mês" value={formatCurrency(vgv)} />
           <DataLine label="Meta VGV" value={formatCurrency(profile?.meta_vgv_mensal ?? 0)} />
-          <DataLine label="Comissão média bruta" value={avgGross === null ? "Dados insuficientes para calcular." : formatCurrency(avgGross)} />
-          <DataLine label="Comissão média líquida" value={avgNet === null ? "Dados insuficientes para calcular." : formatCurrency(avgNet)} />
-          <DataLine label="Ticket médio" value={ticketMonth === null ? "Dados insuficientes para calcular." : formatCurrency(ticketMonth)} />
+          <DataLine label="Comissão média bruta" value={filteredAvgGross === null ? "Dados insuficientes para calcular." : formatCurrency(filteredAvgGross)} />
+          <DataLine label="Comissão média líquida" value={filteredAvgNet === null ? "Dados insuficientes para calcular." : formatCurrency(filteredAvgNet)} />
+          <DataLine label="Ticket médio" value={filteredTicket === null ? "Dados insuficientes para calcular." : formatCurrency(filteredTicket)} />
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
