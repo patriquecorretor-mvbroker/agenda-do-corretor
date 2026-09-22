@@ -37,7 +37,7 @@ import { useFinance } from "@/features/finance/use-finance";
 import type { Client, Commission, CommissionInstallment, FinancialTransaction } from "@/types/database";
 
 type FinanceTab = "dashboard" | "commissions" | "receivable" | "payable" | "cashflow" | "result" | "calendar";
-type FinanceForm = "income" | "expense" | "commission" | null;
+type FinanceForm = "income" | "expense" | "payable" | "commission" | null;
 
 const tabs: Array<{ id: FinanceTab; label: string }> = [
   { id: "dashboard", label: "Visão geral" },
@@ -154,7 +154,7 @@ export function FinancePage() {
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-11" placeholder="Pesquisar cliente, imóvel, categoria..." value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2 md:mt-0 md:flex">
+        <div className="mt-3 grid grid-cols-2 gap-2 md:mt-0 md:flex">
           <Button className="min-h-11 px-2 text-xs sm:text-sm" onClick={() => setForm("income")}>
             <Plus className="h-4 w-4" />
             Receita
@@ -162,6 +162,10 @@ export function FinancePage() {
           <Button className="min-h-11 px-2 text-xs sm:text-sm" variant="outline" onClick={() => setForm("expense")}>
             <Plus className="h-4 w-4" />
             Despesa
+          </Button>
+          <Button className="min-h-11 px-2 text-xs sm:text-sm" variant="outline" onClick={() => setForm("payable")}>
+            <Plus className="h-4 w-4" />
+            Conta a pagar
           </Button>
           <Button className="min-h-11 px-2 text-xs sm:text-sm" variant="outline" onClick={() => setForm("commission")}>
             <Plus className="h-4 w-4" />
@@ -191,15 +195,15 @@ export function FinancePage() {
       <Dialog open={Boolean(form)} onOpenChange={() => setForm(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{form === "commission" ? "Nova comissão" : form === "expense" ? "Nova despesa" : "Nova receita"}</DialogTitle>
+            <DialogTitle>{form === "commission" ? "Nova comissão" : form === "expense" ? "Nova despesa paga" : form === "payable" ? "Nova conta a pagar" : "Nova receita"}</DialogTitle>
             <DialogDescription>
-              {form === "commission" ? "Cadastre venda, comissão e parcelamento automático." : "Cadastro rápido para poucos toques no celular."}
+              {form === "commission" ? "Cadastre venda, comissão e parcelamento automático." : form === "payable" ? "A conta ficará pendente até você registrar o pagamento." : form === "expense" ? "A despesa será registrada como paga e entrará no resultado do mês." : "Cadastro rápido para poucos toques no celular."}
             </DialogDescription>
           </DialogHeader>
           {form === "commission" ? (
             <CommissionForm onSaved={() => setForm(null)} />
           ) : form ? (
-            <TransactionForm type={form === "income" ? "income" : "expense"} onSaved={() => setForm(null)} />
+            <TransactionForm type={form === "income" ? "income" : "expense"} settlement={form === "payable" ? "pending" : "paid"} onSaved={() => setForm(null)} />
           ) : null}
         </DialogContent>
       </Dialog>
@@ -795,12 +799,13 @@ function FinancialCalendar({ transactions, installments }: { transactions: Finan
   );
 }
 
-export function TransactionForm({ type, onSaved }: { type: "income" | "expense"; onSaved: () => void }) {
+export function TransactionForm({ type, settlement = "paid", onSaved }: { type: "income" | "expense"; settlement?: "paid" | "pending"; onSaved: () => void }) {
   const finance = useFinance();
   const { toast } = useToast();
   const storageKey = `mv-broker-${type}-categories`;
   const usageKey = `mv-broker-${type}-category-usage`;
   const baseCategories = type === "income" ? incomeCategories : expenseCategories;
+  const isPayable = type === "expense" && settlement === "pending";
   const [category, setCategory] = useState("");
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
@@ -865,8 +870,8 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
       category: selectedCategory,
       description: selectedCategory,
       due_date: String(form.get("date") || format(new Date(), "yyyy-MM-dd")),
-      paid_date: type === "income" ? String(form.get("date") || format(new Date(), "yyyy-MM-dd")) : null,
-      status: type === "income" ? "recebido" : "pendente",
+      paid_date: type === "income" || !isPayable ? String(form.get("date") || format(new Date(), "yyyy-MM-dd")) : null,
+      status: type === "income" ? "recebido" : isPayable ? "pendente" : "pago",
       payment_method: String(form.get("payment_method") || "PIX"),
       notes: String(form.get("notes") || "") || null,
       is_recurring: form.get("is_recurring") === "on",
@@ -876,7 +881,7 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
     const nextUsage = { ...categoryUsage, [normalizedCategory]: (categoryUsage[normalizedCategory] ?? 0) + 1 };
     setCategoryUsage(nextUsage);
     localStorage.setItem(usageKey, JSON.stringify(nextUsage));
-    toast({ title: type === "income" ? "Receita salva." : "Despesa salva." });
+    toast({ title: type === "income" ? "Receita salva." : isPayable ? "Conta a pagar cadastrada." : "Despesa paga registrada." });
     onSaved();
   }
 
@@ -884,7 +889,7 @@ export function TransactionForm({ type, onSaved }: { type: "income" | "expense";
     <form className="grid gap-4" onSubmit={submit}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field name="amount" label="Valor" type="number" step="0.01" required />
-        <Field name="date" label="Data" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+        <Field name="date" label={type === "income" ? "Data do recebimento" : isPayable ? "Vencimento" : "Data do pagamento"} type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">

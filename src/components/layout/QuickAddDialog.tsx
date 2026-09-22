@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Banknote, CalendarPlus, CheckSquare, Receipt, UserPlus, WalletCards } from "lucide-react";
+import { Banknote, CalendarClock, CalendarPlus, CheckSquare, Receipt, UserPlus, WalletCards } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { EventForm } from "@/features/calendar/EventForm";
@@ -10,7 +10,7 @@ import { useClients } from "@/features/clients/use-clients";
 import { useToast } from "@/components/ui/toast";
 import type { ClientInput } from "@/features/clients/client-service";
 
-type QuickAddMode = "event" | "task" | "client" | "income" | "expense" | "commission";
+type QuickAddMode = "event" | "task" | "client" | "income" | "expense" | "payable" | "commission";
 
 export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [mode, setMode] = useState<QuickAddMode>("event");
@@ -20,7 +20,7 @@ export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Adicionar</DialogTitle>
-          <DialogDescription>Cadastre rotina, receita, despesa ou comissão em poucos toques.</DialogDescription>
+          <DialogDescription>Cadastre rotina, receita, despesa paga, conta a pagar ou comissão.</DialogDescription>
         </DialogHeader>
         <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Button type="button" variant={mode === "event" ? "default" : "outline"} onClick={() => setMode("event")}>
@@ -43,6 +43,10 @@ export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <Receipt className="h-4 w-4" />
             Despesa
           </Button>
+          <Button type="button" variant={mode === "payable" ? "default" : "outline"} onClick={() => setMode("payable")}>
+            <CalendarClock className="h-4 w-4" />
+            Conta a pagar
+          </Button>
           <Button type="button" variant={mode === "commission" ? "default" : "outline"} onClick={() => setMode("commission")}>
             <WalletCards className="h-4 w-4" />
             Comissão
@@ -53,6 +57,7 @@ export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         {mode === "client" && <QuickClientForm onSaved={() => onOpenChange(false)} />}
         {mode === "income" && <TransactionForm type="income" onSaved={() => onOpenChange(false)} />}
         {mode === "expense" && <TransactionForm type="expense" onSaved={() => onOpenChange(false)} />}
+        {mode === "payable" && <TransactionForm type="expense" settlement="pending" onSaved={() => onOpenChange(false)} />}
         {mode === "commission" && <CommissionForm onSaved={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
