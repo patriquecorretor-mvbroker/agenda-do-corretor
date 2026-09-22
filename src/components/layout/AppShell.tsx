@@ -48,6 +48,8 @@ export function AppShell({
   const { toast } = useToast();
   const mobileItems = navItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
   const moreItems = navItems.filter((item) => ["finance", "goals", "profile", "settings"].includes(item.view));
+  const currentItem = navItems.find((item) => item.view === view) ?? navItems[0];
+  const currentDate = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(new Date());
 
   async function handleSignOut() {
     await signOut();
@@ -55,31 +57,33 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.18),_transparent_32%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)))]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-primary/20 bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.18),_transparent_35%),linear-gradient(180deg,_#050403,_#0f0b08)] p-5 text-white backdrop-blur-xl lg:flex lg:flex-col">
-        <div className="mb-8 flex items-center gap-3">
+    <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[#F4F6F8] dark:bg-background">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/10 bg-[#080C12] p-4 text-white lg:flex lg:flex-col">
+        <div className="mb-7 flex items-center gap-3 px-1 pt-1">
           <img
             src="/brand/mv-broker-logo.jpg"
             alt="MV Broker"
-            className="h-14 w-14 rounded-2xl border border-primary/35 object-cover shadow-[0_12px_36px_rgba(218,165,57,0.25)]"
+            className="h-11 w-11 rounded-xl border border-primary/30 object-cover shadow-[0_8px_24px_rgba(218,165,57,0.18)]"
           />
           <div>
-            <p className="font-semibold">MV Broker</p>
-            <p className="text-xs text-white/55">Agenda do Corretor</p>
+            <p className="text-sm font-semibold">MV Broker</p>
+            <p className="text-[0.68rem] text-white/45">Agenda do Corretor</p>
           </div>
         </div>
-        <nav className="grid gap-2">
+        <p className="mb-2 px-3 text-[0.65rem] font-semibold uppercase text-white/30">Workspace</p>
+        <nav className="grid gap-1">
           {navItems.map((item) => (
             <button
               key={item.view}
               type="button"
               onClick={() => setView(item.view)}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/62 transition hover:bg-white/10 hover:text-white",
-                view === item.view && "bg-primary text-primary-foreground shadow-[0_18px_42px_rgba(218,165,57,0.28)] hover:bg-primary hover:text-primary-foreground"
+                "relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-white/55 transition hover:bg-white/[0.055] hover:text-white",
+                view === item.view && "bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
               )}
             >
-              <item.icon className="h-5 w-5" />
+              {view === item.view && <span className="absolute -left-1 h-5 w-0.5 rounded-full bg-primary" />}
+              <item.icon className={cn("h-[18px] w-[18px]", view === item.view && "text-primary")} />
               {item.label}
             </button>
           ))}
@@ -96,46 +100,60 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="mx-auto min-h-screen w-full min-w-0 max-w-7xl overflow-x-hidden px-4 pb-28 pt-5 sm:px-6 lg:ml-72 lg:w-auto lg:px-8 lg:pb-8">
-        {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
-        {view === "agenda" && <AgendaPage />}
-        {view === "clients" && <ClientsPage />}
-        {view === "finance" && <FinancePage />}
-        {view === "goals" && <GoalsPage />}
-        {view === "profile" && (
-          <ProfilePage
-            dark={dark}
-            onDarkChange={onDarkChange}
-            palette={palette}
-            onPaletteChange={onPaletteChange}
-            customColor={customColor}
-            onCustomColorChange={onCustomColorChange}
-          />
-        )}
-        {view === "settings" && (
-          <SettingsPage
-            dark={dark}
-            onDarkChange={onDarkChange}
-            palette={palette}
-            onPaletteChange={onPaletteChange}
-            customColor={customColor}
-            onCustomColorChange={onCustomColorChange}
-          />
-        )}
+      <main className="min-h-screen w-full min-w-0 overflow-x-hidden px-3 pb-28 pt-3 sm:px-5 sm:pt-5 lg:ml-64 lg:w-auto lg:px-6 lg:pb-8 lg:pt-0 xl:px-8 2xl:px-10">
+        <header className="sticky top-0 z-20 -mx-6 hidden h-16 items-center justify-between border-b bg-background/88 px-6 backdrop-blur-xl lg:flex xl:-mx-8 xl:px-8 2xl:-mx-10 2xl:px-10">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl border bg-card text-primary shadow-sm"><currentItem.icon className="h-[18px] w-[18px]" /></span>
+            <div><p className="text-sm font-semibold">{currentItem.label}</p><p className="text-[0.68rem] capitalize text-muted-foreground">{currentDate}</p></div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="icon" variant="outline" aria-label={dark ? "Ativar modo claro" : "Ativar modo escuro"} onClick={() => onDarkChange(!dark)}>
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button onClick={() => setQuickAddOpen(true)}><CirclePlus className="h-4 w-4" /> Novo</Button>
+          </div>
+        </header>
+        <div className="w-full min-w-0 lg:py-6">
+          {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
+          {view === "agenda" && <AgendaPage />}
+          {view === "clients" && <ClientsPage />}
+          {view === "finance" && <FinancePage />}
+          {view === "goals" && <GoalsPage />}
+          {view === "profile" && (
+            <ProfilePage
+              dark={dark}
+              onDarkChange={onDarkChange}
+              palette={palette}
+              onPaletteChange={onPaletteChange}
+              customColor={customColor}
+              onCustomColorChange={onCustomColorChange}
+            />
+          )}
+          {view === "settings" && (
+            <SettingsPage
+              dark={dark}
+              onDarkChange={onDarkChange}
+              palette={palette}
+              onPaletteChange={onPaletteChange}
+              customColor={customColor}
+              onCustomColorChange={onCustomColorChange}
+            />
+          )}
+        </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/94 px-3 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-5 items-end gap-1">
+      <nav className="fixed bottom-2 left-2 right-2 z-40 rounded-[1.4rem] border bg-background/94 px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_14px_40px_rgba(11,18,32,0.18)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto grid max-w-xl grid-cols-5 items-end gap-0.5">
           {mobileItems.slice(0, 2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
           ))}
           <button
             type="button"
             onClick={() => setQuickAddOpen(true)}
-            className="-mt-8 grid h-16 w-16 place-items-center justify-self-center rounded-full bg-primary text-primary-foreground shadow-[0_18px_44px_rgba(218,165,57,0.35)]"
+            className="-mt-7 grid h-14 w-14 place-items-center justify-self-center rounded-full border-4 border-background bg-primary text-primary-foreground shadow-[0_12px_32px_rgba(0,0,0,0.24)]"
             aria-label="Adicionar"
           >
-            <CirclePlus className="h-7 w-7" />
+            <CirclePlus className="h-6 w-6" />
           </button>
           {mobileItems.slice(2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
@@ -143,15 +161,6 @@ export function AppShell({
           <MobileNavItem active={moreItems.some((item) => item.view === view)} icon={LayoutGrid} label="Mais" onClick={() => setMoreOpen(true)} />
         </div>
       </nav>
-
-      <button
-        type="button"
-        onClick={() => setQuickAddOpen(true)}
-        className="fixed bottom-8 right-8 hidden rounded-full bg-primary p-5 text-primary-foreground shadow-[0_18px_44px_rgba(218,165,57,0.35)] transition hover:scale-105 lg:block"
-        aria-label="Adicionar compromisso ou tarefa"
-      >
-        <CirclePlus className="h-7 w-7" />
-      </button>
 
       <QuickAddDialog open={quickAddOpen} onOpenChange={setQuickAddOpen} />
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
@@ -183,10 +192,10 @@ function MobileNavItem({
     <button
       type="button"
       onClick={onClick}
-      className={cn("grid min-h-[64px] place-items-center gap-1 rounded-2xl text-[0.72rem] font-medium text-muted-foreground", active && "text-primary")}
+      className={cn("grid min-h-[58px] place-items-center gap-0.5 rounded-xl px-1 text-[0.65rem] font-medium text-muted-foreground transition", active && "bg-primary/8 text-primary")}
     >
-      <Icon className={cn("h-5 w-5", active && "fill-primary/10")} />
-      {label}
+      <Icon className={cn("h-[18px] w-[18px]", active && "fill-primary/10")} />
+      <span className="max-w-full truncate">{label}</span>
     </button>
   );
 }

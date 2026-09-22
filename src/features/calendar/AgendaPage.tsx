@@ -115,8 +115,8 @@ export function AgendaPage() {
 
   return (
     <div className="space-y-5">
-      <section className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 pb-3 pt-1 shadow-sm backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3">
+      <section className="sticky top-0 z-20 -mx-3 border-b bg-background/95 px-3 pb-3 pt-1 shadow-sm backdrop-blur-xl sm:-mx-5 sm:px-5 lg:top-16 lg:-mx-6 lg:px-6 xl:-mx-8 xl:px-8 2xl:-mx-10 2xl:px-10">
+        <div className="flex w-full flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xs font-medium text-muted-foreground">Agenda</p>
