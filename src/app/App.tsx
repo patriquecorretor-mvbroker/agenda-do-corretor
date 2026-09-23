@@ -13,7 +13,7 @@ function AppContent() {
   const { user, loading } = useAuth();
   const { profile, isLoading } = useProfile();
   const [dark, setDark] = useState(() => safeStorageGet("theme") !== "light");
-  const [palette, setPalette] = useState<PaletteId>(() => (safeStorageGet("palette") as PaletteId | null) ?? "mv-gold");
+  const [palette, setPalette] = useState<PaletteId>(() => normalizePalette(safeStorageGet("palette")));
   const [customColor, setCustomColor] = useState(() => safeStorageGet("custom-color") ?? "#f47c20");
 
   useEffect(() => {
@@ -23,11 +23,14 @@ function AppContent() {
     safeStorageSet("custom-color", customColor);
 
     const selected = getPalette(palette);
-    const primary = palette === "custom" ? hexToHsl(customColor) : dark ? selected.dark : selected.light;
-    document.documentElement.style.setProperty("--primary", primary);
-    document.documentElement.style.setProperty("--accent", primary);
-    document.documentElement.style.setProperty("--ring", primary);
-    document.documentElement.style.setProperty("--primary-foreground", primaryForegroundFor(primary));
+    const tokens = dark ? selected.dark : selected.light;
+    const customPrimary = palette === "custom" ? hexToHsl(customColor) : null;
+    const resolved = customPrimary ? { ...tokens, primary: customPrimary, ring: customPrimary } : tokens;
+    const root = document.documentElement;
+    root.dataset.palette = palette;
+    Object.entries(resolved).forEach(([key, value]) => root.style.setProperty(`--${toKebabCase(key)}`, value));
+    if (customPrimary) root.style.setProperty("--primary-foreground", primaryForegroundFor(customPrimary));
+    root.style.setProperty("--theme-gradient", selected.gradient);
   }, [customColor, dark, palette]);
 
   if (loading) {
@@ -71,6 +74,18 @@ function AppContent() {
       onCustomColorChange={setCustomColor}
     />
   );
+}
+
+function normalizePalette(value: string | null): PaletteId {
+  const valid: PaletteId[] = ["black-signature", "tech-graphite", "coast-pastel", "minimal-ink", "custom"];
+  if (value && valid.includes(value as PaletteId)) return value as PaletteId;
+  if (value === "mv-gold" || value === "premium-amber") return "black-signature";
+  if (value === "broker-orange") return "tech-graphite";
+  return "black-signature";
+}
+
+function toKebabCase(value: string) {
+  return value.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
 export function App() {

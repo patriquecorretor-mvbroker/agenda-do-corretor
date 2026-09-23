@@ -21,6 +21,8 @@
     --border: 24 20% 87%;
     --input: 24 20% 87%;
     --ring: 42 78% 56%;
+    --sidebar: 220 28% 5%;
+    --theme-gradient: linear-gradient(135deg, #050609 0%, #17191f 58%, #7a5a20 140%);
     --radius: 1rem;
   }
 
@@ -42,6 +44,7 @@
     --border: 24 11% 20%;
     --input: 24 11% 20%;
     --ring: 42 78% 60%;
+    --sidebar: 220 34% 3%;
   }
 
   * {
@@ -62,6 +65,7 @@
     max-width: 100%;
     overflow-x: hidden;
     overscroll-behavior-x: none;
+    transition: background-color 240ms ease, color 240ms ease;
   }
 
   #root {
@@ -86,5 +90,9 @@
 
   .glass-card {
     @apply border border-white/60 bg-white/80 shadow-soft backdrop-blur-xl dark:border-white/10 dark:bg-white/5;
+  }
+
+  .theme-gradient {
+    background-image: var(--theme-gradient);
   }
 }

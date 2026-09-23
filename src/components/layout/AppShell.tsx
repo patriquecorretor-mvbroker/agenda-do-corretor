@@ -57,8 +57,8 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[#F4F6F8] dark:bg-background">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/10 bg-[#080C12] p-4 text-white lg:flex lg:flex-col">
+    <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-background transition-colors duration-300">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/10 bg-[hsl(var(--sidebar))] p-4 text-white transition-colors duration-300 lg:flex lg:flex-col">
         <div className="mb-7 flex items-center gap-3 px-1 pt-1">
           <img
             src="/brand/mv-broker-logo.jpg"

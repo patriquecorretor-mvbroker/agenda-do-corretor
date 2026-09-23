@@ -87,9 +87,9 @@ export function ProfilePage({
                   key={item.id}
                   type="button"
                   onClick={() => onPaletteChange(item.id)}
-                  className={cn("rounded-2xl border bg-card p-3 text-left transition hover:shadow-soft", palette === item.id && "border-primary ring-2 ring-primary/25")}
+                  className={cn("rounded-2xl border bg-card p-3 text-left transition hover:-translate-y-0.5 hover:shadow-soft", palette === item.id && "border-primary ring-2 ring-primary/25")}
                 >
-                  <span className="mb-3 block h-8 w-8 rounded-xl" style={{ backgroundColor: item.id === "custom" ? customColor : item.preview }} />
+                  <span className="mb-3 flex h-9 items-center overflow-hidden rounded-xl">{item.swatches.map((color) => <span key={color} className="h-full flex-1" style={{ backgroundColor: color }} />)}</span>
                   <span className="block text-sm font-semibold">{item.name}</span>
                 </button>
               ))}
