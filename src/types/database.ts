@@ -49,6 +49,7 @@ export type Client = {
   property_profile: string | null;
   budget_min: number | null;
   budget_max: number | null;
+  payment_condition: string | null;
   bedrooms: number | null;
   notes: string | null;
   source: string | null;

@@ -26,13 +26,14 @@ function parseConversation(text: string): IntakeResult {
   const phone = normalized.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/)?.[0];
   const email = normalized.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i)?.[0];
   const budget = normalized.match(/(?:até|orcamento|orçamento|valor|faixa)\s*(?:de\s*)?(?:r\$\s*)?([\d.]+(?:,\d{1,2})?)/i)?.[1];
+  const paymentCondition = normalized.match(/\b(à vista|a vista|financiamento(?: bancário)?|parcelamento direto|consórcio|fgts|permuta|entrada\s*\+\s*financiamento)\b/i)?.[1];
   const bedrooms = normalized.match(/(\d+)\s*(?:quartos?|dormitórios?|dorms?)/i)?.[1];
   const city = normalized.match(/(?:cidade|moro em|procuro em|região de)[:\s]+([^\n,.]{3,40})/i)?.[1]?.trim();
   const neighborhood = normalized.match(/(?:bairro|região)[:\s]+([^\n,.]{3,40})/i)?.[1]?.trim();
   const explicitName = normalized.match(/(?:meu nome é|sou o|sou a|cliente[:\s]+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){1,3})/i)?.[1];
   const firstSpeaker = normalized.match(/^([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){1,3})\s*:/)?.[1];
   const profile = normalized.match(/\b(apartamento|casa|studio|terreno|sobrado|cobertura|loft)(?:[^\n,.]{0,45})/i)?.[0];
-  return { name: explicitName ?? firstSpeaker ?? "Cliente sem nome", phone: cleanPhone(phone), whatsapp: cleanPhone(phone), email: email ?? null, city: city ?? null, neighborhood: neighborhood ?? null, property_profile: profile ?? null, budget_max: money(budget), bedrooms: bedrooms ? Number(bedrooms) : null, notes: normalized.slice(0, 3000), source: "Conversa analisada", status: "lead", confidence: { name: explicitName || firstSpeaker ? 0.75 : 0.2, phone: phone ? 0.9 : 0, city: city ? 0.65 : 0 } };
+  return { name: explicitName ?? firstSpeaker ?? "Cliente sem nome", phone: cleanPhone(phone), whatsapp: cleanPhone(phone), email: email ?? null, city: city ?? null, neighborhood: neighborhood ?? null, property_profile: profile ?? null, budget_max: money(budget), payment_condition: paymentCondition ?? null, bedrooms: bedrooms ? Number(bedrooms) : null, notes: normalized.slice(0, 3000), source: "Conversa analisada", status: "lead", confidence: { name: explicitName || firstSpeaker ? 0.75 : 0.2, phone: phone ? 0.9 : 0, city: city ? 0.65 : 0 } };
 }
 
 function fileDataUrl(file: File) {

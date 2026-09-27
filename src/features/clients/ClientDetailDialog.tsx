@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, CircleDollarSign, History, MapPin, Megaphone, MessageCircle, Pencil, Phone, Plus, Thermometer, UserRound } from "lucide-react";
+import { Check, CircleDollarSign, CreditCard, History, MapPin, Megaphone, MessageCircle, Pencil, Phone, Plus, Thermometer, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -93,10 +93,11 @@ function ClientDetailContent({ client, open, onOpenChange, onEdit, onStatus, onF
         </div>
 
         <div className="space-y-5 p-4 sm:p-6">
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Info icon={UserRound} label="Interesse" value={client.property_profile || "Não informado"} />
             <Info icon={MapPin} label="Localização" value={[client.neighborhood, client.city].filter(Boolean).join(", ") || "Não informada"} />
             <Info icon={CircleDollarSign} label="Faixa de investimento" value={budgetLabel(client)} />
+            <Info icon={CreditCard} label="Condição de pagamento" value={client.payment_condition || "Não informada"} />
             <Info icon={Megaphone} label="Fonte de captação" value={client.source || "Não informada"} />
           </section>
 

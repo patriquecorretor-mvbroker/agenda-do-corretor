@@ -13,7 +13,7 @@ import { ClientMap } from "./ClientMap";
 import { useClients } from "./use-clients";
 import { AiClientIntake } from "./AiClientIntake";
 import { ClientDetailDialog } from "./ClientDetailDialog";
-import { ClientForm } from "./ClientForm";
+import { ClientForm, clientPaymentConditions } from "./ClientForm";
 import type { ClientInput } from "./client-service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +45,7 @@ type ClientMapItem = {
   crmStatus?: ClientStatus;
   budgetMin?: number;
   budgetMax?: number;
+  paymentCondition?: string;
   bedrooms?: number;
   nextFollowUp?: string;
   phone?: string;
@@ -136,6 +137,9 @@ export function ClientsPage() {
   const [city, setCity] = useState(allValue);
   const [profile, setProfile] = useState(allValue);
   const [stage, setStage] = useState(allValue);
+  const [paymentCondition, setPaymentCondition] = useState(allValue);
+  const [budgetFrom, setBudgetFrom] = useState("");
+  const [budgetTo, setBudgetTo] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [legacyVisits] = useState<Array<{ clientId: string; date: string }>>(() => {
     try {
@@ -186,12 +190,13 @@ export function ClientsPage() {
     crmStatus: client.status,
     budgetMin: client.budget_min ?? undefined,
     budgetMax: client.budget_max ?? undefined,
+    paymentCondition: client.payment_condition ?? undefined,
     bedrooms: client.bedrooms ?? undefined,
     nextFollowUp: client.next_follow_up ?? undefined,
     source: client.source ?? undefined,
     temperature: client.temperature ?? undefined
   }));
-  const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}`, source: ["Instagram", "Indicação", "Portal imobiliário", "WhatsApp"][index % 4], temperature: (["quente", "morno", "frio"] as ClientTemperature[])[index % 3] })) : []), ...crmClients, ...financeClients, ...customClients].map((client) => {
+  const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}`, source: ["Instagram", "Indicação", "Portal imobiliário", "WhatsApp"][index % 4], temperature: (["quente", "morno", "frio"] as ClientTemperature[])[index % 3], budgetMin: [600000, 900000, 1500000, 450000][index % 4], budgetMax: [900000, 1500000, 2800000, 700000][index % 4], paymentCondition: clientPaymentConditions[index % (clientPaymentConditions.length - 1)] })) : []), ...crmClients, ...financeClients, ...customClients].map((client) => {
     const mark = marks.marks.find((item) => item.client_id === client.id);
     const coordinates = !("lat" in client) || !("lng" in client) || client.lat === undefined || client.lng === undefined ? coordinatesForCity(client.city) : {};
     return { ...client, ...coordinates, photo: mark?.photo ?? ("photo" in client ? client.photo as string : undefined), bought: mark?.sold ?? client.bought };
@@ -199,14 +204,21 @@ export function ClientsPage() {
   const cities = Array.from(new Set(clients.map((client) => client.city)));
   const profiles = Array.from(new Set(clients.map((client) => client.profile)));
   const stages = Array.from(new Set(clients.map((client) => client.stage)));
+  const paymentConditions = Array.from(new Set(clients.map((client) => client.paymentCondition).filter((value): value is string => Boolean(value))));
 
   const filtered = clients.filter((client) => {
-    const matchesQuery = `${client.name} ${client.city} ${client.neighborhood} ${client.profile} ${client.source ?? ""} ${client.temperature ?? ""}`.toLowerCase().includes(query.toLowerCase());
+    const matchesQuery = `${client.name} ${client.city} ${client.neighborhood} ${client.profile} ${client.source ?? ""} ${client.temperature ?? ""} ${client.paymentCondition ?? ""} ${client.budgetMin ?? ""} ${client.budgetMax ?? ""}`.toLowerCase().includes(query.toLowerCase());
     const matchesCity = city === allValue || client.city === city;
     const matchesProfile = profile === allValue || client.profile === profile;
     const matchesStage = stage === allValue || client.stage === stage;
+    const matchesPayment = paymentCondition === allValue || client.paymentCondition === paymentCondition;
+    const minValue = budgetFrom ? Number(budgetFrom) : null;
+    const maxValue = budgetTo ? Number(budgetTo) : null;
+    const clientMin = client.budgetMin ?? client.budgetMax;
+    const clientMax = client.budgetMax ?? client.budgetMin;
+    const matchesValue = minValue === null && maxValue === null ? true : clientMin !== undefined && clientMax !== undefined && (minValue === null || clientMax >= minValue) && (maxValue === null || clientMin <= maxValue);
     const matchesFunnel = funnelStage === "all" || client.crmStatus === funnelStage;
-    return matchesQuery && matchesCity && matchesProfile && matchesStage && matchesFunnel;
+    return matchesQuery && matchesCity && matchesProfile && matchesStage && matchesPayment && matchesValue && matchesFunnel;
   });
 
   const profileChampion = topBy(clients, (client) => client.profile, (client) => client.downloads);
@@ -233,6 +245,20 @@ export function ClientsPage() {
     .sort((a, b) => attentionScore(b, now) - attentionScore(a, now))
     .slice(0, 5);
   const sourcePerformance = acquisitionPerformance(crm.clients);
+  const activeFilterCount = [city, profile, stage, paymentCondition].filter((value) => value !== allValue).length + (budgetFrom ? 1 : 0) + (budgetTo ? 1 : 0);
+
+  function clearClientFilters() {
+    setCity(allValue);
+    setProfile(allValue);
+    setStage(allValue);
+    setPaymentCondition(allValue);
+    setBudgetFrom("");
+    setBudgetTo("");
+    setFunnelStage("all");
+    setMapFilter(allValue);
+    setQuery("");
+    setSelectedClientId(null);
+  }
 
   async function createCrmClient(input: ClientInput) {
     try {
@@ -310,7 +336,7 @@ export function ClientsPage() {
     const existing = crm.clients.find((item) => item.id === client.id || item.name.toLocaleLowerCase("pt-BR") === client.name.toLocaleLowerCase("pt-BR"));
     if (existing) return existing;
     try {
-      return await crm.createClient.mutateAsync({ name: client.name, phone: client.phone ?? null, whatsapp: client.whatsapp ?? null, city: client.city, neighborhood: client.neighborhood, property_profile: client.profile, budget_min: client.budgetMin ?? null, budget_max: client.budgetMax ?? null, bedrooms: client.bedrooms ?? null, source: client.source ?? "Carteira importada", temperature: client.temperature ?? "morno", status: mapStageToClientStatus(client.stage), lat: client.locationPrecision === "exact" ? client.lat : null, lng: client.locationPrecision === "exact" ? client.lng : null });
+      return await crm.createClient.mutateAsync({ name: client.name, phone: client.phone ?? null, whatsapp: client.whatsapp ?? null, city: client.city, neighborhood: client.neighborhood, property_profile: client.profile, budget_min: client.budgetMin ?? null, budget_max: client.budgetMax ?? null, payment_condition: client.paymentCondition ?? null, bedrooms: client.bedrooms ?? null, source: client.source ?? "Carteira importada", temperature: client.temperature ?? "morno", status: mapStageToClientStatus(client.stage), lat: client.locationPrecision === "exact" ? client.lat : null, lng: client.locationPrecision === "exact" ? client.lng : null });
     } catch {
       toast({ title: "Não foi possível adicionar este contato ao CRM.", variant: "error" });
       return null;
@@ -448,17 +474,19 @@ export function ClientsPage() {
       <section className="flex min-w-0 items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input aria-label="Buscar clientes" className="h-12 rounded-2xl border-[#EAECF0] bg-white pl-11 shadow-[0_1px_3px_rgba(16,24,40,0.04)] dark:border-border dark:bg-card" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedClientId(null); }} placeholder="Buscar cliente, cidade, bairro ou perfil" />
+          <Input aria-label="Buscar clientes" className="h-12 rounded-2xl border-[#EAECF0] bg-white pl-11 shadow-[0_1px_3px_rgba(16,24,40,0.04)] dark:border-border dark:bg-card" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedClientId(null); }} placeholder="Cliente, cidade, perfil, valor ou pagamento" />
         </div>
-        <Button variant="outline" className="h-12 shrink-0 rounded-2xl border-[#EAECF0] bg-white px-3 dark:border-border dark:bg-card" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">Filtros</span>{[city, profile, stage].filter((value) => value !== allValue).length > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#0B1220] px-1 text-[11px] text-white">{[city, profile, stage].filter((value) => value !== allValue).length}</span>}</Button>
+        <Button variant="outline" className="h-12 shrink-0 rounded-2xl border-[#EAECF0] bg-white px-3 dark:border-border dark:bg-card" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">Filtros</span>{activeFilterCount > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] text-primary-foreground">{activeFilterCount}</span>}</Button>
         <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Filtrar clientes</DialogTitle><DialogDescription>Cidade, perfil de imóvel e etapa.</DialogDescription></DialogHeader>
+          <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader><DialogTitle>Filtrar clientes</DialogTitle><DialogDescription>Encontre o perfil certo por localização, valor e forma de pagamento.</DialogDescription></DialogHeader>
             <div className="space-y-4">
               <FilterSelect value={city} onValueChange={(value) => { setCity(value); setSelectedClientId(null); }} items={cities} placeholder="Cidade" />
               <FilterSelect value={profile} onValueChange={(value) => { setProfile(value); setSelectedClientId(null); }} items={profiles} placeholder="Perfil" />
               <FilterSelect value={stage} onValueChange={(value) => { setStage(value); setSelectedClientId(null); }} items={stages} placeholder="Etapa" />
-              <div className="grid grid-cols-2 gap-3"><Button variant="outline" onClick={() => { setCity(allValue); setProfile(allValue); setStage(allValue); setMapFilter(allValue); setQuery(""); setSelectedClientId(null); }}>Limpar filtros</Button><Button onClick={() => setFiltersOpen(false)}>Ver {filtered.length} clientes</Button></div>
+              <FilterSelect value={paymentCondition} onValueChange={(value) => { setPaymentCondition(value); setSelectedClientId(null); }} items={paymentConditions} placeholder="Condição de pagamento" />
+              <div className="space-y-2"><Label>Faixa de valor</Label><div className="grid grid-cols-2 gap-3"><Input aria-label="Valor mínimo" inputMode="numeric" type="number" min="0" value={budgetFrom} onChange={(event) => setBudgetFrom(event.target.value)} placeholder="Mínimo" /><Input aria-label="Valor máximo" inputMode="numeric" type="number" min="0" value={budgetTo} onChange={(event) => setBudgetTo(event.target.value)} placeholder="Máximo" /></div><p className="text-xs text-muted-foreground">Mostra clientes cuja faixa de compra cruza os valores informados.</p></div>
+              <div className="grid grid-cols-2 gap-3"><Button variant="outline" onClick={clearClientFilters}>Limpar filtros</Button><Button onClick={() => setFiltersOpen(false)}>Ver {filtered.length} clientes</Button></div>
             </div>
           </DialogContent>
         </Dialog>
@@ -572,8 +600,8 @@ export function ClientsPage() {
           </CardContent>
         </Card>}
 
-        {clientView === "list" && <Card className="overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]"><CardContent className="divide-y divide-[#EAECF0] p-0 dark:divide-border"><ClientEmpty visible={visibleClients.length === 0} onClear={() => { setCity(allValue); setProfile(allValue); setStage(allValue); setFunnelStage("all"); setQuery(""); setMapFilter(allValue); }} />{visibleClients.map((client) => <PremiumClientRow key={client.id} client={client} onOpen={() => openClient(client)} />)}</CardContent></Card>}
-        {clientView === "cards" && <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"><ClientEmpty visible={visibleClients.length === 0} onClear={() => { setCity(allValue); setProfile(allValue); setStage(allValue); setFunnelStage("all"); setQuery(""); setMapFilter(allValue); }} />{visibleClients.map((client) => <PremiumClientCard key={client.id} client={client} editable onOpen={() => openClient(client)} onStatus={(status) => changeCardStatus(client, status)} onTemperature={(temperature) => changeCardTemperature(client, temperature)} />)}</div>}
+        {clientView === "list" && <Card className="overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]"><CardContent className="divide-y divide-[#EAECF0] p-0 dark:divide-border"><ClientEmpty visible={visibleClients.length === 0} onClear={clearClientFilters} />{visibleClients.map((client) => <PremiumClientRow key={client.id} client={client} onOpen={() => openClient(client)} />)}</CardContent></Card>}
+        {clientView === "cards" && <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"><ClientEmpty visible={visibleClients.length === 0} onClear={clearClientFilters} />{visibleClients.map((client) => <PremiumClientCard key={client.id} client={client} editable onOpen={() => openClient(client)} onStatus={(status) => changeCardStatus(client, status)} onTemperature={(temperature) => changeCardTemperature(client, temperature)} />)}</div>}
       </section>
 
       <section className="space-y-4"><div><h2 className="text-lg font-semibold">Panorama da carteira</h2><p className="text-sm text-[#667085] dark:text-muted-foreground">Origem, conversão, perfil, localização e visitas.</p></div>
@@ -657,7 +685,7 @@ function PremiumClientCard({ client, editable, onOpen, onStatus, onTemperature }
   return <article className="rounded-[22px] bg-white p-4 shadow-[0_8px_30px_rgba(16,24,40,0.055)] ring-1 ring-[#EAECF0]/80 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_34px_rgba(16,24,40,0.09)] dark:bg-card dark:ring-border">
     <div className="flex items-start gap-3"><span className="h-12 w-12 shrink-0"><ClientAvatar name={client.name} photo={client.photo} /></span><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><h3 className="truncate font-semibold text-[#0B1220] dark:text-foreground">{client.name}</h3><TemperaturePill temperature={client.temperature} /></div><p className="mt-1 truncate text-sm text-[#667085] dark:text-muted-foreground">{client.profile}</p><p className="truncate text-sm text-[#667085] dark:text-muted-foreground">{client.city}</p></div></div>
     <p className="mt-4 text-base font-semibold text-[#0B1220] dark:text-foreground">{budgetRangeFromMap(client)}</p>
-    <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-[#F7F8FA] p-3 text-xs dark:bg-muted/55"><div><p className="text-[#98A2B3]">Fonte</p><p className="mt-1 truncate font-semibold text-[#475467] dark:text-foreground">{client.source || "Não informada"}</p></div><div><p className="text-[#98A2B3]">Próxima ação</p><p className="mt-1 truncate font-semibold text-[#475467] dark:text-foreground">{nextActionFromMap(client)}</p></div></div>
+    <div className="mt-3 grid grid-cols-2 gap-3 rounded-2xl bg-[#F7F8FA] p-3 text-xs dark:bg-muted/55"><div><p className="text-[#98A2B3]">Fonte</p><p className="mt-1 truncate font-semibold text-[#475467] dark:text-foreground">{client.source || "Não informada"}</p></div><div><p className="text-[#98A2B3]">Pagamento</p><p className="mt-1 truncate font-semibold text-[#475467] dark:text-foreground">{client.paymentCondition || "Não informado"}</p></div><div className="col-span-2"><p className="text-[#98A2B3]">Próxima ação</p><p className="mt-1 truncate font-semibold text-[#475467] dark:text-foreground">{nextActionFromMap(client)}</p></div></div>
     <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
       <Select value={client.crmStatus ?? mapStageToClientStatus(client.stage)} disabled={!editable} onValueChange={(value) => onStatus(value as ClientStatus)}><SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue /></SelectTrigger><SelectContent>{funnelStatuses.filter((item) => item.value !== "all").map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>
       <TemperatureControl value={client.temperature} disabled={!editable} onChange={onTemperature} />
@@ -700,6 +728,7 @@ function CompactClientDialog({ client, open, editable, onOpenChange, onStatus, o
         <MapMini label="Localização" value={`${client.neighborhood}, ${client.city}`} />
         <MapMini label="Investimento" value={budgetRangeFromMap(client)} />
         <MapMini label="Fonte" value={client.source || "Não informada"} />
+        <MapMini label="Pagamento" value={client.paymentCondition || "Não informado"} />
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
         <Select value={client.crmStatus ?? mapStageToClientStatus(client.stage)} disabled={!editable} onValueChange={(value) => onStatus(value as ClientStatus)}><SelectTrigger className="h-10 rounded-xl text-xs"><SelectValue /></SelectTrigger><SelectContent>{funnelStatuses.filter((item) => item.value !== "all").map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select>

@@ -31,7 +31,10 @@ function demoClient(id: string, name: string, status: Client["status"], city: st
   const sources = ["Instagram", "Indicação", "Portal imobiliário", "WhatsApp", "Placa"];
   const temperatures = ["quente", "morno", "frio"] as const;
   const sourceIndex = Number(id.replace(/\D/g, "")) || 0;
-  return { id, user_id: "demo-user", name, phone: null, whatsapp: "5511999999999", email: null, city, neighborhood: null, property_profile: property, budget_min: null, budget_max: null, bedrooms: null, notes: null, source: sources[sourceIndex % sources.length], temperature: temperatures[sourceIndex % temperatures.length], status, sale_date: null, next_follow_up: followUp.toISOString().slice(0, 10), lat: null, lng: null, created_at: now, updated_at: now };
+  const budgets = [[650000, 900000], [900000, 1500000], [1500000, 2500000], [500000, 750000]];
+  const paymentConditions = ["Financiamento bancário", "À vista", "Entrada + financiamento", "Permuta"];
+  const [budgetMin, budgetMax] = budgets[sourceIndex % budgets.length];
+  return { id, user_id: "demo-user", name, phone: null, whatsapp: "5511999999999", email: null, city, neighborhood: null, property_profile: property, budget_min: budgetMin, budget_max: budgetMax, payment_condition: paymentConditions[sourceIndex % paymentConditions.length], bedrooms: null, notes: null, source: sources[sourceIndex % sources.length], temperature: temperatures[sourceIndex % temperatures.length], status, sale_date: null, next_follow_up: followUp.toISOString().slice(0, 10), lat: null, lng: null, created_at: now, updated_at: now };
 }
 
 export function useClients() {
@@ -44,7 +47,7 @@ export function useClients() {
     mutationFn: async (input: ClientInput) => {
       if (hasSupabaseConfig) return createClient(user!.id, input);
       const now = new Date().toISOString();
-      const client: Client = { id: localId(), user_id: user!.id, phone: null, whatsapp: null, email: null, city: null, neighborhood: null, property_profile: null, budget_min: null, budget_max: null, bedrooms: null, notes: null, source: null, temperature: null, status: "lead", sale_date: null, next_follow_up: null, lat: null, lng: null, created_at: now, updated_at: now, ...input };
+      const client: Client = { id: localId(), user_id: user!.id, phone: null, whatsapp: null, email: null, city: null, neighborhood: null, property_profile: null, budget_min: null, budget_max: null, payment_condition: null, bedrooms: null, notes: null, source: null, temperature: null, status: "lead", sale_date: null, next_follow_up: null, lat: null, lng: null, created_at: now, updated_at: now, ...input };
       writeLocal([client, ...readLocal()]);
       appendLocalClientActivity(user!.id, { client_id: client.id, type: "cadastro", title: "Cliente cadastrado", details: client.source ? `Origem: ${client.source}` : null });
       return client;
