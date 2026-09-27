@@ -1,4 +1,4 @@
-const CACHE_NAME = "agenda-corretor-v32";
+const CACHE_NAME = "agenda-corretor-v33";
 const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {

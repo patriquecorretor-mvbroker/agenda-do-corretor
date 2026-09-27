@@ -196,7 +196,7 @@ export function AgendaPage() {
         </Card>
 
         <aside className="space-y-5">
-          <Card className="border-primary/20 bg-primary text-white">
+          <Card className="theme-gradient overflow-hidden border-white/10 text-white shadow-[0_18px_50px_rgba(6,10,18,0.18)]">
             <CardHeader>
               <CardTitle>Foco agora</CardTitle>
               <CardDescription className="text-white/70">Vencidas, alta prioridade e tarefas de hoje.</CardDescription>
@@ -524,7 +524,7 @@ function TaskRow({
           <span
             className={cn(
               "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border",
-              completed ? "border-primary bg-primary text-white" : "border-border"
+              completed ? "border-primary bg-primary text-primary-foreground" : "border-border"
             )}
           >
             {completed && <Check className="h-3.5 w-3.5" />}
