@@ -98,9 +98,9 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
       }
       content.appendChild(badges);
       const title = `${client.name}, ${client.city}${client.bought ? ", vendido" : ""}${client.visited ? ", visitado" : ""}${client.scheduled ? ", visita agendada" : ""}`;
-      const marker = L.marker([client.lat, client.lng], { title, alt: title, keyboard: true, riseOnHover: true, icon: L.divIcon({ html: content, className: "client-map-marker", iconSize: [34, 34], iconAnchor: [17, 17] }) });
+      const marker = L.marker([client.lat, client.lng], { title, alt: title, keyboard: true, riseOnHover: true, icon: L.divIcon({ html: content, className: "client-map-marker", iconSize: [36, 36], iconAnchor: [18, 18] }) });
       const tooltip = document.createElement("span"); tooltip.textContent = client.name;
-      marker.bindTooltip(tooltip, { direction: "top", offset: [0, -20] });
+      marker.bindTooltip(tooltip, { direction: "top", offset: [0, -15] });
       marker.on("click", () => { dialog.current?.close(); setExpanded(false); select.current(client.id); });
       group.addLayer(marker);
     });

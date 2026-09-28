@@ -6,18 +6,20 @@
 .client-map-controls button:disabled { opacity: .5; }
 .client-map-controls button:hover { background: hsl(var(--muted)); }
 .client-map-controls button:focus-visible, .client-map-marker:focus-visible { outline: 3px solid hsl(var(--primary)); outline-offset: 3px; }
-.client-map-avatar { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid #a1a1aa; border-radius: 50%; background: #27272a; color: white; font-size: 10px; font-weight: 600; box-shadow: 0 2px 8px #0004; }
+.client-map-marker { display: grid !important; place-items: center; background: transparent !important; border: 0 !important; }
+.client-map-avatar { position: relative; display: grid; place-items: center; width: 24px; height: 24px; border: 1.5px solid #a1a1aa; border-radius: 50%; background: #27272a; color: white; font-size: 8px; font-weight: 700; box-shadow: 0 2px 6px #0003; }
 .client-map-avatar.is-sold { border-color: #10b981; }
 .client-map-avatar.is-visited { border-color: #0ea5e9; }
 .client-map-avatar.is-scheduled { border-color: #f59e0b; }
-.client-map-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-.client-map-badges { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); display: flex; gap: 1px; }
-.client-map-badges > span { width: 14px; height: 14px; display: grid; place-items: center; border-radius: 50%; font-size: 8px; color: white; border: 1px solid white; }
+.client-map-frame .client-map-avatar img { display: block; width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; object-fit: cover; border-radius: 50%; }
+.client-map-badges { position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); display: flex; gap: 1px; }
+.client-map-badges > span { width: 10px; height: 10px; display: grid; place-items: center; border-radius: 50%; font-size: 6px; line-height: 1; color: white; border: 1px solid white; }
 .client-map-badges .is-sold { background: #047857; }
 .client-map-badges .is-visited { background: #0369a1; }
 .client-map-badges .is-scheduled { background: #a16207; }
 .client-map-frame .marker-cluster { background: hsl(var(--primary) / .25); }
-.client-map-frame .marker-cluster > div { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-family: inherit; font-weight: 700; font-size: 14px; }
+.client-map-frame .marker-cluster-small, .client-map-frame .marker-cluster-medium, .client-map-frame .marker-cluster-large { width: 30px !important; height: 30px !important; margin-left: -15px !important; margin-top: -15px !important; }
+.client-map-frame .marker-cluster > div { width: 24px !important; height: 24px !important; margin: 3px !important; line-height: 24px !important; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-family: inherit; font-weight: 700; font-size: 10px; }
 .client-map-state { position: absolute; z-index: 1; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: hsl(var(--muted)); padding: 24px 65px 24px 24px; text-align: center; font-size: 14px; }
 .client-map-state button { min-height: 44px; padding: 8px 16px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); }
 .client-map-notice { position: absolute; z-index: 2; bottom: 32px; left: 12px; right: 12px; display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 14px; background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 6px 20px rgba(16,24,40,.12); font-size: 13px; }
