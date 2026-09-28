@@ -78,15 +78,64 @@ export type ClientActivity = {
 
 export type Building = {
   id: string;
+  userId?: string | null;
   name: string;
   street: string;
   number: string | null;
   neighborhood: string;
+  city?: string;
+  state?: string;
   postalCode: string | null;
   latitude: number;
   longitude: number;
   mapsUrl: string;
   sourceRow: number;
+  coverUrl?: string | null;
+  coverSourceUrl?: string | null;
+  coverSourceTitle?: string | null;
+  builder?: string | null;
+  developer?: string | null;
+  constructionYear?: number | null;
+  deliveryYear?: number | null;
+  towers?: number | null;
+  floors?: number | null;
+  totalUnits?: number | null;
+  unitsPerFloor?: number | null;
+  elevators?: number | null;
+  parkingSpaces?: number | null;
+  bedroomsMin?: number | null;
+  bedroomsMax?: number | null;
+  privateAreaMin?: number | null;
+  privateAreaMax?: number | null;
+  amenities?: string[];
+  description?: string | null;
+  websiteUrl?: string | null;
+  sourceUrl?: string | null;
+  sourceTitle?: string | null;
+  sourceCheckedAt?: string | null;
+  verificationStatus?: "pendente" | "web" | "verificado" | "manual";
+  notes?: string | null;
+};
+
+export type MarketNews = {
+  id: string;
+  title: string;
+  summary: string;
+  source_name: string;
+  source_url: string;
+  image_url: string | null;
+  published_at: string;
+  category: "litoral" | "mercado" | "crédito" | "investimento" | "legislação";
+  region: string;
+  relevance_score: number;
+  sales_argument: string;
+  whatsapp_script: string;
+  story_headline: string;
+  story_body: string;
+  story_cta: string;
+  created_at: string;
+  saved?: boolean;
+  read?: boolean;
 };
 
 export type CalendarEvent = {

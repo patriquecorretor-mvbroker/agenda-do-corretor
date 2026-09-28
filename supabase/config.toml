@@ -1,0 +1,2 @@
+[functions.market-news-daily]
+verify_jwt = false
