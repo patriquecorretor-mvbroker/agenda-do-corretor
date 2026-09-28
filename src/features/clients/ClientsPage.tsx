@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Bot, Building2, CalendarClock, CalendarPlus, Camera, Check, ChevronRight, CircleDollarSign, Crown, ExternalLink, Grid2X2, LayoutList, Map, MapPin, Megaphone, MessageCircle, Navigation, Phone, Plus, Search, SlidersHorizontal, Thermometer, Trophy, UserRoundSearch, Users, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -116,7 +116,6 @@ export function ClientsPage() {
   const [compactClientId, setCompactClientId] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<Client>();
   const [clientView, setClientView] = useState<ClientView>("list");
-  const clientViewBeforeDialog = useRef<ClientView>("list");
   const [funnelStage, setFunnelStage] = useState<ClientStatus | "all">("all");
   const [scheduleClient, setScheduleClient] = useState<ClientMapItem | null>(null);
   const [saleClient, setSaleClient] = useState<ClientMapItem | null>(null);
@@ -321,7 +320,6 @@ export function ClientsPage() {
     setBudgetTo("");
     setFunnelStage("all");
     setMapFilter("todos");
-    clientViewBeforeDialog.current = "map";
     setClientView("map");
     setSelectedClientId(client.id);
     window.setTimeout(() => document.getElementById("client-map-section")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -419,7 +417,6 @@ export function ClientsPage() {
       const registered = await ensureCrmClient(client);
       if (registered) setSelectedCrmId(registered.id);
     } else {
-      clientViewBeforeDialog.current = clientView;
       setClientView("map");
       setSelectedClientId(client.id);
     }
@@ -627,7 +624,7 @@ export function ClientsPage() {
               <Dialog open={Boolean(selectedClient)} onOpenChange={(open) => {
                 if (!open) {
                   setSelectedClientId(null);
-                  setClientView(clientViewBeforeDialog.current);
+                  setClientView("map");
                 }
               }}>
                 {selectedClient && <DialogContent className="sm:max-w-md">
