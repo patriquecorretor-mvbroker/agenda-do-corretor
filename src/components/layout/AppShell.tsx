@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, CirclePlus, Home, LayoutGrid, LogOut, Moon, Settings, Sun, Target, User, Users, WalletCards } from "lucide-react";
+import { Building2, CalendarDays, CirclePlus, Home, LayoutGrid, LogOut, Moon, Settings, Sun, Target, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
@@ -9,6 +9,7 @@ import { QuickAddDialog } from "@/components/layout/QuickAddDialog";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { AgendaPage } from "@/features/calendar/AgendaPage";
 import { ClientsPage } from "@/features/clients/ClientsPage";
+import { BuildingsPage } from "@/features/buildings/BuildingsPage";
 import { FinancePage } from "@/features/finance/FinancePage";
 import { GoalsPage } from "@/features/goals/GoalsPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
@@ -20,6 +21,7 @@ const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; m
   { view: "day", label: "Meu Dia", icon: Home },
   { view: "agenda", label: "Agenda", icon: CalendarDays },
   { view: "clients", label: "Clientes", icon: Users },
+  { view: "buildings", label: "Edifícios", icon: Building2 },
   { view: "finance", label: "Financeiro", icon: WalletCards },
   { view: "goals", label: "Metas", icon: Target },
   { view: "profile", label: "Perfil", icon: User, mobile: false },
@@ -47,7 +49,7 @@ export function AppShell({
   const { signOut } = useAuth();
   const { toast } = useToast();
   const mobileItems = navItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
-  const moreItems = navItems.filter((item) => ["finance", "goals", "profile", "settings"].includes(item.view));
+  const moreItems = navItems.filter((item) => ["buildings", "finance", "goals", "profile", "settings"].includes(item.view));
   const currentItem = navItems.find((item) => item.view === view) ?? navItems[0];
   const currentDate = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(new Date());
 
@@ -117,6 +119,7 @@ export function AppShell({
           {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
           {view === "agenda" && <AgendaPage />}
           {view === "clients" && <ClientsPage />}
+          {view === "buildings" && <BuildingsPage />}
           {view === "finance" && <FinancePage />}
           {view === "goals" && <GoalsPage />}
           {view === "profile" && (

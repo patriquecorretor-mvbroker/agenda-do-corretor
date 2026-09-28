@@ -76,6 +76,19 @@ export type ClientActivity = {
   created_at: string;
 };
 
+export type Building = {
+  id: string;
+  name: string;
+  street: string;
+  number: string | null;
+  neighborhood: string;
+  postalCode: string | null;
+  latitude: number;
+  longitude: number;
+  mapsUrl: string;
+  sourceRow: number;
+};
+
 export type CalendarEvent = {
   id: string;
   user_id: string;
@@ -89,6 +102,8 @@ export type CalendarEvent = {
   status: EventStatus;
   notes: string | null;
   client_id?: string | null;
+  building_id?: string | null;
+  apartment_number?: string | null;
   created_at: string;
   updated_at: string;
 };

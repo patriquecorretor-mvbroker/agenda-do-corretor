@@ -3,6 +3,7 @@ import { addDays, addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek,
 import { ptBR } from "date-fns/locale";
 import {
   CalendarRange,
+  Building2,
   ChevronLeft,
   ChevronRight,
   Check,
@@ -448,6 +449,12 @@ function TimelineEvent({
                 <MapPin className="h-3.5 w-3.5" />
                 {event.location ?? "Local não informado"}
               </span>
+              {event.apartment_number && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+                  <Building2 className="h-3.5 w-3.5" />
+                  Apto {event.apartment_number}
+                </span>
+              )}
               {event.notes && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
                   <StickyNote className="h-3.5 w-3.5" />

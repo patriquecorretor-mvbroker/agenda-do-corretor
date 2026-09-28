@@ -45,4 +45,6 @@ export type CalendarEventInsert = {
   status?: CalendarEvent["status"];
   notes?: string | null;
   client_id?: string | null;
+  building_id?: string | null;
+  apartment_number?: string | null;
 };
