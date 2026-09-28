@@ -54,6 +54,7 @@ type ClientMapItem = {
 };
 
 type ClientView = "list" | "cards" | "map";
+type InsightFilter = "all" | "active" | "followups-today" | "negotiations" | "sales" | "visited-month" | "visited-year" | "visited";
 
 const funnelStatuses: Array<{ value: ClientStatus | "all"; label: string }> = [
   { value: "all", label: "Todos" },
@@ -140,6 +141,9 @@ export function ClientsPage() {
   const [city, setCity] = useState(allValue);
   const [profile, setProfile] = useState(allValue);
   const [stage, setStage] = useState(allValue);
+  const [source, setSource] = useState(allValue);
+  const [insightFilter, setInsightFilter] = useState<InsightFilter>("all");
+  const [cardFilterLabel, setCardFilterLabel] = useState<string | null>(null);
   const [paymentCondition, setPaymentCondition] = useState(allValue);
   const [budgetFrom, setBudgetFrom] = useState("");
   const [budgetTo, setBudgetTo] = useState("");
@@ -158,6 +162,10 @@ export function ClientsPage() {
 
   const visitLog = [...(isDemo ? legacyVisits : []), ...marks.marks.flatMap((mark) => (mark.visits ?? []).map((date) => ({ clientId: mark.client_id, date })))];
   const visitedClientIds = new Set(visitLog.map((visit) => visit.clientId));
+  const now = new Date();
+  const todayKey = format(now, "yyyy-MM-dd");
+  const visitedThisMonthIds = new Set(visitLog.filter((visit) => isSameMonthKey(visit.date, now)).map((visit) => visit.clientId));
+  const visitedThisYearIds = new Set(visitLog.filter((visit) => new Date(visit.date).getFullYear() === now.getFullYear()).map((visit) => visit.clientId));
   const scheduledIds = new Set((scheduled.data ?? []).map((event) => event.notes?.slice("client-map:".length)));
 
   const financeClients = finance.commissions
@@ -214,6 +222,7 @@ export function ClientsPage() {
     const matchesCity = city === allValue || client.city === city;
     const matchesProfile = profile === allValue || client.profile === profile;
     const matchesStage = stage === allValue || client.stage === stage;
+    const matchesSource = source === allValue || (client.crmStatus !== undefined && client.source === source);
     const matchesPayment = paymentCondition === allValue || client.paymentCondition === paymentCondition;
     const minValue = budgetFrom ? Number(budgetFrom) : null;
     const maxValue = budgetTo ? Number(budgetTo) : null;
@@ -221,7 +230,16 @@ export function ClientsPage() {
     const clientMax = client.budgetMax ?? client.budgetMin;
     const matchesValue = minValue === null && maxValue === null ? true : clientMin !== undefined && clientMax !== undefined && (minValue === null || clientMax >= minValue) && (maxValue === null || clientMin <= maxValue);
     const matchesFunnel = funnelStage === "all" || client.crmStatus === funnelStage;
-    return matchesQuery && matchesCity && matchesProfile && matchesStage && matchesPayment && matchesValue && matchesFunnel;
+    const status = client.crmStatus ?? mapStageToClientStatus(client.stage);
+    const matchesInsight = insightFilter === "all"
+      || (insightFilter === "active" && client.crmStatus !== undefined && !["venda realizada", "pós-venda", "perdido"].includes(status))
+      || (insightFilter === "followups-today" && client.crmStatus !== undefined && client.nextFollowUp === todayKey)
+      || (insightFilter === "negotiations" && client.crmStatus !== undefined && ["proposta", "negociação"].includes(status))
+      || (insightFilter === "sales" && client.bought)
+      || (insightFilter === "visited-month" && visitedThisMonthIds.has(client.id))
+      || (insightFilter === "visited-year" && visitedThisYearIds.has(client.id))
+      || (insightFilter === "visited" && visitedClientIds.has(client.id));
+    return matchesQuery && matchesCity && matchesProfile && matchesStage && matchesSource && matchesPayment && matchesValue && matchesFunnel && matchesInsight;
   });
 
   const profileChampion = topBy(clients, (client) => client.profile, (client) => client.downloads);
@@ -232,14 +250,12 @@ export function ClientsPage() {
   const mappedClients = visibleClients.filter((client): client is ClientMapItem & { lat: number; lng: number } => Number.isFinite(client.lat) && Number.isFinite(client.lng) && Math.abs(client.lat!) <= 90 && Math.abs(client.lng!) <= 180);
   const selectedClient = visibleClients.find((client) => client.id === selectedClientId);
   const compactClient = clients.find((client) => client.id === compactClientId);
-  const now = new Date();
   const visitsThisMonth = visitLog.filter((visit) => isSameMonthKey(visit.date, now)).length;
   const visitsThisYear = visitLog.filter((visit) => new Date(visit.date).getFullYear() === now.getFullYear()).length;
   const selectedClientVisits = selectedClient ? visitLog.filter((visit) => visit.clientId === selectedClient.id) : [];
   const selectedVisitedToday = selectedClient ? visitLog.some((visit) => visit.clientId === selectedClient.id && isTodayKey(visit.date)) : false;
   const selectedCrmClient = crm.clients.find((client) => client.id === selectedCrmId);
   const activeClients = crm.clients.filter((client) => !["venda realizada", "pós-venda", "perdido"].includes(client.status)).length;
-  const todayKey = format(now, "yyyy-MM-dd");
   const followUpsToday = crm.clients.filter((client) => client.next_follow_up === todayKey).length;
   const scheduledVisits = crm.clients.filter((client) => client.status === "visita agendada").length;
   const negotiations = crm.clients.filter((client) => ["proposta", "negociação"].includes(client.status)).length;
@@ -248,7 +264,7 @@ export function ClientsPage() {
     .sort((a, b) => attentionScore(b, now) - attentionScore(a, now))
     .slice(0, 5);
   const sourcePerformance = acquisitionPerformance(crm.clients);
-  const activeFilterCount = [city, profile, stage, paymentCondition].filter((value) => value !== allValue).length + (budgetFrom ? 1 : 0) + (budgetTo ? 1 : 0);
+  const activeFilterCount = [city, profile, stage, source, paymentCondition].filter((value) => value !== allValue).length + (insightFilter !== "all" ? 1 : 0) + (budgetFrom ? 1 : 0) + (budgetTo ? 1 : 0);
   const cityGroups = groupClientsByCity(clients);
   const cityExplorerClients = cityExplorer ? clients.filter((client) => client.city === cityExplorer) : [];
   const cityNeighborhoods = Array.from(new Set(cityExplorerClients.map((client) => client.neighborhood).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR"));
@@ -258,6 +274,9 @@ export function ClientsPage() {
     setCity(allValue);
     setProfile(allValue);
     setStage(allValue);
+    setSource(allValue);
+    setInsightFilter("all");
+    setCardFilterLabel(null);
     setPaymentCondition(allValue);
     setBudgetFrom("");
     setBudgetTo("");
@@ -265,6 +284,19 @@ export function ClientsPage() {
     setMapFilter(allValue);
     setQuery("");
     setSelectedClientId(null);
+  }
+
+  function applyCardFilter(label: string, options: { insight?: InsightFilter; city?: string; profile?: string; source?: string; funnel?: ClientStatus; view?: ClientView; mapFilter?: string } = {}) {
+    clearClientFilters();
+    setCardFilterLabel(label);
+    if (options.insight) setInsightFilter(options.insight);
+    if (options.city) setCity(options.city);
+    if (options.profile) setProfile(options.profile);
+    if (options.source) setSource(options.source);
+    if (options.funnel) setFunnelStage(options.funnel);
+    if (options.view) setClientView(options.view);
+    if (options.mapFilter) setMapFilter(options.mapFilter);
+    window.setTimeout(() => document.getElementById("client-map-section")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
 
   function openCityExplorer(cityName?: string) {
@@ -281,6 +313,9 @@ export function ClientsPage() {
     setCity(allValue);
     setProfile(allValue);
     setStage(allValue);
+    setSource(allValue);
+    setInsightFilter("all");
+    setCardFilterLabel(null);
     setPaymentCondition(allValue);
     setBudgetFrom("");
     setBudgetTo("");
@@ -504,10 +539,10 @@ export function ClientsPage() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <CommercialMetric icon={UserRoundSearch} label="Clientes ativos" value={activeClients} />
-        <CommercialMetric icon={CalendarClock} label="Follow-ups hoje" value={followUpsToday} attention={followUpsToday > 0} />
-        <CommercialMetric icon={CalendarPlus} label="Visitas agendadas" value={scheduledVisits} />
-        <CommercialMetric icon={CircleDollarSign} label="Negociações" value={negotiations} />
+        <CommercialMetric icon={UserRoundSearch} label="Clientes ativos" value={activeClients} active={cardFilterLabel === "Clientes ativos"} onClick={() => applyCardFilter("Clientes ativos", { insight: "active" })} />
+        <CommercialMetric icon={CalendarClock} label="Follow-ups hoje" value={followUpsToday} attention={followUpsToday > 0} active={cardFilterLabel === "Follow-ups hoje"} onClick={() => applyCardFilter("Follow-ups hoje", { insight: "followups-today" })} />
+        <CommercialMetric icon={CalendarPlus} label="Visitas agendadas" value={scheduledVisits} active={cardFilterLabel === "Visitas agendadas"} onClick={() => applyCardFilter("Visitas agendadas", { funnel: "visita agendada" })} />
+        <CommercialMetric icon={CircleDollarSign} label="Negociações" value={negotiations} active={cardFilterLabel === "Negociações"} onClick={() => applyCardFilter("Negociações", { insight: "negotiations" })} />
       </section>
 
       <Card className="overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]">
@@ -558,6 +593,7 @@ export function ClientsPage() {
             {([['list', 'Lista', LayoutList], ['cards', 'Cards', Grid2X2], ['map', 'Mapa', Map]] as const).map(([value, label, Icon]) => <button key={value} type="button" aria-label={label} title={label} onClick={() => setClientView(value)} className={cn("grid h-10 w-10 place-items-center rounded-xl text-[#667085] transition sm:w-auto sm:grid-cols-[auto_auto] sm:gap-2 sm:px-3", clientView === value && "bg-white text-[#0B1220] shadow-sm dark:bg-card dark:text-foreground")}><Icon className="h-4 w-4" /><span className="hidden text-sm font-semibold sm:inline">{label}</span></button>)}
           </div>
         </div>
+        {cardFilterLabel && <button type="button" onClick={clearClientFilters} className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#0B1220] px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-[#172033] dark:bg-foreground dark:text-background"><span>Filtro: {cardFilterLabel}</span><X className="h-3.5 w-3.5" /></button>}
 
         {clientView === "map" && <Card className="min-w-0 overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]">
           <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -640,15 +676,15 @@ export function ClientsPage() {
 
       <section className="space-y-4"><div><h2 className="text-lg font-semibold">Panorama da carteira</h2><p className="text-sm text-[#667085] dark:text-muted-foreground">Origem, conversão, perfil, localização e visitas.</p></div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {sourcePerformance.length ? sourcePerformance.slice(0, 4).map((source) => <AcquisitionCard key={source.label} {...source} />) : <div className="col-span-full rounded-[20px] border border-dashed p-5 text-sm text-muted-foreground">Cadastre a fonte de captação dos clientes para acompanhar volume e conversão.</div>}
+          {sourcePerformance.length ? sourcePerformance.slice(0, 4).map((item) => <AcquisitionCard key={item.label} {...item} active={cardFilterLabel === `Fonte: ${item.label}`} onClick={() => applyCardFilter(`Fonte: ${item.label}`, { source: item.label })} />) : <div className="col-span-full rounded-[20px] border border-dashed p-5 text-sm text-muted-foreground">Cadastre a fonte de captação dos clientes para acompanhar volume e conversão.</div>}
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <ChampionCard icon={Crown} label="Perfil mais procurado" value={profileChampion?.label ?? "Dados insuficientes"} helper={`${profileChampion?.score ?? 0} interações`} />
-        <ChampionCard icon={MapPin} label="Cidade campeã" value={cityChampion?.label ?? "Dados insuficientes"} helper={`${cityChampion?.score ?? 0} clientes`} actionLabel="Ver todas as cidades" onAction={() => openCityExplorer()} />
-        <ChampionCard icon={Trophy} label="Cidade que mais vendeu" value={citySalesChampion?.label ?? "Dados insuficientes"} helper={`${citySalesChampion?.score ?? 0} vendas`} />
-        <ChampionCard icon={Check} label="Visitas no mês" value={String(visitsThisMonth)} helper="visitas registradas" />
-        <ChampionCard icon={Navigation} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} />
-        <ChampionCard icon={Users} label="Clientes visitados" value={String(visitedClientIds.size)} helper="clientes únicos" />
+        <ChampionCard icon={Crown} label="Perfil mais procurado" value={profileChampion?.label ?? "Dados insuficientes"} helper={`${profileChampion?.score ?? 0} interações`} active={cardFilterLabel === "Perfil mais procurado"} onClick={profileChampion ? () => applyCardFilter("Perfil mais procurado", { profile: profileChampion.label }) : undefined} />
+        <ChampionCard icon={MapPin} label="Cidade campeã" value={cityChampion?.label ?? "Dados insuficientes"} helper={`${cityChampion?.score ?? 0} clientes`} active={cardFilterLabel === "Cidade campeã"} onClick={cityChampion ? () => applyCardFilter("Cidade campeã", { city: cityChampion.label }) : undefined} actionLabel="Ver todas as cidades" onAction={() => openCityExplorer()} />
+        <ChampionCard icon={Trophy} label="Cidade que mais vendeu" value={citySalesChampion?.label ?? "Dados insuficientes"} helper={`${citySalesChampion?.score ?? 0} vendas`} active={cardFilterLabel === "Cidade que mais vendeu"} onClick={citySalesChampion ? () => applyCardFilter("Cidade que mais vendeu", { city: citySalesChampion.label, insight: "sales" }) : undefined} />
+        <ChampionCard icon={Check} label="Visitas no mês" value={String(visitsThisMonth)} helper="visitas registradas" active={cardFilterLabel === "Visitas no mês"} onClick={() => applyCardFilter("Visitas no mês", { insight: "visited-month", view: "map", mapFilter: "visitei" })} />
+        <ChampionCard icon={Navigation} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} active={cardFilterLabel === "Visitas no ano"} onClick={() => applyCardFilter("Visitas no ano", { insight: "visited-year", view: "map", mapFilter: "visitei" })} />
+        <ChampionCard icon={Users} label="Clientes visitados" value={String(visitedClientIds.size)} helper="clientes únicos" active={cardFilterLabel === "Clientes visitados"} onClick={() => applyCardFilter("Clientes visitados", { insight: "visited", view: "map", mapFilter: "visitei" })} />
       </div></section>
 
       <Dialog open={citiesOpen} onOpenChange={setCitiesOpen}>
@@ -705,11 +741,11 @@ export function ClientsPage() {
   );
 }
 
-function CommercialMetric({ icon: Icon, label, value, attention }: { icon: React.ElementType; label: string; value: number; attention?: boolean }) {
-  return <div className="min-w-0 rounded-[20px] bg-white p-4 shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 transition duration-200 hover:-translate-y-0.5 dark:bg-card dark:ring-border">
+function CommercialMetric({ icon: Icon, label, value, attention, active, onClick }: { icon: React.ElementType; label: string; value: number; attention?: boolean; active?: boolean; onClick: () => void }) {
+  return <button type="button" aria-pressed={active} onClick={onClick} className={cn("min-w-0 rounded-[20px] bg-white p-4 text-left shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(16,24,40,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B1220] dark:bg-card dark:ring-border", active && "ring-2 ring-[#0B1220] dark:ring-foreground") }>
     <div className="flex items-start justify-between gap-2"><p className="text-sm font-medium leading-5 text-[#667085] dark:text-muted-foreground">{label}</p><span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#F2F4F7] text-[#475467] dark:bg-muted dark:text-muted-foreground", attention && "bg-[#0F8A65]/10 text-[#0F8A65]")}><Icon className="h-4 w-4" /></span></div>
     <p className="mt-4 text-3xl font-semibold tabular-nums text-[#0B1220] dark:text-foreground">{value}</p>
-  </div>;
+  </button>;
 }
 
 function AttentionRow({ client, now, onOpen }: { client: Client; now: Date; onOpen: () => void }) {
@@ -809,13 +845,13 @@ function CompactClientDialog({ client, open, editable, onOpenChange, onStatus, o
   </Dialog>;
 }
 
-function AcquisitionCard({ label, total, converted, conversion }: { label: string; total: number; converted: number; conversion: number }) {
-  return <Card className="overflow-hidden border-0 shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 dark:ring-border">
-    <CardContent className="p-4">
+function AcquisitionCard({ label, total, converted, conversion, active, onClick }: { label: string; total: number; converted: number; conversion: number; active?: boolean; onClick: () => void }) {
+  return <Card className={cn("overflow-hidden border-0 shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(16,24,40,0.09)] dark:ring-border", active && "ring-2 ring-[#0B1220] dark:ring-foreground")}>
+    <button type="button" aria-pressed={active} onClick={onClick} className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0B1220]"><CardContent className="p-4">
       <div className="flex items-start justify-between gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0B1220] text-white"><Megaphone className="h-4 w-4" /></span><span className="rounded-full bg-[#0F8A65]/10 px-2 py-1 text-[10px] font-semibold text-[#0F8A65]">{conversion}% conversão</span></div>
       <p className="mt-4 truncate text-sm font-semibold">{label}</p>
       <div className="mt-2 flex items-end justify-between"><div><p className="text-2xl font-semibold tabular-nums">{total}</p><p className="text-xs text-muted-foreground">clientes captados</p></div><div className="text-right"><p className="font-semibold tabular-nums">{converted}</p><p className="text-xs text-muted-foreground">vendas</p></div></div>
-    </CardContent>
+    </CardContent></button>
   </Card>;
 }
 
@@ -913,15 +949,15 @@ function FilterSelect({ value, onValueChange, items, placeholder }: { value: str
   );
 }
 
-function ChampionCard({ icon: Icon, label, value, helper, actionLabel, onAction }: { icon: React.ElementType; label: string; value: string; helper: string; actionLabel?: string; onAction?: () => void }) {
+function ChampionCard({ icon: Icon, label, value, helper, actionLabel, onAction, onClick, active }: { icon: React.ElementType; label: string; value: string; helper: string; actionLabel?: string; onAction?: () => void; onClick?: () => void; active?: boolean }) {
   return (
-    <Card className="overflow-hidden border-0 shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 dark:ring-border">
+    <Card role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} aria-pressed={onClick ? active : undefined} onClick={onClick} onKeyDown={(event) => { if (onClick && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onClick(); } }} className={cn("overflow-hidden border-0 shadow-[0_6px_24px_rgba(16,24,40,0.05)] ring-1 ring-[#EAECF0]/80 transition dark:ring-border", onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(16,24,40,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B1220]", active && "ring-2 ring-[#0B1220] dark:ring-foreground")}>
       <CardContent className="p-4">
         <Icon className="mb-4 h-5 w-5 text-[#B89A6A]" />
         <p className="text-xs text-[#667085] dark:text-muted-foreground">{label}</p>
         <p className="mt-1 truncate text-lg font-semibold text-[#0B1220] dark:text-foreground sm:text-xl">{value}</p>
         <p className="mt-1 text-xs text-[#98A2B3]">{helper}</p>
-        {actionLabel && onAction && <button type="button" onClick={onAction} className="mt-4 inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-[#0B1220] transition hover:text-[#B89A6A] dark:text-foreground"><span>{actionLabel}</span><ChevronRight className="h-3.5 w-3.5" /></button>}
+        {actionLabel && onAction && <button type="button" onClick={(event) => { event.stopPropagation(); onAction(); }} className="mt-4 inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-[#0B1220] transition hover:text-[#B89A6A] dark:text-foreground"><span>{actionLabel}</span><ChevronRight className="h-3.5 w-3.5" /></button>}
       </CardContent>
     </Card>
   );
