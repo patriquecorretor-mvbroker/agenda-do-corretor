@@ -7,7 +7,7 @@ import type { Profile } from "@/types/database";
 const demoProfile: Profile = {
   id: "demo-profile",
   user_id: "demo-user",
-  nome: "Patrick",
+  nome: "Patrique Lopes",
   foto: null,
   logo: "/brand/mv-broker-logo.jpg",
   nome_marca: "MV Broker",
@@ -15,7 +15,7 @@ const demoProfile: Profile = {
   whatsapp: null,
   email: "demo@agenda.local",
   creci: "CRECI 000000",
-  cidade: "São Paulo",
+  cidade: "Capão da Canoa, RS",
   empresa: "Agenda do Corretor",
   horario_inicio: "08:00",
   horario_fim: "18:00",

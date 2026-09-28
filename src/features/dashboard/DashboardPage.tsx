@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { endOfMonth, format, isBefore, isToday, parseISO, startOfMonth, subMonths } from "date-fns";
+import { eachDayOfInterval, endOfMonth, endOfWeek, format, isBefore, isSameDay, isToday, parseISO, startOfMonth, startOfWeek, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Building2,
   Activity,
   BarChart3,
+  CalendarDays,
   CalendarCheck2,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Cloud,
   CloudRain,
   CloudSun,
@@ -14,9 +17,11 @@ import {
   Handshake,
   Home,
   ListChecks,
+  MapPin,
   Pause,
   Percent,
   PhoneCall,
+  Plus,
   Play,
   RotateCcw,
   Moon,
@@ -46,6 +51,7 @@ import { getWeather, weatherMessage } from "@/features/dashboard/weather-service
 import { hasSupabaseConfig } from "@/lib/supabase";
 import type { AppView } from "@/types/ui";
 import type { WeatherData } from "@/features/dashboard/weather-service";
+import { getUpcomingSpecialDate } from "@/features/calendar/special-dates";
 
 const phrases = [
   "Consistência gera resultado.",
@@ -169,75 +175,67 @@ export function DashboardPage({
   const phrase = phrases[new Date().getDate() % phrases.length];
   const greeting = new Date().getHours() < 12 ? "Bom dia" : new Date().getHours() < 18 ? "Boa tarde" : "Boa noite";
   const weatherVisual = getWeatherVisual(weatherQuery.data);
+  const upcomingSpecial = getUpcomingSpecialDate(new Date());
+  const weekDays = eachDayOfInterval({ start: startOfWeek(new Date(), { weekStartsOn: 1 }), end: endOfWeek(new Date(), { weekStartsOn: 1 }) });
 
   return (
     <div className="space-y-5">
-      <section className={`relative overflow-hidden rounded-[2rem] p-5 text-white shadow-soft md:p-8 ${weatherVisual.background}`}>
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,_rgba(0,0,0,0.26),_rgba(0,0,0,0.05)_45%,_rgba(0,0,0,0.38))]" />
-        <div className={`absolute ${weatherVisual.orbClass}`} />
-        <div className="absolute -bottom-24 left-1/4 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
-        <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/12 px-3 py-1 text-xs font-semibold text-white/80 backdrop-blur">
-                <weatherVisual.icon className="h-3.5 w-3.5" />
-                {weatherVisual.label}
-              </span>
-              <div className="grid grid-cols-2 gap-1 rounded-full border border-white/15 bg-white/10 p-1 backdrop-blur">
-                <button
-                  type="button"
-                  onClick={() => onDarkChange(false)}
-                  className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${!dark ? "bg-white text-[#17120b]" : "text-white/70 hover:text-white"}`}
-                >
-                  <Sun className="h-3.5 w-3.5" />
-                  Claro
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDarkChange(true)}
-                  className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${dark ? "bg-white text-[#17120b]" : "text-white/70 hover:text-white"}`}
-                >
-                  <Moon className="h-3.5 w-3.5" />
-                  Escuro
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigate("profile")}
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/18 bg-black/15 px-2.5 pr-3 text-xs font-semibold text-white transition hover:bg-white/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-                aria-label="Abrir configurações do perfil"
-              >
-                {profile?.foto ? (
-                  <img src={profile.foto} alt="" className="h-7 w-7 rounded-full border border-white/30 object-cover" />
-                ) : (
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15">
-                    <UserRoundCog className="h-4 w-4" />
-                  </span>
-                )}
-                Meu perfil
-              </button>
+      <section className="relative min-h-[250px] overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#07101b] text-white shadow-[0_24px_70px_rgba(2,8,18,.24)] md:min-h-[270px]">
+        <img src="/brand/capao-sunset.png" alt="Orla ao pôr do sol" className="absolute inset-0 h-full w-full object-cover object-[62%_center]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,9,16,.96)_0%,rgba(3,9,16,.72)_42%,rgba(3,9,16,.12)_76%,rgba(3,9,16,.52)_100%)]" />
+        <div className="relative flex min-h-[250px] flex-col justify-between gap-6 p-5 md:min-h-[270px] md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase text-[#f1cf79]">{profile?.cidade ?? "Litoral"}</p>
+              <h1 className="mt-4 text-3xl font-semibold md:text-[2.35rem]">{greeting}, {profile?.nome?.split(" ")[0] ?? "corretor"}!</h1>
+              <p className="mt-2 text-sm text-white/68 md:text-base">Planejamento hoje, grandes conquistas amanhã.</p>
             </div>
-            <p className="text-sm text-white/75">{format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
-            <h1 className="mt-2 text-3xl font-semibold md:text-5xl">
-              {greeting}, {profile?.nome?.split(" ")[0] ?? "corretor"}
-            </h1>
-            <p className="mt-3 text-sm text-white/80">
-              {format(new Date(), "HH:mm")} • {profile?.cidade ?? "Cidade não informada"}
-            </p>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-white/75">{weatherVisual.message}</p>
+            <p className="hidden max-w-[190px] text-right text-xs font-semibold uppercase leading-5 text-white/85 md:block">Mais que negócios,<br /><span className="text-[#f1cf79]">qualidade de vida.</span></p>
           </div>
-          <WeatherMini weather={weatherQuery.data} loading={weatherQuery.isLoading} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => onDarkChange(false)} className={cn("grid h-9 w-9 place-items-center rounded-lg border border-white/15", !dark ? "bg-white text-[#111827]" : "bg-black/25 text-white/70")} aria-label="Modo claro"><Sun className="h-4 w-4" /></button>
+              <button type="button" onClick={() => onDarkChange(true)} className={cn("grid h-9 w-9 place-items-center rounded-lg border border-white/15", dark ? "bg-white text-[#111827]" : "bg-black/25 text-white/70")} aria-label="Modo escuro"><Moon className="h-4 w-4" /></button>
+              <button type="button" onClick={() => onNavigate("profile")} className="ml-1 inline-flex min-h-9 items-center gap-2 rounded-lg border border-white/15 bg-black/25 px-3 text-xs font-semibold text-white/78 backdrop-blur"><UserRoundCog className="h-3.5 w-3.5" />Perfil</button>
+            </div>
+            <div className="flex w-full max-w-xl items-center justify-between gap-4 rounded-xl border border-white/15 bg-[#07101b]/78 px-4 py-3 backdrop-blur-md sm:w-auto sm:min-w-[420px]">
+              <div className="flex items-center gap-3"><weatherVisual.icon className="h-7 w-7 text-[#f1cf79]" /><div><p className="text-sm font-semibold">{weatherQuery.data?.temperature !== null && weatherQuery.data?.temperature !== undefined ? `${weatherQuery.data.temperature}°` : "--°"} <span className="ml-1 text-xs font-normal text-white/65">{weatherQuery.data?.condition ?? weatherVisual.label}</span></p><p className="text-[0.68rem] text-white/55">{profile?.cidade ?? "Cidade não informada"}</p></div></div>
+              <div className="h-9 w-px bg-white/15" />
+              <div className="text-right"><p className="text-xs font-semibold capitalize">{format(new Date(), "EEE, dd 'de' MMMM", { locale: ptBR })}</p><p className="mt-1 text-[0.68rem] text-white/55">Semana {format(new Date(), "II")} • {format(new Date(), "yyyy")}</p></div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <SummaryCard icon={CalendarCheck2} label="Compromissos hoje" value={events.length} onClick={() => onNavigate("agenda")} />
-        <SummaryCard icon={ListChecks} label="Tarefas pendentes" value={pendingTasks.length} onClick={() => onNavigate("agenda")} />
-        <SummaryCard icon={CheckCircle2} label="Tarefas concluídas" value={completedTasks.length} />
-        <SummaryCard icon={Target} label="Meta diária" value={`${dailyProgress}%`} />
-        <SummaryCard icon={TrendingUp} label="Progresso mensal" value="0%" onClick={() => onNavigate("goals")} />
-        <SummaryCard icon={Clock} label="Atrasados" value={overdueEvents.length} />
-      </section>
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-4">
+          <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <PremiumMetricCard icon={CalendarCheck2} label="Compromissos" value={events.length} helper="hoje" tone="blue" onClick={() => onNavigate("agenda")} />
+            <PremiumMetricCard icon={CheckCircle2} label="Concluídos" value={completedEvents.length} helper="já resolvidos" tone="green" onClick={() => onNavigate("agenda")} />
+            <PremiumMetricCard icon={Clock} label="Pendentes" value={pendingTasks.length} helper="ainda em aberto" tone="gold" onClick={() => onNavigate("agenda")} />
+            <PremiumMetricCard icon={Target} label="Atrasados" value={overdueEvents.length} helper="pedem atenção" tone="red" onClick={() => onNavigate("agenda")} />
+          </section>
+
+          <Card className="overflow-hidden rounded-[1.4rem] border-black/5 shadow-[0_18px_60px_rgba(2,8,18,.08)] dark:border-white/10">
+            <CardHeader className="border-b p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl border bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></span><div><CardTitle className="text-lg">Agenda</CardTitle><CardDescription className="capitalize">{format(new Date(), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</CardDescription></div></div><div className="flex items-center gap-1"><Button size="icon" variant="outline" onClick={() => onNavigate("agenda")}><ChevronLeft className="h-4 w-4" /></Button><Button size="sm" variant="outline" onClick={() => onNavigate("agenda")}>Hoje</Button><Button size="icon" variant="outline" onClick={() => onNavigate("agenda")}><ChevronRight className="h-4 w-4" /></Button><Button className="ml-1 hidden sm:inline-flex" onClick={() => onNavigate("agenda")}><Plus className="h-4 w-4" />Novo</Button></div></div>
+              <div className="mt-4 grid grid-cols-4 rounded-xl border bg-muted/40 p-1 text-xs font-semibold text-muted-foreground"><button type="button" onClick={() => onNavigate("agenda")} className="min-h-9 rounded-lg bg-primary text-primary-foreground shadow-sm">Dia</button><button type="button" onClick={() => onNavigate("agenda")} className="rounded-lg">Semana</button><button type="button" onClick={() => onNavigate("agenda")} className="rounded-lg">Mês</button><button type="button" onClick={() => onNavigate("agenda")} className="rounded-lg">Lista</button></div>
+              <div className="mt-3 grid grid-cols-7 gap-1 rounded-xl border p-1.5">{weekDays.map((day) => <button key={day.toISOString()} type="button" onClick={() => onNavigate("agenda")} className={cn("grid min-h-12 place-items-center rounded-lg text-center transition hover:bg-muted", isSameDay(day, new Date()) && "bg-[linear-gradient(135deg,#f7dfa1,#e7b94d)] text-[#17120b] shadow-[0_8px_24px_rgba(218,165,57,.24)]")}><span className="text-[0.58rem] font-semibold uppercase">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span><span className="text-sm font-semibold">{format(day, "dd")}</span></button>)}</div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5">
+              {upcomingSpecial && <div className="mb-5 flex flex-col gap-3 rounded-xl border bg-muted/35 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><CalendarDays className="mt-0.5 h-5 w-5 text-primary" /><div><p className="text-[0.65rem] font-semibold uppercase text-primary">Próxima data • {format(upcomingSpecial.date, "dd/MM")}</p><p className="mt-1 font-semibold">{upcomingSpecial.special.title}</p><p className="mt-1 text-xs text-muted-foreground">{upcomingSpecial.special.message}</p></div></div><Button size="sm" variant="outline" onClick={() => onNavigate("agenda")}>Criar arte</Button></div>}
+              <div className="mb-3 flex items-end justify-between"><div><h2 className="font-semibold">Linha do tempo</h2><p className="text-xs text-muted-foreground">Conclua ou abra a agenda para editar os detalhes.</p></div><button type="button" onClick={() => onNavigate("agenda")} className="text-xs font-semibold text-primary">Ver dia completo</button></div>
+              {loadingEvents ? <Skeleton className="h-28" /> : events.length ? <div className="divide-y rounded-xl border">{events.slice(0, 3).map((event) => <div key={event.id} className="grid grid-cols-[52px_1fr_auto] items-center gap-3 p-3 sm:grid-cols-[68px_1fr_auto]"><span className="text-sm font-semibold">{event.start_time.slice(0,5)}</span><div className="min-w-0"><p className="truncate text-sm font-semibold capitalize">{event.title}</p><p className="mt-1 flex items-center gap-1 truncate text-[0.68rem] text-muted-foreground"><MapPin className="h-3 w-3 shrink-0" />{event.location ?? "Local não informado"}</p></div><Button size="sm" variant={event.status === "concluído" ? "secondary" : "outline"} onClick={() => updateEvent.mutate({ id: event.id, input: { status: event.status === "concluído" ? "agendado" : "concluído" } })}>{event.status === "concluído" ? "Feito" : "Concluir"}</Button></div>)}</div> : <EmptyState text="Nenhum compromisso hoje. Use o botão + para cadastrar." />}
+            </CardContent>
+          </Card>
+        </div>
+
+        <aside className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-1">
+          <Card className="rounded-[1.4rem]"><CardHeader><CardTitle>Foco agora</CardTitle><CardDescription>Vencidas, alta prioridade e tarefas de hoje.</CardDescription></CardHeader><CardContent className="space-y-2">{priorities.length ? priorities.slice(0,4).map((task) => <button key={task.id} type="button" onClick={() => updateTask.mutate({ id: task.id, input: { status: "concluída" } })} className="flex w-full items-center justify-between gap-2 rounded-xl border p-3 text-left text-xs transition hover:border-primary/40"><span className="truncate font-medium">{task.title}</span><span className="shrink-0 text-muted-foreground">{task.due_time?.slice(0,5) ?? "Hoje"}</span></button>) : <div className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">Nenhuma prioridade crítica agora.</div>}<Button variant="ghost" className="mt-1 w-full justify-between" onClick={() => onNavigate("agenda")}>Ver todas as tarefas <ChevronRight className="h-4 w-4" /></Button></CardContent></Card>
+          <Card className="rounded-[1.4rem]"><CardHeader><CardTitle>Tarefas do dia</CardTitle><CardDescription>Lista compacta para operar rápido.</CardDescription></CardHeader><CardContent className="space-y-2">{todayTasks.slice(0,4).map((task) => <button key={task.id} type="button" onClick={() => updateTask.mutate({ id: task.id, input: { status: task.status === "concluída" ? "pendente" : "concluída" } })} className="flex w-full items-center gap-2 py-1.5 text-left"><span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", task.status === "concluída" && "border-primary bg-primary text-primary-foreground")}><CheckCircle2 className="h-3 w-3" /></span><span className="min-w-0 flex-1 truncate text-xs">{task.title}</span><span className="text-[0.65rem] text-muted-foreground">{task.due_time?.slice(0,5)}</span></button>)}{!todayTasks.length && <p className="text-sm text-muted-foreground">Nenhuma tarefa para hoje.</p>}</CardContent></Card>
+          <div className="relative min-h-40 overflow-hidden rounded-[1.4rem] border border-white/10 bg-[#08111d] p-5 text-white shadow-[0_18px_50px_rgba(2,8,18,.18)] sm:col-span-2 2xl:col-span-1"><img src="/brand/capao-sunset.png" alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" /><div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,9,16,.94),rgba(3,9,16,.35))]" /><div className="relative"><p className="text-4xl leading-none text-primary">“</p><p className="mt-1 max-w-[220px] text-lg font-medium leading-7">{phrase}</p><span className="mt-4 block h-0.5 w-8 bg-primary" /></div></div>
+        </aside>
+      </div>
 
       <CommercialGrowthPanel
         month={performanceMonth}
@@ -305,74 +303,6 @@ export function DashboardPage({
           <FinanceMini label="Resultado líquido" value={formatCurrency(finance.metrics.netResultMonth)} />
         </div>
       </button>
-
-      <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Agenda de hoje</CardTitle>
-            <CardDescription>Linha do tempo dos compromissos principais.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {loadingEvents ? (
-              <Skeleton className="h-36" />
-            ) : events.length ? (
-              events.map((event) => (
-                <div key={event.id} className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-2xl border p-3">
-                  <span className="font-semibold text-primary">{event.start_time.slice(0, 5)}</span>
-                  <div>
-                    <p className="font-medium">{event.title}</p>
-                    <p className="text-xs text-muted-foreground">{event.type} • {event.location ?? "local não informado"}</p>
-                  </div>
-                  <Button size="sm" variant={event.status === "concluído" ? "secondary" : "outline"} onClick={() => updateEvent.mutate({ id: event.id, input: { status: event.status === "concluído" ? "agendado" : "concluído" } })}>
-                    {event.status === "concluído" ? "Feito" : "Concluir"}
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <EmptyState text="Nenhum compromisso hoje. Use o botão + para cadastrar." />
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>Prioridades de hoje</CardTitle>
-              <CardDescription>Vencidas, alta prioridade e tarefas do dia.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loadingTasks ? (
-                <Skeleton className="h-28" />
-              ) : priorities.length ? (
-                priorities.map((task) => (
-                  <button
-                    key={task.id}
-                    type="button"
-                    onClick={() => updateTask.mutate({ id: task.id, input: { status: "concluída" } })}
-                    className="flex w-full items-center justify-between rounded-2xl border p-3 text-left transition hover:bg-muted"
-                  >
-                    <span className="text-sm font-medium">{task.title}</span>
-                    <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">{task.priority}</span>
-                  </button>
-                ))
-              ) : (
-                <EmptyState text="Sem prioridades pendentes." />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Meta diária</CardTitle>
-              <CardDescription>{dailyDone} de {dailyGoalTotal} ações concluídas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Progress value={dailyProgress} />
-              <p className="mt-3 text-3xl font-semibold">{dailyProgress}%</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
         <WeatherCard weather={weatherQuery.data} loading={weatherQuery.isLoading} />
@@ -460,15 +390,17 @@ function getWeatherVisual(weather?: WeatherData) {
   };
 }
 
-function SummaryCard({ icon: Icon, label, value, onClick }: { icon: React.ElementType; label: string; value: number | string; onClick?: () => void }) {
-  const Comp = onClick ? "button" : "div";
-  return (
-    <Comp onClick={onClick} className="rounded-3xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft">
-      <Icon className="mb-4 h-5 w-5 text-primary" />
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-    </Comp>
-  );
+function PremiumMetricCard({ icon: Icon, label, value, helper, tone, onClick }: { icon: React.ElementType; label: string; value: number | string; helper: string; tone: "blue" | "green" | "gold" | "red"; onClick: () => void }) {
+  const tones = {
+    blue: "border-sky-400/20 bg-sky-400/10 text-sky-500",
+    green: "border-emerald-400/20 bg-emerald-400/10 text-emerald-500",
+    gold: "border-amber-400/20 bg-amber-400/10 text-amber-500",
+    red: "border-red-400/20 bg-red-400/10 text-red-500"
+  };
+  return <button type="button" onClick={onClick} className="group flex min-h-[104px] items-center gap-3 rounded-[1.15rem] border bg-card p-3 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_14px_36px_rgba(2,8,18,.10)] sm:p-4">
+    <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl border", tones[tone])}><Icon className="h-5 w-5" /></span>
+    <span className="min-w-0"><span className="block text-2xl font-semibold leading-none tabular-nums">{value}</span><span className="mt-1.5 block truncate text-xs font-medium">{label}</span><span className="mt-0.5 block truncate text-[0.65rem] text-muted-foreground">{helper}</span></span>
+  </button>;
 }
 
 type CommercialSnapshot = {
