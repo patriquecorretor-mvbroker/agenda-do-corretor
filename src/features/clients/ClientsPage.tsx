@@ -471,25 +471,11 @@ export function ClientsPage() {
         </div>
       </header>
 
-      <section className="flex min-w-0 items-center gap-2">
+      <section className="min-w-0">
         <div className="relative min-w-0 flex-1">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input aria-label="Buscar clientes" className="h-12 rounded-2xl border-[#EAECF0] bg-white pl-11 shadow-[0_1px_3px_rgba(16,24,40,0.04)] dark:border-border dark:bg-card" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedClientId(null); }} placeholder="Cliente, cidade, perfil, valor ou pagamento" />
         </div>
-        <Button variant="outline" className="h-12 shrink-0 rounded-2xl border-[#EAECF0] bg-white px-3 dark:border-border dark:bg-card" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">Filtros</span>{activeFilterCount > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] text-primary-foreground">{activeFilterCount}</span>}</Button>
-        <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
-            <DialogHeader><DialogTitle>Filtrar clientes</DialogTitle><DialogDescription>Encontre o perfil certo por localização, valor e forma de pagamento.</DialogDescription></DialogHeader>
-            <div className="space-y-4">
-              <FilterSelect value={city} onValueChange={(value) => { setCity(value); setSelectedClientId(null); }} items={cities} placeholder="Cidade" />
-              <FilterSelect value={profile} onValueChange={(value) => { setProfile(value); setSelectedClientId(null); }} items={profiles} placeholder="Perfil" />
-              <FilterSelect value={stage} onValueChange={(value) => { setStage(value); setSelectedClientId(null); }} items={stages} placeholder="Etapa" />
-              <FilterSelect value={paymentCondition} onValueChange={(value) => { setPaymentCondition(value); setSelectedClientId(null); }} items={paymentConditions} placeholder="Condição de pagamento" />
-              <div className="space-y-2"><Label>Faixa de valor</Label><div className="grid grid-cols-2 gap-3"><Input aria-label="Valor mínimo" inputMode="numeric" type="number" min="0" value={budgetFrom} onChange={(event) => setBudgetFrom(event.target.value)} placeholder="Mínimo" /><Input aria-label="Valor máximo" inputMode="numeric" type="number" min="0" value={budgetTo} onChange={(event) => setBudgetTo(event.target.value)} placeholder="Máximo" /></div><p className="text-xs text-muted-foreground">Mostra clientes cuja faixa de compra cruza os valores informados.</p></div>
-              <div className="grid grid-cols-2 gap-3"><Button variant="outline" onClick={clearClientFilters}>Limpar filtros</Button><Button onClick={() => setFiltersOpen(false)}>Ver {filtered.length} clientes</Button></div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </section>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -507,7 +493,23 @@ export function ClientsPage() {
       </Card>
 
       <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-semibold">Funil comercial</h2><p className="text-sm text-[#667085] dark:text-muted-foreground">Selecione uma etapa para filtrar a carteira.</p></div></div>
+        <div className="flex items-end justify-between gap-3">
+          <div><h2 className="text-lg font-semibold">Funil comercial</h2><p className="text-sm text-[#667085] dark:text-muted-foreground">Selecione uma etapa e refine a carteira pelos filtros comerciais.</p></div>
+          <Button variant="outline" className="h-11 shrink-0 rounded-2xl border-[#EAECF0] bg-white px-3 dark:border-border dark:bg-card" onClick={() => setFiltersOpen(true)}><SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">Filtros</span>{activeFilterCount > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] text-primary-foreground">{activeFilterCount}</span>}</Button>
+        </div>
+        <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader><DialogTitle>Filtros do funil</DialogTitle><DialogDescription>Refine os clientes por localização, perfil, valor e forma de pagamento.</DialogDescription></DialogHeader>
+            <div className="space-y-4">
+              <FilterSelect value={city} onValueChange={(value) => { setCity(value); setSelectedClientId(null); }} items={cities} placeholder="Cidade" />
+              <FilterSelect value={profile} onValueChange={(value) => { setProfile(value); setSelectedClientId(null); }} items={profiles} placeholder="Perfil" />
+              <FilterSelect value={stage} onValueChange={(value) => { setStage(value); setSelectedClientId(null); }} items={stages} placeholder="Etapa" />
+              <FilterSelect value={paymentCondition} onValueChange={(value) => { setPaymentCondition(value); setSelectedClientId(null); }} items={paymentConditions} placeholder="Condição de pagamento" />
+              <div className="space-y-2"><Label>Faixa de valor</Label><div className="grid grid-cols-2 gap-3"><Input aria-label="Valor mínimo" inputMode="numeric" type="number" min="0" value={budgetFrom} onChange={(event) => setBudgetFrom(event.target.value)} placeholder="Mínimo" /><Input aria-label="Valor máximo" inputMode="numeric" type="number" min="0" value={budgetTo} onChange={(event) => setBudgetTo(event.target.value)} placeholder="Máximo" /></div><p className="text-xs text-muted-foreground">Mostra clientes cuja faixa de compra cruza os valores informados.</p></div>
+              <div className="grid grid-cols-2 gap-3"><Button variant="outline" onClick={clearClientFilters}>Limpar filtros</Button><Button onClick={() => setFiltersOpen(false)}>Ver {filtered.length} clientes</Button></div>
+            </div>
+          </DialogContent>
+        </Dialog>
         <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
           <div className="flex w-max gap-2">
             {funnelStatuses.map((item) => {
