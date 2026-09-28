@@ -3,6 +3,7 @@ dist
 .sites-package
 .pnpm-store
 *.tar
+*.tar.gz
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
