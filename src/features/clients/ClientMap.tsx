@@ -9,10 +9,11 @@ export type GeographicClient = {
   lat: number; lng: number; bought: boolean; visited: boolean; scheduled: boolean;
 };
 
-export function ClientMap({ clients, onSelect, emptyMessage }: {
+export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
   clients: GeographicClient[];
   onSelect: (id: string) => void;
   emptyMessage: string;
+  focusClientId?: string | null;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -106,6 +107,12 @@ export function ClientMap({ clients, onSelect, emptyMessage }: {
     const boundsKey = clients.map((client) => `${client.id}:${client.lat}:${client.lng}`).sort().join("|");
     if (previousBounds.current !== boundsKey) { previousBounds.current = boundsKey; fitClients(); }
   }, [clients, ready]);
+
+  useEffect(() => {
+    if (!ready || !focusClientId) return;
+    const client = clients.find((item) => item.id === focusClientId);
+    if (client) map.current?.setView([client.lat, client.lng], 15, { animate: true });
+  }, [clients, focusClientId, ready]);
 
   // Reparent the existing map into a native modal; preserve its camera and touch state.
   useEffect(() => {
