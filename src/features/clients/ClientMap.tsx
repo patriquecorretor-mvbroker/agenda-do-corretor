@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Check, Expand, LocateFixed, Loader2, MapPin, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { loadMapLibrary, type ClientLeafletMap, type MapCluster, type MapLibrary } from "./map-library";
 import { cn } from "@/lib/utils";
@@ -7,13 +7,22 @@ import "./client-map.css";
 export type GeographicClient = {
   id: string; name: string; city: string; photo?: string;
   lat: number; lng: number; bought: boolean; visited: boolean; scheduled: boolean;
+  kind?: "client" | "building" | "compatible";
+  urgency?: "overdue" | "today" | "upcoming" | "normal";
 };
 
-export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
+export function ClientMap({ clients, onSelect, emptyMessage, focusClientId, routeMode = false, routeIds = [], onToggleRoute, onVisibleChange, onLocationChange, externalLocation, overlay }: {
   clients: GeographicClient[];
   onSelect: (id: string) => void;
   emptyMessage: string;
   focusClientId?: string | null;
+  routeMode?: boolean;
+  routeIds?: string[];
+  onToggleRoute?: (id: string) => void;
+  onVisibleChange?: (ids: string[]) => void;
+  onLocationChange?: (location: { lat: number; lng: number }) => void;
+  externalLocation?: { lat: number; lng: number } | null;
+  overlay?: ReactNode;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -34,7 +43,9 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
   const [locating, setLocating] = useState(false);
   const [locationMessage, setLocationMessage] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [areaDirty, setAreaDirty] = useState(false);
   const locationLayers = useRef<Array<{ remove(): unknown }>>([]);
+  const initialized = useRef(false);
 
   function fitClients() {
     const points = currentClients.current.map((client): [number, number] => [client.lat, client.lng]);
@@ -59,9 +70,11 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
       tiles.on("tileerror", () => { if (++failures >= 2 && !disposed) setTileError(true); });
       tiles.on("tileload", () => { failures = 0; if (!disposed) setTileError(false); });
       clusters.current = L.markerClusterGroup({ maxClusterRadius: 58, showCoverageOnHover: false, spiderfyOnMaxZoom: true, zoomToBoundsOnClick: true, animate: !reducedMotion }).addTo(instance);
+      instance.on("moveend", () => { if (initialized.current && !disposed) setAreaDirty(true); });
       observer = new ResizeObserver(() => instance.invalidateSize({ pan: false }));
       observer.observe(element.current);
       previousBounds.current = "";
+      initialized.current = false;
       setReady(true);
     }).catch(() => { if (!disposed) setError(true); });
     return () => {
@@ -71,6 +84,7 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
       map.current = undefined;
       clusters.current = undefined;
       locationLayers.current = [];
+      initialized.current = false;
     };
   }, [retry]);
 
@@ -81,10 +95,10 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
     group.clearLayers();
     clients.forEach((client) => {
       const content = document.createElement("div");
-      content.className = `client-map-avatar ${client.bought ? "is-sold" : client.visited ? "is-visited" : client.scheduled ? "is-scheduled" : ""}`;
+      content.className = `client-map-avatar is-${client.kind ?? "client"} ${client.bought ? "is-sold" : client.visited ? "is-visited" : client.scheduled ? "is-scheduled" : ""} urgency-${client.urgency ?? "normal"} ${routeIds.includes(client.id) ? "is-route-selected" : ""}`;
       const initials = document.createElement("span");
-      initials.textContent = client.name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("");
-      if (client.photo) {
+      initials.textContent = client.kind === "building" || client.kind === "compatible" ? "E" : client.name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("");
+      if (client.photo && (client.kind ?? "client") === "client") {
         const img = document.createElement("img");
         img.src = client.photo; img.alt = client.name; img.draggable = false;
         img.onerror = () => { img.replaceWith(initials); };
@@ -101,18 +115,30 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
       const marker = L.marker([client.lat, client.lng], { title, alt: title, keyboard: true, riseOnHover: true, icon: L.divIcon({ html: content, className: "client-map-marker", iconSize: [36, 36], iconAnchor: [18, 18] }) });
       const tooltip = document.createElement("span"); tooltip.textContent = client.name;
       marker.bindTooltip(tooltip, { direction: "top", offset: [0, -15] });
-      marker.on("click", () => { dialog.current?.close(); setExpanded(false); select.current(client.id); });
+      marker.on("click", () => {
+        if (routeMode && (client.kind ?? "client") === "client") onToggleRoute?.(client.id);
+        else select.current(client.id);
+      });
       group.addLayer(marker);
     });
     const boundsKey = clients.map((client) => `${client.id}:${client.lat}:${client.lng}`).sort().join("|");
-    if (previousBounds.current !== boundsKey) { previousBounds.current = boundsKey; fitClients(); }
-  }, [clients, ready]);
+    if (previousBounds.current !== boundsKey) {
+      previousBounds.current = boundsKey;
+      fitClients();
+      window.setTimeout(() => { initialized.current = true; setAreaDirty(false); }, 250);
+    }
+  }, [clients, onToggleRoute, ready, routeIds, routeMode]);
 
   useEffect(() => {
     if (!ready || !focusClientId) return;
     const client = clients.find((item) => item.id === focusClientId);
     if (client) map.current?.setView([client.lat, client.lng], 15, { animate: true });
   }, [clients, focusClientId, ready]);
+
+  useEffect(() => {
+    if (!ready || !externalLocation) return;
+    drawLocation(externalLocation.lat, externalLocation.lng, 80, false);
+  }, [externalLocation, ready]);
 
   // Reparent the existing map into a native modal; preserve its camera and touch state.
   useEffect(() => {
@@ -132,15 +158,30 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
       const L = library.current;
       const instance = map.current;
       if (!L || !instance) return;
-      locationLayers.current.forEach((layer) => layer.remove());
-      const point: [number, number] = [position.coords.latitude, position.coords.longitude];
-      locationLayers.current = [
-        L.circle(point, { radius: position.coords.accuracy, color: "#0284c7", weight: 1, fillOpacity: 0.08 }).addTo(instance),
-        L.circleMarker(point, { radius: 8, color: "white", weight: 3, fillColor: "#0284c7", fillOpacity: 1 }).addTo(instance)
-      ];
-      instance.setView(point, 14);
+      drawLocation(position.coords.latitude, position.coords.longitude, position.coords.accuracy, true);
+      onLocationChange?.({ lat: position.coords.latitude, lng: position.coords.longitude });
       setLocating(false);
     }, () => { setLocating(false); setLocationMessage("Não foi possível obter sua localização. Confira a permissão do navegador."); }, { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true });
+  }
+
+  function drawLocation(lat: number, lng: number, accuracy: number, center: boolean) {
+    const L = library.current;
+    const instance = map.current;
+    if (!L || !instance) return;
+    locationLayers.current.forEach((layer) => layer.remove());
+    const point: [number, number] = [lat, lng];
+    locationLayers.current = [
+      L.circle(point, { radius: accuracy, color: "#0284c7", weight: 1, fillOpacity: 0.08 }).addTo(instance),
+      L.circleMarker(point, { radius: 7, color: "white", weight: 3, fillColor: "#0284c7", fillOpacity: 1 }).addTo(instance)
+    ];
+    if (center) instance.setView(point, 14);
+  }
+
+  function searchVisibleArea() {
+    const bounds = map.current?.getBounds();
+    if (!bounds) return;
+    onVisibleChange?.(currentClients.current.filter((client) => bounds.contains([client.lat, client.lng])).map((client) => client.id));
+    setAreaDirty(false);
   }
 
   return <>
@@ -154,9 +195,11 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
           <MapControl label="Mostrar todos os clientes" icon={RotateCcw} disabled={!ready || !clients.length} onClick={fitClients} />
           <MapControl label="Minha localização" icon={locating ? Loader2 : LocateFixed} disabled={!ready || locating} onClick={locate} />
         </div>
+        {areaDirty && ready && clients.length > 0 && <button type="button" className="client-map-search-area" onClick={searchVisibleArea}><MapPin className="h-3.5 w-3.5" />Buscar nesta área</button>}
         {(!ready || error) && <div className="client-map-state" role="status">{error ? <><p>Não foi possível carregar o mapa.</p><button onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></> : <><Loader2 className="h-6 w-6 animate-spin" /><p>Carregando mapa...</p></>}</div>}
         {ready && !clients.length && <div className="client-map-notice"><MapPin className="h-4 w-4 shrink-0" /><span>{emptyMessage}</span></div>}
         {(tileError || locationMessage) && <div className="client-map-notice" role="status"><span>{locationMessage || "As ruas estão indisponíveis. Verifique sua conexão."}</span><button aria-label="Tentar carregar novamente" onClick={() => { setLocationMessage(""); setRetry((value) => value + 1); }}><RotateCcw className="h-4 w-4" /></button></div>}
+        {overlay}
       </div>
     </div>
     <dialog ref={dialog} className="client-map-dialog" aria-label="Mapa em tela cheia" onCancel={(event) => { event.preventDefault(); setExpanded(false); }} />
@@ -164,6 +207,7 @@ export function ClientMap({ clients, onSelect, emptyMessage, focusClientId }: {
       <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Vendido</span>
       <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-sky-500" />Visitado</span>
       <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />Agendado</span>
+      <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#0B1220] dark:bg-white" />Edifício</span>
     </div>
   </>;
 }

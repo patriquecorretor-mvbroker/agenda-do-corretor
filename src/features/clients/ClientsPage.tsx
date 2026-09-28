@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Bot, Building2, CalendarClock, CalendarPlus, Camera, Check, ChevronRight, CircleDollarSign, Crown, ExternalLink, Grid2X2, LayoutList, Map, MapPin, Megaphone, MessageCircle, Navigation, Phone, Plus, Search, SlidersHorizontal, Thermometer, Trophy, UserRoundSearch, Users, X } from "lucide-react";
+import { ArrowLeft, Bot, Building2, CalendarClock, CalendarPlus, Camera, Check, ChevronRight, CircleDollarSign, Crown, ExternalLink, Grid2X2, Layers3, LayoutList, LocateFixed, Map, MapPin, Megaphone, MessageCircle, Navigation, Phone, Plus, Route, Search, SlidersHorizontal, Thermometer, Trophy, UserRoundSearch, Users, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useFinance } from "@/features/finance/use-finance";
+import { buildingAddress, useBuildings } from "@/features/buildings/use-buildings";
 
 type ClientStage = "lead" | "em contato" | "visita agendada" | "comprador" | "pós-venda";
 
@@ -54,6 +55,7 @@ type ClientMapItem = {
 };
 
 type ClientView = "list" | "cards" | "map";
+type ClientMapLayer = "clients" | "nearby" | "visits" | "sales" | "buildings" | "compatible";
 type InsightFilter = "all" | "active" | "followups-today" | "negotiations" | "sales" | "visited-month" | "visited-year" | "visited";
 
 const funnelStatuses: Array<{ value: ClientStatus | "all"; label: string }> = [
@@ -106,6 +108,7 @@ export function ClientsPage() {
   const marks = useClientMarks();
   const calendar = useEvents();
   const crm = useClients();
+  const buildingCatalog = useBuildings();
   const [mapFilter, setMapFilter] = useState("todos");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [citiesOpen, setCitiesOpen] = useState(false);
@@ -147,6 +150,13 @@ export function ClientsPage() {
   const [budgetFrom, setBudgetFrom] = useState("");
   const [budgetTo, setBudgetTo] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  const [mapDetailsOpen, setMapDetailsOpen] = useState(false);
+  const [mapLayer, setMapLayer] = useState<ClientMapLayer>("clients");
+  const [visibleMapIds, setVisibleMapIds] = useState<string[] | null>(null);
+  const [routeMode, setRouteMode] = useState(false);
+  const [routeClientIds, setRouteClientIds] = useState<string[]>([]);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [legacyVisits] = useState<Array<{ clientId: string; date: string }>>(() => {
     try {
       return JSON.parse(localStorage.getItem(visitStorageKey) ?? "[]") as Array<{ clientId: string; date: string }>;
@@ -195,6 +205,7 @@ export function ClientsPage() {
     y: 50,
     lat: client.lat ?? undefined,
     lng: client.lng ?? undefined,
+    locationPrecision: client.lat !== null && client.lng !== null ? "exact" : "city",
     whatsapp: client.whatsapp ?? client.phone ?? undefined,
     phone: client.phone ?? undefined,
     crmStatus: client.status,
@@ -247,7 +258,8 @@ export function ClientsPage() {
   const matchesMapFilter = (client: ClientMapItem, filter: string) => filter === "todos" || (filter === "vendi" && client.bought) || (filter === "visitei" && visitedClientIds.has(client.id)) || (filter === "agendadas" && (scheduledIds.has(client.id) || client.stage === "visita agendada")) || (filter === "sem-visita" && !visitedClientIds.has(client.id));
   const visibleClients = filtered.filter((client) => matchesMapFilter(client, mapFilter));
   const mappedClients = visibleClients.filter((client): client is ClientMapItem & { lat: number; lng: number } => Number.isFinite(client.lat) && Number.isFinite(client.lng) && Math.abs(client.lat!) <= 90 && Math.abs(client.lng!) <= 180);
-  const selectedClient = visibleClients.find((client) => client.id === selectedClientId);
+  const selectedClient = clients.find((client) => client.id === selectedClientId);
+  const selectedBuilding = buildingCatalog.buildings.find((building) => building.id === selectedBuildingId);
   const compactClient = clients.find((client) => client.id === compactClientId);
   const visitsThisMonth = visitLog.filter((visit) => isSameMonthKey(visit.date, now)).length;
   const visitsThisYear = visitLog.filter((visit) => new Date(visit.date).getFullYear() === now.getFullYear()).length;
@@ -268,6 +280,21 @@ export function ClientsPage() {
   const cityExplorerClients = cityExplorer ? clients.filter((client) => client.city === cityExplorer) : [];
   const cityNeighborhoods = Array.from(new Set(cityExplorerClients.map((client) => client.neighborhood).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR"));
   const neighborhoodClients = cityExplorerClients.filter((client) => neighborhoodExplorer === allValue || client.neighborhood === neighborhoodExplorer);
+  const nearbyClients = userLocation
+    ? mappedClients.map((client) => ({ client, distance: distanceKm(userLocation, { lat: client.lat, lng: client.lng }) })).filter((item) => item.distance <= 30).sort((a, b) => a.distance - b.distance)
+    : [];
+  const compatibleNeighborhoods = new Set(filtered.map((client) => normalizeText(client.neighborhood)).filter((value) => value && !value.includes("nao informado")));
+  const mapLayerClients = mapLayer === "visits" ? mappedClients.filter((client) => scheduledIds.has(client.id) || client.stage === "visita agendada")
+    : mapLayer === "sales" ? mappedClients.filter((client) => client.bought)
+    : mapLayer === "nearby" ? nearbyClients.map((item) => item.client)
+    : mappedClients;
+  const mapBuildings = mapLayer === "compatible"
+    ? buildingCatalog.buildings.filter((building) => compatibleNeighborhoods.has(normalizeText(building.neighborhood)))
+    : buildingCatalog.buildings;
+  const clientMapPoints = (mapLayer === "buildings" || mapLayer === "compatible")
+    ? mapBuildings.map((building) => ({ id: `${mapLayer === "compatible" ? "compatible" : "building"}:${building.id}`, name: building.name, city: building.neighborhood, lat: building.latitude, lng: building.longitude, bought: false, visited: false, scheduled: false, kind: mapLayer === "compatible" ? "compatible" as const : "building" as const, urgency: "normal" as const }))
+    : mapLayerClients.map((client) => ({ ...client, visited: visitedClientIds.has(client.id), scheduled: scheduledIds.has(client.id) || client.stage === "visita agendada", kind: "client" as const, urgency: mapUrgency(client, todayKey) }));
+  const synchronizedClients = (visibleMapIds ? mapLayerClients.filter((client) => visibleMapIds.includes(client.id)) : mapLayerClients).slice(0, 10);
 
   function clearClientFilters() {
     setCity(allValue);
@@ -321,8 +348,63 @@ export function ClientsPage() {
     setFunnelStage("all");
     setMapFilter("todos");
     setClientView("map");
+    setMapLayer("clients");
+    setVisibleMapIds(null);
     setSelectedClientId(client.id);
     window.setTimeout(() => document.getElementById("client-map-section")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+  function selectMapPoint(id: string) {
+    setMapDetailsOpen(false);
+    if (id.startsWith("building:") || id.startsWith("compatible:")) {
+      setSelectedClientId(null);
+      setSelectedBuildingId(id.split(":").slice(1).join(":"));
+      return;
+    }
+    setSelectedBuildingId(null);
+    setSelectedClientId(id);
+  }
+
+  function chooseMapLayer(layer: ClientMapLayer) {
+    setSelectedClientId(null);
+    setSelectedBuildingId(null);
+    setVisibleMapIds(null);
+    if (layer === "nearby" && !userLocation) {
+      requestUserLocation(() => setMapLayer("nearby"));
+      return;
+    }
+    setMapLayer(layer);
+  }
+
+  function requestUserLocation(after?: () => void) {
+    if (!navigator.geolocation) {
+      toast({ title: "Localização indisponível neste navegador.", variant: "error" });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition((position) => {
+      setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+      after?.();
+    }, () => toast({ title: "Autorize a localização para encontrar clientes próximos.", variant: "error" }), { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true });
+  }
+
+  function toggleRouteClient(id: string) {
+    setRouteClientIds((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      if (current.length >= 8) {
+        toast({ title: "A rota aceita até 8 clientes por vez." });
+        return current;
+      }
+      return [...current, id];
+    });
+  }
+
+  function openPlannedRoute() {
+    const stops = routeClientIds.map((id) => mappedClients.find((client) => client.id === id)).filter((client): client is ClientMapItem & { lat: number; lng: number } => Boolean(client));
+    if (!stops.length) return;
+    const origin = userLocation ? `${userLocation.lat},${userLocation.lng}` : `${stops[0].lat},${stops[0].lng}`;
+    const destination = stops.length === 1 ? `${stops[0].lat},${stops[0].lng}` : `${stops[stops.length - 1].lat},${stops[stops.length - 1].lng}`;
+    const waypoints = stops.slice(userLocation ? 0 : 1, -1).map((client) => `${client.lat},${client.lng}`).join("|");
+    window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints ? `&waypoints=${encodeURIComponent(waypoints)}` : ""}`, "_blank", "noopener,noreferrer");
   }
 
   async function createCrmClient(input: ClientInput) {
@@ -573,7 +655,7 @@ export function ClientsPage() {
             </div>
           </DialogContent>
         </Dialog>
-        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+        <div className="client-map-strip -mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
           <div className="flex w-max gap-2">
             {funnelStatuses.map((item) => {
               const count = item.value === "all" ? crm.clients.length : crm.clients.filter((client) => client.status === item.value).length;
@@ -593,14 +675,15 @@ export function ClientsPage() {
         {cardFilterLabel && <button type="button" onClick={clearClientFilters} className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#0B1220] px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-[#172033] dark:bg-foreground dark:text-background"><span>Filtro: {cardFilterLabel}</span><X className="h-3.5 w-3.5" /></button>}
 
         {clientView === "map" && <Card className="min-w-0 overflow-hidden border-0 shadow-[0_8px_30px_rgba(16,24,40,0.06)]">
-          <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>Mapa</CardTitle>
-              <CardDescription>{mappedClients.length} clientes com localização</CardDescription>
-            </div>
+          <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div><CardTitle>Mapa operacional</CardTitle><CardDescription>{mapLayer === "buildings" || mapLayer === "compatible" ? `${clientMapPoints.length} edifícios no mapa` : `${mapLayerClients.length} clientes com localização`}</CardDescription></div>
+            <Button type="button" variant={routeMode ? "default" : "outline"} className="min-h-10 shrink-0" onClick={() => { setRouteMode((current) => !current); setSelectedClientId(null); setSelectedBuildingId(null); }}><Route className="h-4 w-4" />{routeMode ? "Selecionando rota" : "Planejar rota"}</Button>
           </CardHeader>
-          <CardContent>
-            <div className="mb-3 flex gap-2 overflow-x-auto pb-2" aria-label="Filtrar marcações do mapa">
+          <CardContent className="min-w-0">
+            <div className="client-map-strip mb-3 flex gap-2 overflow-x-auto pb-2" aria-label="Camadas do mapa">
+              {([['clients', 'Clientes', Users], ['nearby', 'Próximos', LocateFixed], ['visits', 'Visitas', CalendarPlus], ['sales', 'Vendas', Trophy], ['buildings', 'Edifícios', Building2], ['compatible', 'Compatíveis', Layers3]] as const).map(([value, label, Icon]) => <button key={value} type="button" aria-pressed={mapLayer === value} onClick={() => chooseMapLayer(value)} className={cn("inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition", mapLayer === value ? "border-[#0B1220] bg-[#0B1220] text-white dark:border-foreground dark:bg-foreground dark:text-background" : "border-[#EAECF0] bg-white text-[#475467] hover:bg-[#F7F8FA] dark:border-border dark:bg-card dark:text-muted-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
+            </div>
+            <div className="client-map-strip mb-3 flex gap-2 overflow-x-auto pb-2" aria-label="Filtrar marcações do mapa">
               {([
                 ["todos", "Todos", Users, "text-foreground"],
                 ["vendi", "Vendi", Trophy, "text-emerald-600 dark:text-emerald-400"],
@@ -608,25 +691,36 @@ export function ClientsPage() {
                 ["agendadas", "Agendadas", CalendarPlus, "text-amber-600 dark:text-amber-400"],
                 ["sem-visita", "Sem visita", MapPin, "text-muted-foreground"]
               ] as const).map(([value, label, Icon, color]) => (
-                <button key={value} type="button" aria-pressed={mapFilter === value} onClick={() => { setMapFilter(value); setSelectedClientId(null); }} className={cn("inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-medium transition-colors", mapFilter === value ? "border-[#0B1220] bg-[#0B1220] text-white" : "border-[#EAECF0] bg-white text-[#475467] hover:bg-[#F7F8FA] dark:border-border dark:bg-card dark:text-muted-foreground")}>
+                <button key={value} type="button" aria-pressed={mapFilter === value} onClick={() => { setMapFilter(value); setMapLayer("clients"); setVisibleMapIds(null); setSelectedClientId(null); }} className={cn("inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-medium transition-colors", mapFilter === value ? "border-[#0B1220] bg-[#0B1220] text-white" : "border-[#EAECF0] bg-white text-[#475467] hover:bg-[#F7F8FA] dark:border-border dark:bg-card dark:text-muted-foreground")}>
                   <Icon className={cn("h-4 w-4", color)} />{label}<span className="text-xs tabular-nums text-muted-foreground">{filtered.filter((client) => matchesMapFilter(client, value)).length}</span>
                 </button>
               ))}
             </div>
             {(marks.error || scheduled.error) && <p role="alert" className="mb-3 text-sm text-destructive">Não foi possível carregar as marcações. <button className="underline" onClick={() => window.location.reload()}>Tentar novamente</button></p>}
             <ClientMap
-              clients={mappedClients.map((client) => ({ ...client, visited: visitedClientIds.has(client.id), scheduled: scheduledIds.has(client.id) || client.stage === "visita agendada" }))}
+              clients={clientMapPoints}
               focusClientId={selectedClientId}
-              onSelect={setSelectedClientId}
-              emptyMessage={visibleClients.length ? "Clientes sem localização conhecida. Consulte a lista." : "Nenhum cliente corresponde aos filtros."}
+              onSelect={selectMapPoint}
+              onVisibleChange={setVisibleMapIds}
+              onLocationChange={setUserLocation}
+              externalLocation={userLocation}
+              routeMode={routeMode}
+              routeIds={routeClientIds}
+              onToggleRoute={toggleRouteClient}
+              emptyMessage={mapLayer === "nearby" && !userLocation ? "Ative sua localização para ver clientes próximos." : "Nenhum ponto corresponde aos filtros desta camada."}
+              overlay={<>
+                {selectedClient && !mapDetailsOpen && <div className="absolute inset-x-3 bottom-3 z-[4] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-[0_16px_40px_rgba(16,24,40,.24)] backdrop-blur dark:border-white/10 dark:bg-[#10151f]/95">
+                  <div className="flex items-center gap-3"><span className="h-10 w-10 shrink-0"><ClientAvatar name={selectedClient.name} photo={selectedClient.photo} /></span><button type="button" className="min-w-0 flex-1 text-left" onClick={() => setMapDetailsOpen(true)}><span className="block truncate text-sm font-bold">{selectedClient.name}</span><span className="block truncate text-xs text-muted-foreground">{selectedClient.profile} • {selectedClient.city}</span></button><button type="button" className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted" aria-label="Fechar ficha" onClick={() => setSelectedClientId(null)}><X className="h-4 w-4" /></button></div>
+                  <div className="mt-2 flex items-center gap-2 overflow-x-auto text-xs"><span className="shrink-0 rounded-full bg-muted px-2.5 py-1 font-semibold">{nextActionFromMap(selectedClient)}</span><span className="shrink-0 rounded-full bg-muted px-2.5 py-1">{locationPrecisionLabel(selectedClient)}</span>{userLocation && selectedClient.lat !== undefined && selectedClient.lng !== undefined && <span className="shrink-0 rounded-full bg-muted px-2.5 py-1">{distanceKm(userLocation, { lat: selectedClient.lat, lng: selectedClient.lng }).toFixed(1).replace('.', ',')} km</span>}</div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">{selectedClient.whatsapp ? <a href={whatsappUrl(selectedClient.whatsapp, selectedClient.name)} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border text-sm font-semibold"><MessageCircle className="h-4 w-4" />WhatsApp</a> : <Button variant="outline" disabled>Sem WhatsApp</Button>}<Button type="button" className="min-h-10" onClick={() => setMapDetailsOpen(true)}>Abrir cliente</Button></div>
+                </div>}
+                {selectedBuilding && <div className="absolute inset-x-3 bottom-3 z-[4] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-[0_16px_40px_rgba(16,24,40,.24)] backdrop-blur dark:border-white/10 dark:bg-[#10151f]/95"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0B1220] text-white"><Building2 className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{selectedBuilding.name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{buildingAddress(selectedBuilding)}</p><p className="mt-2 text-xs font-medium text-[#667085] dark:text-muted-foreground">Localização do catálogo de edifícios</p></div><button type="button" className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted" aria-label="Fechar edifício" onClick={() => setSelectedBuildingId(null)}><X className="h-4 w-4" /></button></div><a href={selectedBuilding.mapsUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#0B1220] px-3 text-sm font-semibold text-white dark:bg-foreground dark:text-background"><Navigation className="h-4 w-4" />Abrir rota</a></div>}
+              </>}
             />
+            {routeMode && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border bg-muted/50 p-3"><Route className="h-4 w-4" /><p className="mr-auto text-sm font-semibold">{routeClientIds.length ? `${routeClientIds.length} parada(s) selecionada(s)` : "Toque nos clientes para montar a rota"}</p><Button type="button" variant="ghost" size="sm" onClick={() => setRouteClientIds([])} disabled={!routeClientIds.length}>Limpar</Button><Button type="button" size="sm" onClick={openPlannedRoute} disabled={!routeClientIds.length}>Abrir rota</Button></div>}
+            {!(mapLayer === "buildings" || mapLayer === "compatible") && synchronizedClients.length > 0 && <div className="mt-3"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Na área do mapa</p><span className="text-xs text-muted-foreground">{synchronizedClients.length} visíveis</span></div><div className="flex gap-2 overflow-x-auto pb-2">{synchronizedClients.map((client) => <button key={client.id} type="button" onClick={() => routeMode ? toggleRouteClient(client.id) : setSelectedClientId(client.id)} className={cn("flex min-w-[190px] items-center gap-2 rounded-xl border bg-card p-2 text-left transition", (selectedClientId === client.id || routeClientIds.includes(client.id)) && "border-[#0F8A65] ring-1 ring-[#0F8A65]")}><span className="h-8 w-8 shrink-0"><ClientAvatar name={client.name} photo={client.photo} /></span><span className="min-w-0"><span className="block truncate text-xs font-bold">{client.name}</span><span className="block truncate text-[11px] text-muted-foreground">{nextActionFromMap(client)}</span></span></button>)}</div></div>}
             {visibleClients.length > mappedClients.length && <p className="mt-3 text-sm text-muted-foreground">{visibleClients.length - mappedClients.length} cliente(s) sem localização conhecida na lista.</p>}
-              <Dialog open={Boolean(selectedClient)} onOpenChange={(open) => {
-                if (!open) {
-                  setSelectedClientId(null);
-                  setClientView("map");
-                }
-              }}>
+              <Dialog open={mapDetailsOpen && Boolean(selectedClient)} onOpenChange={(open) => { setMapDetailsOpen(open); if (!open) setClientView("map"); }}>
                 {selectedClient && <DialogContent className="sm:max-w-md">
                   <DialogHeader><DialogTitle>{selectedClient.name}</DialogTitle><DialogDescription>{selectedClient.city} • {selectedClient.neighborhood}</DialogDescription></DialogHeader>
                   <p className="mb-3 text-xs text-muted-foreground">{selectedClient.locationPrecision === "city" ? "Localização aproximada: centro da cidade." : isDemo && !selectedClient.id.startsWith("sale-") ? "Localização demonstrativa." : ""}</p>
@@ -701,7 +795,7 @@ export function ClientsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Filtrar clientes por bairro">
+                <div className="client-map-strip -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Filtrar clientes por bairro">
                   <NeighborhoodChip label="Todos" count={cityExplorerClients.length} active={neighborhoodExplorer === allValue} onClick={() => setNeighborhoodExplorer(allValue)} />
                   {cityNeighborhoods.map((name) => <NeighborhoodChip key={name} label={name} count={cityExplorerClients.filter((client) => client.neighborhood === name).length} active={neighborhoodExplorer === name} onClick={() => setNeighborhoodExplorer(name)} />)}
                 </div>
@@ -958,6 +1052,29 @@ function ChampionCard({ icon: Icon, label, value, helper, actionLabel, onAction,
       </CardContent>
     </Card>
   );
+}
+
+function mapUrgency(client: ClientMapItem, todayKey: string): "overdue" | "today" | "upcoming" | "normal" {
+  if (!client.nextFollowUp) return client.stage === "visita agendada" ? "upcoming" : "normal";
+  if (client.nextFollowUp < todayKey) return "overdue";
+  if (client.nextFollowUp === todayKey) return "today";
+  return "upcoming";
+}
+
+function locationPrecisionLabel(client: ClientMapItem) {
+  return client.locationPrecision === "exact" ? "Localização exata" : "Localização aproximada";
+}
+
+function normalizeText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+function distanceKm(from: { lat: number; lng: number }, to: { lat: number; lng: number }) {
+  const radius = 6371;
+  const latitude = (to.lat - from.lat) * Math.PI / 180;
+  const longitude = (to.lng - from.lng) * Math.PI / 180;
+  const a = Math.sin(latitude / 2) ** 2 + Math.cos(from.lat * Math.PI / 180) * Math.cos(to.lat * Math.PI / 180) * Math.sin(longitude / 2) ** 2;
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function NeighborhoodChip({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {

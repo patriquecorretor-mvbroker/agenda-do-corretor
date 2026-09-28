@@ -1,0 +1,32 @@
+{
+  "name": "Agenda do Corretor",
+  "short_name": "Agenda",
+  "description": "Agenda PWA para corretores de imóveis acompanharem rotina, tarefas, metas e compromissos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#050403",
+  "theme_color": "#050403",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/brand/mv-broker-logo.jpg",
+      "sizes": "1280x1280",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

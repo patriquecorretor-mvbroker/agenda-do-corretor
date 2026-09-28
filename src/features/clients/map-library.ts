@@ -20,6 +20,7 @@ export interface ClientLeafletMap {
   zoomOut(): this;
   remove(): void;
   getZoom(): number;
+  getBounds(): { contains(point: Point): boolean };
   on(event: string, callback: () => void): this;
 }
 export interface MapLibrary {
