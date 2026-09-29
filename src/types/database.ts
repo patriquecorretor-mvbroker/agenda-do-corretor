@@ -117,6 +117,34 @@ export type Building = {
   notes?: string | null;
 };
 
+export type CondominiumStatus = "entregue" | "em obras" | "lançamento" | "a confirmar";
+export type CondominiumUnitType = "lotes" | "casas" | "apartamentos" | "misto" | "não informado";
+
+export type Condominium = {
+  id: string;
+  userId?: string | null;
+  name: string;
+  city: "Capão da Canoa" | "Xangri-Lá" | string;
+  neighborhood: string | null;
+  status: CondominiumStatus;
+  developer: string | null;
+  launchYear: number | null;
+  totalUnits: number | null;
+  areaHa: number | null;
+  unitType: CondominiumUnitType;
+  areaMin: number | null;
+  areaMax: number | null;
+  hasBeachClub: boolean;
+  amenities: string[];
+  description: string | null;
+  coverUrl: string | null;
+  sourceUrl: string | null;
+  sourceTitle: string | null;
+  sourceCheckedAt: string | null;
+  verificationStatus: "web" | "verificado" | "manual" | "pendente";
+  notes: string | null;
+};
+
 export type MarketNews = {
   id: string;
   title: string;
@@ -128,7 +156,12 @@ export type MarketNews = {
   category: "litoral" | "mercado" | "crédito" | "investimento" | "legislação";
   region: string;
   relevance_score: number;
+  audiences: ("comprador" | "investidor" | "proprietário")[];
+  market_impact: "positivo" | "atenção" | "neutro";
   sales_argument: string;
+  objection: string;
+  objection_response: string;
+  discovery_question: string;
   whatsapp_script: string;
   story_headline: string;
   story_body: string;
@@ -136,6 +169,35 @@ export type MarketNews = {
   created_at: string;
   saved?: boolean;
   read?: boolean;
+};
+
+export type MarketNewsSettings = {
+  enabled: boolean;
+  delivery_time: string;
+  categories: MarketNews["category"][];
+  regions: string[];
+  push_enabled: boolean;
+};
+
+export type CityMedia = {
+  id: string;
+  user_id: string;
+  title: string;
+  city: string;
+  neighborhood: string | null;
+  media_type: "photo" | "video";
+  category: "praia" | "cidade" | "gastronomia" | "lifestyle" | "infraestrutura" | "evento" | "outro";
+  orientation: "vertical" | "horizontal" | "quadrado";
+  storage_path: string | null;
+  mime_type: string;
+  file_size: number;
+  tags: string[];
+  favorite: boolean;
+  captured_at: string | null;
+  created_at: string;
+  updated_at: string;
+  media_url?: string;
+  demo?: boolean;
 };
 
 export type CalendarEvent = {
@@ -152,6 +214,7 @@ export type CalendarEvent = {
   notes: string | null;
   client_id?: string | null;
   building_id?: string | null;
+  condominium_id?: string | null;
   apartment_number?: string | null;
   created_at: string;
   updated_at: string;

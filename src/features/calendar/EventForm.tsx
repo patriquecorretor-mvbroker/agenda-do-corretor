@@ -11,6 +11,8 @@ import { useEvents } from "@/features/calendar/use-events";
 import { useClients } from "@/features/clients/use-clients";
 import { BuildingPicker } from "@/features/buildings/BuildingPicker";
 import { buildingAddress, useBuildings } from "@/features/buildings/use-buildings";
+import { useCondominiums, condominiumMapsUrl } from "@/features/condominiums/use-condominiums";
+import { CondominiumPicker } from "@/features/condominiums/CondominiumPicker";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, EventType } from "@/types/database";
 
@@ -31,12 +33,14 @@ export function EventForm({ event, onSaved }: { event?: CalendarEvent; onSaved?:
   const { createEvent, updateEvent } = useEvents(event?.date ?? today);
   const clients = useClients();
   const buildingCatalog = useBuildings();
+  const condominiumCatalog = useCondominiums();
   const { toast } = useToast();
   const initialAction = eventActions.find((action) => action.title.toLocaleLowerCase("pt-BR") === event?.title.toLocaleLowerCase("pt-BR")) ?? eventActions.find((action) => action.type === event?.type) ?? eventActions[0];
   const [selectedAction, setSelectedAction] = useState(initialAction.title);
   const [eventType, setEventType] = useState<EventType>(initialAction.type);
   const [clientChoice, setClientChoice] = useState(event?.client_id ?? "new");
   const [buildingId, setBuildingId] = useState<string | null>(event?.building_id ?? null);
+  const [condominiumId, setCondominiumId] = useState<string | null>(event?.condominium_id ?? null);
   const loading = createEvent.isPending || updateEvent.isPending || clients.createClient.isPending;
   const actionConfig = eventActions.find((action) => action.title === selectedAction) ?? initialAction;
   const needsClient = Boolean(actionConfig.needsClient);
@@ -58,6 +62,7 @@ export function EventForm({ event, onSaved }: { event?: CalendarEvent; onSaved?:
         if (current && current.status !== "visita agendada") await clients.updateClient.mutateAsync({ id: current.id, input: { status: "visita agendada", next_follow_up: String(form.get("date") || today) }, previousStatus: current.status });
       }
       const selectedBuilding = buildingCatalog.buildings.find((building) => building.id === buildingId);
+      const selectedCondominium = condominiumCatalog.condominiums.find((condominium) => condominium.id === condominiumId);
       const typedLocation = String(form.get("location") || "").trim();
       const input = {
       title: selectedAction,
@@ -66,11 +71,12 @@ export function EventForm({ event, onSaved }: { event?: CalendarEvent; onSaved?:
       start_time: String(form.get("start_time") || "09:00"),
       end_time: String(form.get("end_time") || "") || null,
       type: eventType,
-      location: typedLocation || (selectedBuilding ? buildingAddress(selectedBuilding) : null),
+      location: typedLocation || (selectedBuilding ? buildingAddress(selectedBuilding) : selectedCondominium ? `${selectedCondominium.name} · ${selectedCondominium.neighborhood ?? selectedCondominium.city}` : null),
       status: event?.status ?? "agendado",
       notes: event?.notes ?? null,
       client_id: clientId,
       building_id: needsProperty ? selectedBuilding?.id ?? null : null,
+      condominium_id: needsProperty ? selectedCondominium?.id ?? null : null,
       apartment_number: needsProperty ? String(form.get("apartment_number") || "").trim() || null : null
       };
       if (event) await updateEvent.mutateAsync({ id: event.id, input });
@@ -106,9 +112,11 @@ export function EventForm({ event, onSaved }: { event?: CalendarEvent; onSaved?:
       {needsProperty && <div className="space-y-3 rounded-lg border bg-muted/35 p-3">
         <div className="flex items-center gap-2 font-medium"><Building2 className="h-4 w-4 text-primary" />Imóvel do compromisso</div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
-          <div className="space-y-2"><Label>Edifício</Label><BuildingPicker value={buildingId} onChange={(building) => setBuildingId(building?.id ?? null)} /></div>
+          <div className="space-y-2"><Label>Edifício</Label><BuildingPicker value={buildingId} onChange={(building) => { const next = building?.id ?? null; setBuildingId(next); if (next) setCondominiumId(null); }} /></div>
           <div className="space-y-2"><Label htmlFor="apartment_number">Nº do apartamento</Label><Input id="apartment_number" name="apartment_number" defaultValue={event?.apartment_number ?? ""} placeholder="Ex.: 804" /></div>
         </div>
+        <div className="space-y-2"><Label>Ou condomínio</Label><CondominiumPicker value={condominiumId} onChange={(item) => { const next = item?.id ?? null; setCondominiumId(next); if (next) setBuildingId(null); }} /></div>
+        {condominiumId && <a className="inline-flex items-center text-xs font-semibold text-primary" href={condominiumMapsUrl(condominiumCatalog.condominiums.find((item) => item.id === condominiumId)!)} target="_blank" rel="noreferrer">Conferir localização no mapa</a>}
       </div>}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
