@@ -145,6 +145,25 @@ export type Condominium = {
   notes: string | null;
 };
 
+export type CondominiumAssetType = "photo" | "video" | "pdf" | "drive";
+
+export type CondominiumAsset = {
+  id: string;
+  user_id: string;
+  condominium_id: string;
+  asset_type: CondominiumAssetType;
+  title: string;
+  file_name: string | null;
+  storage_path: string | null;
+  external_url: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  created_at: string;
+  updated_at: string;
+  asset_url?: string;
+  local_only?: boolean;
+};
+
 export type MarketNews = {
   id: string;
   title: string;
@@ -459,6 +478,16 @@ export type Database = {
           file_path: string;
         };
         Update: Partial<FinancialAttachment>;
+      };
+      condominium_assets: {
+        Row: CondominiumAsset;
+        Insert: Omit<Partial<CondominiumAsset>, "id" | "created_at" | "updated_at"> & {
+          user_id: string;
+          condominium_id: string;
+          asset_type: CondominiumAssetType;
+          title: string;
+        };
+        Update: Partial<CondominiumAsset>;
       };
     };
     Views: Record<string, never>;
