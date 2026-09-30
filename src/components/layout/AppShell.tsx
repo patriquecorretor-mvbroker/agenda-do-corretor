@@ -136,11 +136,11 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="min-h-screen w-full min-w-0 overflow-x-hidden px-3 pb-28 pt-3 sm:px-5 sm:pt-5 lg:ml-[248px] lg:w-auto lg:px-5 lg:pb-8 lg:pt-0 xl:px-7 2xl:px-8">
-        <header className="sticky top-0 z-20 -mx-5 hidden h-[76px] items-center justify-between border-b bg-background/86 px-5 backdrop-blur-xl lg:flex xl:-mx-7 xl:px-7 2xl:-mx-8 2xl:px-8">
+      <main className={cn("min-h-screen w-full min-w-0 overflow-x-hidden px-3 pb-28 pt-3 sm:px-5 sm:pt-5 lg:ml-[248px] lg:w-auto lg:px-5 lg:pb-8 lg:pt-0 xl:px-7 2xl:px-8", view === "focus" && "bg-[#05070a]")}>
+        <header className={cn("sticky top-0 z-20 -mx-5 hidden h-[76px] items-center justify-between border-b bg-background/86 px-5 backdrop-blur-xl lg:flex xl:-mx-7 xl:px-7 2xl:-mx-8 2xl:px-8", view === "focus" && "border-white/10 bg-[#05070a]/90 text-white")}>
           <form onSubmit={handleGlobalSearch} className="relative w-full max-w-[560px]">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className="h-11 w-full rounded-xl border bg-card/70 pl-11 pr-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/10" placeholder="Buscar clientes, imóveis, compromissos..." aria-label="Busca global" />
+            <input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className={cn("h-11 w-full rounded-xl border bg-card/70 pl-11 pr-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/10", view === "focus" && "border-white/10 bg-white/[0.035] text-white placeholder:text-white/30")} placeholder="Buscar clientes, imóveis, compromissos..." aria-label="Busca global" />
           </form>
           <div className="flex items-center gap-2">
             <Button size="icon" variant="ghost" aria-label="Notificações" onClick={() => toast({ title: "Nenhuma nova notificação." })} className="relative">
@@ -186,7 +186,7 @@ export function AppShell({
         </div>
       </main>
 
-      <nav className="fixed bottom-2 left-2 right-2 z-40 rounded-[1.4rem] border bg-background/94 px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_14px_40px_rgba(11,18,32,0.18)] backdrop-blur-xl lg:hidden">
+      <nav className={cn("fixed bottom-2 left-2 right-2 z-40 rounded-[1.4rem] border bg-background/94 px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_14px_40px_rgba(11,18,32,0.18)] backdrop-blur-xl lg:hidden", view === "focus" && "border-white/10 bg-[#0a0d12]/94 text-white")}>
         <div className="mx-auto grid max-w-xl grid-cols-5 items-end gap-0.5">
           {mobileItems.slice(0, 2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
