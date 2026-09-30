@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, Home, Images, LandPlot, LayoutGrid, LogOut, Moon, Newspaper, Search, Settings, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
+import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
@@ -18,6 +18,9 @@ import { GoalsPage } from "@/features/goals/GoalsPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { FocusPage } from "@/features/focus/FocusPage";
+import { AdminPage } from "@/features/admin/AdminPage";
+import { useSaasAdmin } from "@/features/admin/use-saas-admin";
+import { MaterialsLibraryPage } from "@/features/library/MaterialsLibraryPage";
 import { useProfile } from "@/features/profile/use-profile";
 import type { PaletteId } from "@/lib/appearance";
 import type { AppView } from "@/types/ui";
@@ -31,10 +34,12 @@ const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; m
   { view: "condominiums", label: "Condomínios", icon: LandPlot },
   { view: "city-media", label: "Mídia da Cidade", icon: Images },
   { view: "news", label: "Mercado", icon: Newspaper },
+  { view: "library", label: "Materiais", icon: Library },
   { view: "finance", label: "Financeiro", icon: WalletCards },
   { view: "goals", label: "Metas", icon: Target },
   { view: "profile", label: "Perfil", icon: User, mobile: false },
-  { view: "settings", label: "Configurações", icon: Settings }
+  { view: "settings", label: "Configurações", icon: Settings },
+  { view: "admin", label: "Super Admin", icon: ShieldCheck }
 ];
 
 export function AppShell({
@@ -58,9 +63,11 @@ export function AppShell({
   const [globalSearch, setGlobalSearch] = useState("");
   const { signOut } = useAuth();
   const { profile } = useProfile();
+  const saasAdmin = useSaasAdmin();
   const { toast } = useToast();
-  const mobileItems = navItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
-  const moreItems = navItems.filter((item) => ["focus", "buildings", "condominiums", "city-media", "news", "finance", "goals", "profile", "settings"].includes(item.view));
+  const visibleNavItems = navItems.filter((item) => item.view !== "admin" || saasAdmin.isAdmin);
+  const mobileItems = visibleNavItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
+  const moreItems = visibleNavItems.filter((item) => ["focus", "buildings", "condominiums", "city-media", "news", "library", "finance", "goals", "profile", "settings", "admin"].includes(item.view));
 
   async function handleSignOut() {
     await signOut();
@@ -78,6 +85,8 @@ export function AppShell({
     else if (/foco|pomodoro|produtividade/.test(term)) setView("focus");
     else if (/agenda|compromisso|visita|reuni[aã]o|tarefa/.test(term)) setView("agenda");
     else if (/not[ií]cia|mercado|cr[eé]dito|investimento/.test(term)) setView("news");
+    else if (/material|campanha|arquivo|biblioteca/.test(term)) setView("library");
+    else if (saasAdmin.isAdmin && /admin|assinante|plano|pagamento|saas/.test(term)) setView("admin");
     else if (/finance|receita|despesa|comiss[aã]o/.test(term)) setView("finance");
     else if (/meta|objetivo/.test(term)) setView("goals");
     else {
@@ -104,7 +113,7 @@ export function AppShell({
           </div>
         </div>
         <nav className="relative grid gap-1.5">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.view}
               type="button"
@@ -161,6 +170,7 @@ export function AppShell({
           {view === "condominiums" && <CondominiumsPage />}
           {view === "city-media" && <CityMediaPage />}
           {view === "news" && <MarketNewsPage />}
+          {view === "library" && <MaterialsLibraryPage />}
           {view === "finance" && <FinancePage />}
           {view === "goals" && <GoalsPage />}
           {view === "profile" && (
@@ -183,6 +193,7 @@ export function AppShell({
               onCustomColorChange={onCustomColorChange}
             />
           )}
+          {view === "admin" && saasAdmin.isAdmin && <AdminPage />}
         </div>
       </main>
 
