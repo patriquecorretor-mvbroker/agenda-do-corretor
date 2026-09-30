@@ -15,22 +15,22 @@
 
 @layer base {
   :root {
-    --background: 24 45% 98%;
-    --foreground: 24 20% 7%;
+    --background: 220 20% 98%;
+    --foreground: 222 24% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 24 20% 7%;
+    --card-foreground: 222 24% 10%;
     --primary: 42 78% 56%;
     --primary-foreground: 0 0% 100%;
     --secondary: 24 16% 10%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 24 22% 93%;
-    --muted-foreground: 24 8% 42%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 42%;
     --accent: 42 78% 56%;
     --accent-foreground: 24 20% 7%;
     --destructive: 0 67% 52%;
     --destructive-foreground: 0 0% 100%;
-    --border: 24 20% 87%;
-    --input: 24 20% 87%;
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
     --ring: 42 78% 56%;
     --sidebar: 220 28% 5%;
     --theme-gradient: linear-gradient(135deg, #050609 0%, #17191f 58%, #7a5a20 140%);
@@ -79,6 +79,10 @@
     transition: background-color 240ms ease, color 240ms ease;
   }
 
+  :root:not(.dark) body {
+    background-image: linear-gradient(to bottom, hsl(var(--background)), #ffffff 38rem);
+  }
+
   #root {
     width: 100%;
     max-width: 100%;
@@ -100,10 +104,23 @@
   }
 
   .glass-card {
-    @apply border border-white/60 bg-white/80 shadow-soft backdrop-blur-xl dark:border-white/10 dark:bg-white/5;
+    @apply border border-border bg-white/95 shadow-[0_1px_2px_rgba(16,24,40,0.04)] backdrop-blur-xl dark:border-white/10 dark:bg-white/5 dark:shadow-soft;
   }
 
   .theme-gradient {
     background-image: var(--theme-gradient);
   }
+
+  .motion-rise {
+    animation: motion-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .motion-rise { animation: none; }
+  }
+}
+
+@keyframes motion-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }

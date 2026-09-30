@@ -6,6 +6,8 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Banknote,
+  BarChart3,
+  BriefcaseBusiness,
   CalendarDays,
   Car,
   Crown,
@@ -103,18 +105,16 @@ export function FinancePage() {
 
   return (
     <div className="space-y-4 md:space-y-5">
-      <section className="overflow-hidden rounded-[1.75rem] bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.36),_transparent_36%),linear-gradient(135deg,_#050403,_#15100b_58%,_#050403)] text-white shadow-soft md:rounded-[2rem]">
+      <section className="motion-rise overflow-hidden rounded-[1.75rem] border bg-card text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#05070b,#11151d)] dark:text-white dark:shadow-soft md:rounded-[2rem]">
         <div className="relative p-4 md:p-8">
-          <div className="absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/35 blur-3xl" />
-          <div className="absolute bottom-0 left-1/3 h-24 w-72 rounded-full bg-white/10 blur-3xl" />
           <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary md:mb-4">
+              <div className="mb-3 inline-flex items-center gap-2 text-xs font-semibold uppercase text-primary md:mb-4">
                 <WalletCards className="h-3.5 w-3.5" />
                 Financeiro MV Broker
               </div>
-              <h1 className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl md:text-5xl">Controle real do dinheiro.</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/62 md:mt-3">
+              <h1 className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl md:text-4xl">Controle financeiro</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground dark:text-white/62 md:mt-3">
                 Separação clara entre realizado, confirmado, previsto, potencial e atrasado. Sem misturar promessa com caixa.
               </p>
             </div>
@@ -126,7 +126,7 @@ export function FinancePage() {
         </div>
       </section>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div className="scrollbar-none flex w-full gap-2 overflow-x-auto pb-1">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -142,7 +142,7 @@ export function FinancePage() {
         ))}
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1 xl:grid-cols-5">
         <FinanceCard featured label="Resultado líquido" value={formatCurrency(finance.metrics.netResultMonth)} icon={LineChart} onClick={() => setTab("result")} />
         <FinanceCard label="Comissão recebida" value={formatCurrency(finance.metrics.commissionReceivedMonth)} icon={Banknote} onClick={() => setTab("commissions")} />
         <FinanceCard label="A receber" value={formatCurrency(finance.metrics.commissionReceivable)} icon={ArrowDownCircle} onClick={() => setTab("receivable")} />
@@ -236,6 +236,7 @@ function DashboardFinance({
 
   return (
     <div className="space-y-5">
+      <SalesPortfolio commissions={finance.commissions} installments={finance.installments} onOpen={() => onOpen("commissions")} />
       <FinancialPerformance transactions={finance.transactions} installments={finance.installments} />
       <CommissionRankings commissions={finance.commissions} clients={clients} />
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -281,10 +282,10 @@ function DashboardFinance({
       </div>
 
       <div className="space-y-5">
-        <Card className="border-primary/25 bg-[#050403] text-white">
+        <Card className="border-border bg-card text-foreground dark:border-primary/25 dark:bg-[#070A0F] dark:text-white">
           <CardHeader>
             <CardTitle>Alertas</CardTitle>
-            <CardDescription className="text-white/65">Pontos que pedem ação.</CardDescription>
+            <CardDescription>Pontos que pedem ação.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <AlertLine text={`Você possui ${formatCurrency(finance.metrics.receiveToday)} para receber hoje.`} />
@@ -328,6 +329,49 @@ function DashboardFinance({
   );
 }
 
+function SalesPortfolio({ commissions, installments, onOpen }: { commissions: Commission[]; installments: CommissionInstallment[]; onOpen: () => void }) {
+  const [query, setQuery] = useState("");
+  const now = new Date();
+  const monthKey = format(now, "yyyy-MM");
+  const yearKey = format(now, "yyyy");
+  const sales = commissions.filter((item) => item.status !== "cancelada").sort((a, b) => (b.sale_date ?? b.created_at).localeCompare(a.sale_date ?? a.created_at));
+  const monthSales = sales.filter((item) => item.sale_date?.startsWith(monthKey));
+  const yearSales = sales.filter((item) => item.sale_date?.startsWith(yearKey));
+  const totalCommission = sum(sales.map((item) => item.net_commission));
+  const receivedCommission = sum(installments.map((item) => item.received_amount));
+  const yearVgv = sum(yearSales.map((item) => item.vgv));
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const date = subMonths(now, 5 - index);
+    const key = format(date, "yyyy-MM");
+    const rows = sales.filter((item) => item.sale_date?.startsWith(key));
+    return { key, label: format(date, "MMM", { locale: ptBR }).replace(".", ""), count: rows.length, vgv: sum(rows.map((item) => item.vgv)), commission: sum(rows.map((item) => item.net_commission)) };
+  });
+  const maxCommission = Math.max(...months.map((item) => item.commission), 1);
+  const statusGroups = ["recebida", "parcialmente recebida", "confirmada", "atrasada", "em negociação", "estimada"].map((status) => ({ status, count: sales.filter((item) => item.status === status).length, value: sum(sales.filter((item) => item.status === status).map((item) => item.net_commission)) })).filter((item) => item.count);
+  const maxStatus = Math.max(...statusGroups.map((item) => item.value), 1);
+  const visibleSales = sales.filter((item) => `${item.client ?? ""} ${item.property ?? ""} ${item.development ?? ""} ${item.builder ?? ""}`.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR")));
+
+  return <section className="motion-rise space-y-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase text-primary"><BriefcaseBusiness className="h-4 w-4" />Carteira de vendas</div><h2 className="mt-1 text-xl font-semibold">Vendas e comissões</h2><p className="mt-1 text-sm text-muted-foreground">Visão consolidada das vendas cadastradas, sem contar cancelamentos.</p></div><Button variant="outline" onClick={onOpen}>Abrir comissões</Button></div>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <SalesMetric label="Vendas no mês" value={String(monthSales.length)} helper={format(now, "MMMM", { locale: ptBR })} />
+      <SalesMetric label="Vendas no ano" value={String(yearSales.length)} helper={yearKey} />
+      <SalesMetric label="Comissão gerada" value={formatCurrency(totalCommission)} helper="total não cancelado" wide />
+      <SalesMetric label="Comissão recebida" value={formatCurrency(receivedCommission)} helper="parcelas recebidas" />
+      <SalesMetric label="VGV no ano" value={formatCurrency(yearVgv)} helper={`${yearSales.length} venda(s)`} />
+    </div>
+    <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <Card className="overflow-hidden"><CardHeader><div className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><CardTitle>Evolução das vendas</CardTitle></div><CardDescription>Comissão líquida gerada e quantidade de vendas nos últimos seis meses.</CardDescription></CardHeader><CardContent><div className="grid h-56 grid-cols-6 items-end gap-2 border-b border-border/70 pt-4 sm:gap-5">{months.map((item, index) => <div key={item.key} className="flex h-full min-w-0 flex-col justify-end gap-2" style={{ animationDelay: `${index * 45}ms` }}><div className="flex h-40 items-end justify-center"><div title={`${formatCurrency(item.commission)} · ${item.count} venda(s)`} className="w-full max-w-10 rounded-t-lg border border-primary/25 bg-primary/15 transition-all duration-700 dark:bg-primary/35" style={{ height: `${item.commission ? Math.max((item.commission / maxCommission) * 100, 8) : 3}%` }} /></div><div className="text-center"><p className="text-xs font-semibold tabular-nums">{item.count}</p><p className="truncate text-[0.65rem] font-medium uppercase text-muted-foreground">{item.label}</p></div></div>)}</div><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>Altura: comissão gerada</span><span>Número: vendas</span></div></CardContent></Card>
+      <Card><CardHeader><CardTitle>Status das comissões</CardTitle><CardDescription>Valores mantidos separados por estágio financeiro.</CardDescription></CardHeader><CardContent className="space-y-4">{statusGroups.length ? statusGroups.map((item) => <div key={item.status}><div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span className="capitalize text-muted-foreground">{item.status} · {item.count}</span><strong>{formatCurrency(item.value)}</strong></div><div className="h-2 overflow-hidden rounded-full border bg-background"><div className="h-full rounded-full bg-foreground/75 transition-all duration-700 dark:bg-primary" style={{ width: `${Math.max((item.value / maxStatus) * 100, 3)}%` }} /></div></div>) : <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">Cadastre vendas para visualizar a distribuição.</p>}</CardContent></Card>
+    </div>
+    <Card><CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between"><div><CardTitle>Todas as vendas</CardTitle><CardDescription>Cliente, imóvel, data, VGV, comissão e situação.</CardDescription></div><div className="relative w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Buscar venda" /></div></CardHeader><CardContent>{visibleSales.length ? <div className="max-h-[520px] overflow-auto rounded-2xl border"><div className="hidden min-w-[760px] grid-cols-[1.2fr_1.3fr_110px_130px_140px_120px] gap-3 border-b bg-muted/45 px-4 py-3 text-[0.68rem] font-semibold uppercase text-muted-foreground md:grid"><span>Cliente</span><span>Imóvel</span><span>Data</span><span>VGV</span><span>Comissão</span><span>Status</span></div>{visibleSales.map((sale) => <article key={sale.id} className="grid gap-2 border-b p-4 last:border-b-0 md:min-w-[760px] md:grid-cols-[1.2fr_1.3fr_110px_130px_140px_120px] md:items-center md:gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{sale.client || "Cliente não informado"}</p><p className="truncate text-xs text-muted-foreground md:hidden">{sale.property ?? sale.development ?? "Imóvel não informado"}</p></div><p className="hidden truncate text-sm text-muted-foreground md:block">{sale.property ?? sale.development ?? "Imóvel não informado"}</p><p className="text-xs text-muted-foreground">{sale.sale_date ? format(parseISO(sale.sale_date), "dd/MM/yyyy") : "Sem data"}</p><p className="text-sm font-medium">{formatCurrency(sale.vgv)}</p><p className="text-sm font-semibold">{formatCurrency(sale.net_commission)}</p><StatusBadge status={sale.status} /></article>)}</div> : <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhuma venda encontrada.</div>}</CardContent></Card>
+  </section>;
+}
+
+function SalesMetric({ label, value, helper, wide }: { label: string; value: string; helper: string; wide?: boolean }) {
+  return <article className={cn("rounded-2xl border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,40,0.035)]", wide && "col-span-2 lg:col-span-1")}><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-2 truncate text-xl font-semibold sm:text-2xl">{value}</p><p className="mt-1 truncate text-[0.68rem] text-muted-foreground">{helper}</p></article>;
+}
+
 function FinancialPerformance({ transactions, installments }: { transactions: FinancialTransaction[]; installments: CommissionInstallment[] }) {
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
   const selectedDate = parseISO(`${month}-01`);
@@ -353,17 +397,17 @@ function FinancialPerformance({ transactions, installments }: { transactions: Fi
   const maxChart = Math.max(...chart.flatMap((item) => [item.income, item.expenses]), 1);
 
   return (
-    <Card className="overflow-hidden border-primary/25 bg-[#070A0F] text-white shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
-      <CardHeader className="border-b border-white/10">
+    <Card className="motion-rise overflow-hidden border-border bg-card text-foreground dark:border-white/10 dark:bg-[#070A0F] dark:text-white dark:shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
+      <CardHeader className="border-b">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary"><LineChart className="h-4 w-4" /> Desempenho financeiro</div>
             <CardTitle>Resultado por mês</CardTitle>
-            <CardDescription className="text-white/55">Somente receitas recebidas e despesas efetivamente pagas.</CardDescription>
+            <CardDescription>Somente receitas recebidas e despesas efetivamente pagas.</CardDescription>
           </div>
-          <label className="grid gap-1 text-xs text-white/55">
+          <label className="grid gap-1 text-xs text-muted-foreground">
             Período
-            <input type="month" value={month} max={format(new Date(), "yyyy-MM")} onChange={(event) => setMonth(event.target.value)} className="h-11 rounded-2xl border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-white outline-none focus:ring-2 focus:ring-primary/35" />
+            <input type="month" value={month} max={format(new Date(), "yyyy-MM")} onChange={(event) => setMonth(event.target.value)} className="h-11 rounded-2xl border bg-background px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/35 dark:border-white/10 dark:bg-white/[0.06] dark:text-white" />
           </label>
         </div>
       </CardHeader>
@@ -374,19 +418,19 @@ function FinancialPerformance({ transactions, installments }: { transactions: Fi
           <DarkMetric label="Comparativo anterior" value={comparison === null ? "Sem base" : `${comparison >= 0 ? "+" : ""}${comparison}%`} helper={`Anterior: ${formatCurrency(previous.result)}`} positive={comparison !== null && comparison >= 0} />
           <DarkMetric label="Despesas do período" value={formatCurrency(current.expenses)} helper={`${current.movements} movimento(s)`} />
         </div>
-        <div className="rounded-[1.4rem] border border-white/10 bg-white/[0.035] p-4">
+        <div className="rounded-[1.4rem] border bg-background/45 p-4 dark:border-white/10 dark:bg-white/[0.035]">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div><p className="font-semibold">Receitas x despesas</p><p className="text-xs text-white/45">Últimos seis meses até o período selecionado.</p></div>
-            <div className="flex gap-3 text-[0.68rem] text-white/55"><ChartKey tone="bg-emerald-500" label="Receitas" /><ChartKey tone="bg-primary" label="Despesas" /></div>
+            <div><p className="font-semibold">Receitas x despesas</p><p className="text-xs text-muted-foreground">Últimos seis meses até o período selecionado.</p></div>
+            <div className="flex gap-3 text-[0.68rem] text-muted-foreground"><ChartKey tone="bg-emerald-500" label="Receitas" /><ChartKey tone="bg-foreground/65 dark:bg-primary" label="Despesas" /></div>
           </div>
           <div className="grid h-48 grid-cols-6 items-end gap-2 sm:gap-5">
             {chart.map((item) => (
               <div key={item.key} className="flex h-full min-w-0 flex-col justify-end gap-2">
                 <div className="flex h-36 items-end justify-center gap-1.5">
                   <FinanceChartColumn value={item.income} max={maxChart} tone="bg-emerald-500" />
-                  <FinanceChartColumn value={item.expenses} max={maxChart} tone="bg-primary" />
+                  <FinanceChartColumn value={item.expenses} max={maxChart} tone="bg-foreground/65 dark:bg-primary" />
                 </div>
-                <span className="truncate text-center text-[0.65rem] font-semibold uppercase text-white/45">{item.label}</span>
+                <span className="truncate text-center text-[0.65rem] font-semibold uppercase text-muted-foreground">{item.label}</span>
               </div>
             ))}
           </div>
@@ -398,10 +442,10 @@ function FinancialPerformance({ transactions, installments }: { transactions: Fi
 
 function DarkMetric({ label, value, helper, featured, positive }: { label: string; value: string; helper: string; featured?: boolean; positive?: boolean }) {
   return (
-    <div className={cn("min-w-0 rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-4", featured && "border-primary/35 bg-primary/10")}>
-      <p className="text-xs text-white/48">{label}</p>
-      <p className={cn("mt-2 truncate text-xl font-semibold sm:text-2xl", positive && "text-emerald-400")}>{value}</p>
-      <p className="mt-2 truncate text-[0.68rem] text-white/42">{helper}</p>
+    <div className={cn("min-w-0 rounded-[1.35rem] border bg-card p-4 dark:border-white/10 dark:bg-white/[0.045]", featured && "border-primary/35 bg-primary/5 dark:bg-primary/10")}>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={cn("mt-2 truncate text-xl font-semibold sm:text-2xl", positive && "text-emerald-600 dark:text-emerald-400")}>{value}</p>
+      <p className="mt-2 truncate text-[0.68rem] text-muted-foreground">{helper}</p>
     </div>
   );
 }
@@ -463,15 +507,15 @@ function CommissionRankings({ commissions, clients }: { commissions: Commission[
   }, [clients, commissions]);
 
   return (
-    <Card className="overflow-hidden border-primary/25 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.2),_transparent_34%),linear-gradient(145deg,_#050403,_#110d09_58%,_#050403)] text-white shadow-[0_26px_80px_rgba(0,0,0,0.24)]">
-      <CardHeader className="border-b border-white/10">
+    <Card className="motion-rise overflow-hidden border-border bg-card text-foreground dark:border-primary/25 dark:bg-[linear-gradient(145deg,#05070b,#11151d)] dark:text-white dark:shadow-[0_26px_80px_rgba(0,0,0,0.24)]">
+      <CardHeader className="border-b">
         <div className="flex items-start gap-3">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_32px_hsl(var(--primary)/0.24)]">
             <Crown className="h-5 w-5" />
           </span>
           <div>
             <CardTitle>Ranking de comissões</CardTitle>
-            <CardDescription className="mt-1 text-white/58">
+            <CardDescription className="mt-1">
               Somente vendas confirmadas, recebidas, parciais ou atrasadas entram no ranking.
             </CardDescription>
           </div>
@@ -488,7 +532,7 @@ function CommissionRankings({ commissions, clients }: { commissions: Commission[
 
 function RankingColumn({ title, icon: Icon, items, empty }: { title: string; icon: React.ElementType; items: RankedItem[]; empty: string }) {
   return (
-    <section className="border-b border-white/10 p-4 last:border-b-0 sm:p-5 lg:border-b-0 lg:border-r lg:last:border-r-0">
+    <section className="border-b p-4 last:border-b-0 sm:p-5 lg:border-b-0 lg:border-r lg:last:border-r-0">
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
         <Icon className="h-4 w-4 text-primary" />
         {title}
@@ -499,20 +543,20 @@ function RankingColumn({ title, icon: Icon, items, empty }: { title: string; ico
             <li key={`${item.label}-${index}`} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2.5">
               <span className={cn(
                 "grid h-8 w-8 place-items-center rounded-full border text-xs font-bold",
-                index === 0 ? "border-primary/50 bg-primary text-primary-foreground" : "border-white/15 bg-white/5 text-white/65"
+                index === 0 ? "border-primary/50 bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground dark:border-white/15 dark:bg-white/5 dark:text-white/65"
               )}>
                 {index + 1}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{item.label}</p>
-                <p className="truncate text-xs text-white/48">{item.detail}</p>
+                <p className="truncate text-sm font-semibold">{item.label}</p>
+                <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
               </div>
               <p className="whitespace-nowrap text-xs font-semibold text-primary sm:text-sm">{formatCurrency(item.value)}</p>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="rounded-2xl border border-dashed border-white/14 bg-white/[0.03] p-4 text-sm leading-5 text-white/48">{empty}</p>
+        <p className="rounded-2xl border border-dashed bg-background/50 p-4 text-sm leading-5 text-muted-foreground">{empty}</p>
       )}
     </section>
   );
@@ -793,9 +837,9 @@ function CashFlow({ transactions, installments }: { transactions: FinancialTrans
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-center justify-between rounded-[1.4rem] bg-[#0B1220] p-4 text-white">
-          <div><p className="text-xs text-white/50">Resultado do período</p><p className="mt-1 text-2xl font-semibold">{formatCurrency(balance)}</p></div>
-          <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-white/60">{rows.length} movimentos</span>
+        <div className="flex items-center justify-between rounded-[1.4rem] border bg-background/50 p-4 dark:border-white/10 dark:bg-[#0B1220] dark:text-white">
+          <div><p className="text-xs text-muted-foreground dark:text-white/50">Resultado do período</p><p className="mt-1 text-2xl font-semibold">{formatCurrency(balance)}</p></div>
+          <span className="rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.06] dark:text-white/60">{rows.length} movimentos</span>
         </div>
         {rows.length ? rows.map((row, index) => (
           <div key={`${row.date}-${index}`} className="flex items-center gap-3 rounded-[1.35rem] border bg-card p-3 shadow-[0_8px_24px_rgba(11,18,32,0.04)] sm:p-4">
@@ -874,8 +918,8 @@ function FinancialResult({
           <DreSection title="Receitas" groups={incomeGroups} />
           {receivedInstallments.length > 0 && <DataLine label="Comissões recebidas" value={formatCurrency(sum(receivedInstallments.map((item) => item.received_amount)))} />}
           <DreSection title="Despesas" groups={expenseGroups} negative />
-          <div className="rounded-3xl bg-[#050403] p-5 text-white">
-            <p className="text-sm text-white/60">Resultado líquido</p>
+          <div className="rounded-3xl border bg-background/50 p-5 dark:border-white/10 dark:bg-[#050403] dark:text-white">
+            <p className="text-sm text-muted-foreground dark:text-white/60">Resultado líquido</p>
             <p className="mt-1 text-3xl font-semibold">{formatCurrency(result)}</p>
           </div>
         </CardContent>
@@ -1179,8 +1223,8 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: str
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 sm:rounded-3xl sm:p-4">
-      <p className="text-xs text-white/55">{label}</p>
+    <div className="rounded-2xl border bg-background/45 p-3 sm:rounded-3xl sm:p-4 dark:border-white/10 dark:bg-white/[0.06]">
+      <p className="text-xs text-muted-foreground dark:text-white/55">{label}</p>
       <p className="mt-1 text-lg font-semibold sm:text-xl">{value}</p>
     </div>
   );
@@ -1192,15 +1236,15 @@ function FinanceCard({ label, value, icon: Icon, onClick, featured }: { label: s
     <Comp
       onClick={onClick}
       className={cn(
-        "min-h-[116px] rounded-3xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.22),_transparent_42%),linear-gradient(135deg,_#050403,_#15100b_64%,_#050403)] p-4 text-left text-white shadow-[0_24px_60px_rgba(0,0,0,0.24)] transition hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-[0_28px_70px_rgba(0,0,0,0.34)]",
-        featured && "border-primary/45 sm:col-span-2 xl:col-span-1"
+        "motion-rise min-h-[116px] rounded-3xl border bg-card p-4 text-left text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition duration-300 hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-[0_12px_30px_rgba(16,24,40,0.08)] dark:border-primary/20 dark:bg-[linear-gradient(135deg,#05070b,#11151d)] dark:text-white dark:shadow-[0_24px_60px_rgba(0,0,0,0.24)]",
+        featured && "border-primary/45 bg-primary/[0.035] sm:col-span-2 xl:col-span-1 dark:bg-[linear-gradient(135deg,#05070b,#11151d)]"
       )}
     >
       <div className="mb-4 flex items-center justify-between">
         <Icon className="h-5 w-5 text-primary" />
         {featured && <span className="rounded-full border border-primary/25 bg-primary/15 px-2.5 py-1 text-[0.68rem] font-semibold text-primary">mês</span>}
       </div>
-      <p className="text-xs text-white/52">{label}</p>
+      <p className="text-xs text-muted-foreground dark:text-white/52">{label}</p>
       <p className={cn("mt-1 font-semibold", featured ? "text-2xl" : "text-xl")}>{value}</p>
     </Comp>
   );
@@ -1208,7 +1252,7 @@ function FinanceCard({ label, value, icon: Icon, onClick, featured }: { label: s
 
 function ForecastItem({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-muted p-4">
+    <div className="rounded-2xl border bg-background/40 p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-semibold">{formatCurrency(value)}</p>
     </div>
@@ -1232,26 +1276,26 @@ function DreamGoalsCard() {
   ];
 
   return (
-    <Card className="overflow-hidden border-primary/25 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.18),_transparent_36%),linear-gradient(135deg,_#050403,_#15100b)] text-white">
+    <Card className="overflow-hidden border-border bg-card text-foreground dark:border-primary/25 dark:bg-[linear-gradient(135deg,#05070b,#11151d)] dark:text-white">
       <CardHeader>
         <CardTitle>Metas de conquista</CardTitle>
-        <CardDescription className="text-white/62">Viagem, carro ou imóvel conectados ao foco financeiro.</CardDescription>
+        <CardDescription>Viagem, carro ou imóvel conectados ao foco financeiro.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {goals.map((goal) => {
           const progress = clampPercent((goal.saved / goal.target) * 100);
           const Icon = goal.icon;
           return (
-            <div key={goal.label} className="rounded-2xl border border-white/10 bg-white/[0.055] p-3">
+            <div key={goal.label} className="rounded-2xl border bg-background/45 p-3 dark:border-white/10 dark:bg-white/[0.055]">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <Icon className="h-4 w-4 shrink-0 text-primary" />
                   <span className="truncate text-sm font-semibold">{goal.label}</span>
                 </div>
-                <span className="text-xs text-white/62">{progress}%</span>
+                <span className="text-xs text-muted-foreground">{progress}%</span>
               </div>
-              <Progress value={progress} className="bg-white/10" />
-              <p className="mt-2 text-xs text-white/58">{formatCurrency(goal.saved)} guardados de {formatCurrency(goal.target)}</p>
+              <Progress value={progress} />
+              <p className="mt-2 text-xs text-muted-foreground">{formatCurrency(goal.saved)} guardados de {formatCurrency(goal.target)}</p>
             </div>
           );
         })}
@@ -1281,7 +1325,7 @@ function ExpenseAIReport({ transactions }: { transactions: FinancialTransaction[
 
   return (
     <Card className="overflow-hidden border-primary/20">
-      <CardHeader className="bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.14),_transparent_34%),hsl(var(--card))]">
+      <CardHeader className="border-b bg-card">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           <CardTitle>Relatório de despesas com IA</CardTitle>
@@ -1327,9 +1371,9 @@ function Bar({ label, value, max, tone }: { label: string; value: number; max: n
 
 function AlertLine({ text }: { text: string }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm">
+    <div className="flex gap-3 rounded-2xl border bg-background/45 p-3 text-sm dark:border-white/10 dark:bg-white/5">
       <AlertTriangle className="h-4 w-4 shrink-0 text-primary" />
-      <span className="text-white/76">{text}</span>
+      <span className="text-muted-foreground dark:text-white/76">{text}</span>
     </div>
   );
 }
