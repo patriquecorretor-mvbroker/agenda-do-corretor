@@ -8,6 +8,8 @@ import { useProfile } from "@/features/profile/use-profile";
 import { OnboardingPage } from "@/features/profile/OnboardingPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { getPalette, hexToHsl, primaryForegroundFor, type PaletteId } from "@/lib/appearance";
+import { PublicCityPage } from "@/features/city-media/PublicCityPage";
+import { readSharedCityPage } from "@/features/city-media/city-pages";
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -32,6 +34,9 @@ function AppContent() {
     if (customPrimary) root.style.setProperty("--primary-foreground", primaryForegroundFor(customPrimary));
     root.style.setProperty("--theme-gradient", selected.gradient);
   }, [customColor, dark, palette]);
+
+  const sharedCityPage = readSharedCityPage();
+  if (sharedCityPage) return <PublicCityPage page={sharedCityPage} />;
 
   if (loading) {
     return (
