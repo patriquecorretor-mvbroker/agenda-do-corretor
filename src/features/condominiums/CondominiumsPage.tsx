@@ -13,6 +13,7 @@ import { CondominiumMaterialsDialog } from "./CondominiumMaterialsDialog";
 import { condominiumMapsUrl, newCondominium, useCondominiums } from "./use-condominiums";
 
 type Scope = "todos" | "Capão da Canoa" | "Xangri-Lá" | "ativos";
+type SortOrder = "alphabetical" | "oldest" | "newest";
 
 export function CondominiumsPage() {
   const { condominiums, isLoading, error, saveCondominium } = useCondominiums();
@@ -21,6 +22,7 @@ export function CondominiumsPage() {
   const [scope, setScope] = useState<Scope>("todos");
   const [status, setStatus] = useState("todos");
   const [neighborhood, setNeighborhood] = useState("todos");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("alphabetical");
   const [selected, setSelected] = useState<Condominium>();
   const [editing, setEditing] = useState<Condominium>();
   const [materials, setMaterials] = useState<{ item: Condominium; filter: CondominiumAssetType | "all" }>();
@@ -29,14 +31,22 @@ export function CondominiumsPage() {
   const neighborhoods = useMemo(() => Array.from(new Set(condominiums.map((item) => item.neighborhood).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")), [condominiums]);
   const filtered = useMemo(() => {
     const term = normalize(query);
-    return condominiums.filter((item) => {
+    const matches = condominiums.filter((item) => {
       const matchesScope = scope === "todos" || item.city === scope || (scope === "ativos" && item.status !== "entregue");
       const matchesStatus = status === "todos" || item.status === status;
       const matchesNeighborhood = neighborhood === "todos" || item.neighborhood === neighborhood;
       const matchesSearch = !term || normalize(`${item.name} ${item.city} ${item.neighborhood ?? ""} ${item.developer ?? ""} ${item.unitType}`).includes(term);
       return matchesScope && matchesStatus && matchesNeighborhood && matchesSearch;
     });
-  }, [condominiums, neighborhood, query, scope, status]);
+    return matches.sort((a, b) => {
+      if (sortOrder === "alphabetical") return a.name.localeCompare(b.name, "pt-BR");
+      if (a.launchYear == null && b.launchYear == null) return a.name.localeCompare(b.name, "pt-BR");
+      if (a.launchYear == null) return 1;
+      if (b.launchYear == null) return -1;
+      const yearDifference = sortOrder === "oldest" ? a.launchYear - b.launchYear : b.launchYear - a.launchYear;
+      return yearDifference || a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [condominiums, neighborhood, query, scope, sortOrder, status]);
   const visible = filtered.slice(0, limit);
   const capao = condominiums.filter((item) => item.city === "Capão da Canoa").length;
   const xangri = condominiums.filter((item) => item.city === "Xangri-Lá").length;
@@ -52,7 +62,7 @@ export function CondominiumsPage() {
   }
 
   function clearFilters() {
-    setQuery(""); setScope("todos"); setStatus("todos"); setNeighborhood("todos"); setLimit(36);
+    setQuery(""); setScope("todos"); setStatus("todos"); setNeighborhood("todos"); setSortOrder("alphabetical"); setLimit(36);
   }
 
   return <div className="space-y-5">
@@ -68,13 +78,14 @@ export function CondominiumsPage() {
       <Summary label="Em obras / lançamentos" value={active} active={scope === "ativos"} icon={CalendarDays} onClick={() => setScope("ativos")} />
     </section>
 
-    <section className="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_190px]">
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_190px_190px_210px]">
       <div className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => { setQuery(event.target.value); setLimit(36); }} className="h-12 rounded-2xl bg-card pl-11" placeholder="Buscar condomínio, bairro ou construtora" /></div>
       <Select value={neighborhood} onValueChange={(value) => { setNeighborhood(value); setLimit(36); }}><SelectTrigger className="h-12 rounded-2xl bg-card"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os bairros</SelectItem>{neighborhoods.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
       <Select value={status} onValueChange={(value) => { setStatus(value); setLimit(36); }}><SelectTrigger className="h-12 rounded-2xl bg-card"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="todos">Todas as situações</SelectItem><SelectItem value="entregue">Entregues</SelectItem><SelectItem value="em obras">Em obras</SelectItem><SelectItem value="lançamento">Lançamentos</SelectItem><SelectItem value="a confirmar">A confirmar</SelectItem></SelectContent></Select>
+      <Select value={sortOrder} onValueChange={(value) => { setSortOrder(value as SortOrder); setLimit(36); }}><SelectTrigger className="h-12 rounded-2xl bg-card"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="alphabetical">Ordem alfabética</SelectItem><SelectItem value="oldest">Mais antigos primeiro</SelectItem><SelectItem value="newest">Mais novos primeiro</SelectItem></SelectContent></Select>
     </section>
 
-    <div className="flex items-center justify-between text-sm text-muted-foreground"><span>{filtered.length} condomínios encontrados</span>{(query || scope !== "todos" || status !== "todos" || neighborhood !== "todos") && <button type="button" onClick={clearFilters} className="font-semibold text-primary">Limpar filtros</button>}</div>
+    <div className="flex items-center justify-between text-sm text-muted-foreground"><span>{filtered.length} condomínios encontrados</span>{(query || scope !== "todos" || status !== "todos" || neighborhood !== "todos" || sortOrder !== "alphabetical") && <button type="button" onClick={clearFilters} className="font-semibold text-primary">Limpar filtros</button>}</div>
     {error && <div role="alert" className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm">A base local está disponível. A sincronização online será retomada automaticamente.</div>}
     {isLoading && !condominiums.length && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-72 animate-pulse rounded-2xl bg-muted" />)}</div>}
 
