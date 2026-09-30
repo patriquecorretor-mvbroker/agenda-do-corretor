@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Copy, ExternalLink, Image as ImageIcon, MapPin, Navigation, Pencil, Plus, Search, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, CheckCircle2, ChevronRight, Copy, ExternalLink, Image as ImageIcon, LayoutGrid, List, MapPin, Navigation, Pencil, Plus, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RouteButton } from "@/components/RouteButton";
@@ -14,6 +14,7 @@ import { buildingAddress, newBuilding, useBuildings } from "./use-buildings";
 
 const allNeighborhoods = "todos";
 type CatalogFilter = "todos" | "com-foto" | "dados-publicos" | "pendente";
+type ViewMode = "list" | "cards";
 
 export function BuildingsPage() {
   const { buildings, isLoading, error, saveBuilding } = useBuildings();
@@ -21,6 +22,7 @@ export function BuildingsPage() {
   const [query, setQuery] = useState("");
   const [neighborhood, setNeighborhood] = useState(allNeighborhoods);
   const [catalogFilter, setCatalogFilter] = useState<CatalogFilter>("todos");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [limit, setLimit] = useState(48);
   const [selected, setSelected] = useState<Building>();
   const [editing, setEditing] = useState<Building>();
@@ -68,17 +70,20 @@ export function BuildingsPage() {
       <Summary label="A completar" value={pending} active={catalogFilter === "pendente"} icon={CalendarDays} onClick={() => setCatalogFilter("pendente")} />
     </section>
 
-    <section className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+    <section className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px_auto]">
       <div className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => { setQuery(event.target.value); setLimit(48); }} className="h-12 rounded-2xl bg-card pl-11" placeholder="Buscar edifício, rua, bairro ou construtora" /></div>
       <Select value={neighborhood} onValueChange={(value) => { setNeighborhood(value); setLimit(48); }}><SelectTrigger className="h-12 rounded-2xl bg-card"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={allNeighborhoods}>Todos os bairros</SelectItem>{neighborhoods.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
+      <ViewToggle value={viewMode} onChange={setViewMode} />
     </section>
 
     {error && <div role="alert" className="rounded-2xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">Não foi possível carregar o catálogo do banco. A base local permanece disponível neste dispositivo.</div>}
     {isLoading && !buildings.length ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-72 animate-pulse rounded-2xl bg-muted" />)}</div> : null}
 
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    {viewMode === "list" ? <section className="space-y-2">
+      {visible.map((building) => <BuildingListRow key={building.id} building={building} onOpen={() => setSelected(building)} />)}
+    </section> : <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-5">
       {visible.map((building) => <BuildingCard key={building.id} building={building} onOpen={() => setSelected(building)} />)}
-    </section>
+    </section>}
     {!visible.length && <div className="rounded-2xl border bg-card px-5 py-14 text-center"><Building2 className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 font-semibold">Nenhum edifício encontrado</p><Button variant="outline" className="mt-4" onClick={() => { setQuery(""); setNeighborhood(allNeighborhoods); setCatalogFilter("todos"); }}>Limpar busca</Button></div>}
     {visible.length < filtered.length && <div className="flex justify-center"><Button variant="outline" onClick={() => setLimit((current) => current + 48)}>Mostrar mais {Math.min(48, filtered.length - visible.length)}</Button></div>}
 
@@ -90,12 +95,28 @@ export function BuildingsPage() {
 function BuildingCard({ building, onOpen }: { building: Building; onOpen: () => void }) {
   const completeness = buildingCompleteness(building);
   return <Card className="group relative overflow-hidden border-0 shadow-[0_8px_28px_rgba(15,23,42,0.07)] ring-1 ring-border/70 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(15,23,42,0.12)]">
-    <RouteButton label={building.name} address={buildingAddress(building)} latitude={building.latitude} longitude={building.longitude} text="" className="absolute right-3 top-3 z-10 h-10 w-10 rounded-xl border border-white/25 bg-black/65 text-white shadow-lg backdrop-blur transition hover:bg-primary hover:text-primary-foreground" />
+    <RouteButton label={building.name} address={buildingAddress(building)} latitude={building.latitude} longitude={building.longitude} text="" className="absolute right-2 top-2 z-10 h-8 w-8 rounded-lg border border-white/25 bg-black/65 text-white shadow-lg backdrop-blur transition hover:bg-primary hover:text-primary-foreground" />
     <button type="button" onClick={onOpen} className="w-full text-left">
       <BuildingCover building={building} compact />
-      <CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-base font-semibold">{building.name}</h2><p className="mt-1 truncate text-xs text-muted-foreground">{building.builder || "Construtora não informada"}</p></div><VerificationBadge status={building.verificationStatus} /></div><p className="mt-3 flex items-start gap-1.5 text-sm leading-5 text-muted-foreground"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /><span className="line-clamp-2">{buildingAddress(building)}</span></p><div className="mt-4 grid grid-cols-3 gap-2 border-t pt-3 text-center text-xs"><MiniMetric label="Unidades" value={building.totalUnits} /><MiniMetric label="Elevadores" value={building.elevators} /><MiniMetric label="Entrega" value={building.deliveryYear} /></div><div className="mt-3 flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completeness}%` }} /></div><span className="text-[10px] font-semibold tabular-nums text-muted-foreground">Ficha {completeness}%</span></div></CardContent>
+      <CardContent className="p-3"><h2 className="truncate text-sm font-semibold">{building.name}</h2><p className="mt-1 truncate text-[11px] text-muted-foreground">{building.builder || building.neighborhood}</p><p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin className="h-3 w-3 shrink-0 text-primary" /><span className="truncate">{buildingAddress(building)}</span></p><div className="mt-3 flex items-center gap-2"><div className="h-1 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completeness}%` }} /></div><span className="text-[9px] font-semibold tabular-nums text-muted-foreground">{completeness}%</span></div></CardContent>
     </button>
   </Card>;
+}
+
+function BuildingListRow({ building, onOpen }: { building: Building; onOpen: () => void }) {
+  return <article className="flex items-center gap-2 rounded-2xl border bg-card p-2 shadow-[0_1px_2px_rgba(16,24,40,0.035)] transition hover:border-primary/35 sm:gap-3 sm:p-3">
+    <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <BuildingThumbnail building={building} />
+      <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate text-sm font-semibold sm:text-base">{building.name}</span><span className="hidden sm:inline-flex"><VerificationBadge status={building.verificationStatus} /></span></span><span className="mt-1 block truncate text-xs text-muted-foreground">{buildingAddress(building)}</span><span className="mt-1 block truncate text-[11px] text-muted-foreground">{building.builder || "Construtora não informada"}{building.deliveryYear ? ` · Entrega ${building.deliveryYear}` : ""}</span></span>
+    </button>
+    <RouteButton label={building.name} address={buildingAddress(building)} latitude={building.latitude} longitude={building.longitude} text="" className="h-9 w-9 shrink-0 rounded-xl border bg-background text-primary hover:bg-muted" />
+    <button type="button" onClick={onOpen} aria-label={`Abrir ${building.name}`} className="grid h-9 w-7 shrink-0 place-items-center text-muted-foreground"><ChevronRight className="h-4 w-4" /></button>
+  </article>;
+}
+
+function BuildingThumbnail({ building }: { building: Building }) {
+  const [failed, setFailed] = useState(false);
+  return <span className={cn("relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl text-white sm:h-20 sm:w-24", coverTone(building.neighborhood))}>{building.coverUrl && !failed ? <img src={building.coverUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-cover" /> : <Building2 className="h-6 w-6 text-white/65" />}</span>;
 }
 
 function BuildingDetails({ building, onClose, onCopy, onEdit }: { building?: Building; onClose: () => void; onCopy: (building: Building) => void; onEdit: (building: Building) => void }) {
@@ -117,8 +138,10 @@ function BuildingDetails({ building, onClose, onCopy, onEdit }: { building?: Bui
 function BuildingCover({ building, compact = false }: { building: Building; compact?: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(building.coverUrl) && !imageFailed;
-  return <div className={cn("relative flex items-end overflow-hidden text-white", compact ? "h-36 p-4" : "h-52 rounded-t-[2rem] p-5 sm:h-64", !showImage && coverTone(building.neighborhood))}>{showImage ? <img src={building.coverUrl!} alt={`Fachada do ${building.name}`} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" /> : <Building2 className="absolute right-5 top-5 h-12 w-12 text-white/18" />}<div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" /><span className="relative rounded-full border border-white/20 bg-black/30 px-2.5 py-1 text-xs font-semibold backdrop-blur">{building.neighborhood}</span></div>;
+  return <div className={cn("relative flex items-end overflow-hidden text-white", compact ? "h-24 p-2.5" : "h-52 rounded-t-[2rem] p-5 sm:h-64", !showImage && coverTone(building.neighborhood))}>{showImage ? <img src={building.coverUrl!} alt={`Fachada do ${building.name}`} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" /> : <Building2 className={cn("absolute h-9 w-9 text-white/18", compact ? "left-3 top-3" : "right-5 top-5")} />}<div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent" /><span className="relative max-w-full truncate rounded-full border border-white/20 bg-black/30 px-2 py-1 text-[10px] font-semibold backdrop-blur">{building.neighborhood}</span></div>;
 }
+
+function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (value: ViewMode) => void }) { return <div className="grid h-12 grid-cols-2 rounded-2xl border bg-card p-1"><button type="button" aria-pressed={value === "list"} onClick={() => onChange("list")} className={cn("flex min-w-24 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition", value === "list" ? "bg-foreground text-background" : "text-muted-foreground")}><List className="h-4 w-4" />Lista</button><button type="button" aria-pressed={value === "cards"} onClick={() => onChange("cards")} className={cn("flex min-w-24 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition", value === "cards" ? "bg-foreground text-background" : "text-muted-foreground")}><LayoutGrid className="h-4 w-4" />Cards</button></div>; }
 
 function Summary({ label, value, active, icon: Icon = Building2, onClick }: { label: string; value: number; active: boolean; icon?: React.ElementType; onClick: () => void }) { return <button type="button" onClick={onClick} className={cn("rounded-2xl border p-4 text-left shadow-sm transition", active ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:border-primary/35")}><div className="flex items-center justify-between gap-2"><p className={cn("text-xs font-medium uppercase", active ? "text-primary-foreground/70" : "text-muted-foreground")}>{label}</p><Icon className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p></button>; }
 function VerificationBadge({ status }: { status?: Building["verificationStatus"] }) { const verified = status === "verificado"; const web = status === "web"; return <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase", verified ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : web ? "bg-sky-500/10 text-sky-700 dark:text-sky-300" : status === "manual" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>{(verified || web) && <CheckCircle2 className="h-3 w-3" />}{verified ? "Oficial" : web ? "Dados públicos" : status === "manual" ? "Manual" : "A completar"}</span>; }
