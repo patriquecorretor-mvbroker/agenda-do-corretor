@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import { Building2, Check, Image as ImageIcon } from "lucide-react";
+import { Building2, Check, ExternalLink, Image as ImageIcon, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Building } from "@/types/database";
 
-const amenityOptions = ["Academia", "Bicicletário", "Brinquedoteca", "Churrasqueira", "Coworking", "Espaço gourmet", "Pet place", "Piscina", "Piscina aquecida", "Playground", "Portaria 24h", "Sala de cinema", "Sala de jogos", "Salão de festas", "Sauna", "Varanda"];
+const amenityOptions = ["Academia", "Acessibilidade", "Água quente", "Bicicletário", "Brinquedoteca", "Churrasqueira", "Coworking", "Espaço gourmet", "Gás central", "Hall decorado", "Pet place", "Piscina", "Piscina aquecida", "Playground", "Portaria 24h", "Portaria eletrônica", "Sala de cinema", "Sala de jogos", "Salão de festas", "Sauna", "Varanda", "Zeladoria"];
 
 export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { open: boolean; building: Building; onOpenChange: (open: boolean) => void; onSave: (building: Building) => Promise<void> }) {
   const [draft, setDraft] = useState(building);
@@ -69,6 +70,8 @@ export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { o
           <Field label="Descrição" className="sm:col-span-2"><Textarea value={draft.description ?? ""} onChange={(event) => set("description", event.target.value || null)} /></Field>
           <Field label="Observações internas" className="sm:col-span-2"><Textarea value={draft.notes ?? ""} onChange={(event) => set("notes", event.target.value || null)} /></Field>
         </FormSection>
+
+        <section className="rounded-2xl border bg-muted/25 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Informações públicas</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Registre apenas dados publicados e deixe campos não confirmados em branco.</p></div><Button type="button" variant="outline" size="sm" asChild><a href={`https://www.google.com/search?q=${encodeURIComponent(`${draft.name} ${draft.city || "Capão da Canoa"} edifício construtora`)}`} target="_blank" rel="noreferrer"><Search className="h-4 w-4" />Pesquisar na internet</a></Button></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Situação da ficha"><Select value={draft.verificationStatus ?? "pendente"} onValueChange={(value) => set("verificationStatus", value as Building["verificationStatus"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pendente">A completar</SelectItem><SelectItem value="web">Dados públicos encontrados</SelectItem><SelectItem value="verificado">Verificado em fonte oficial</SelectItem><SelectItem value="manual">Cadastro manual</SelectItem></SelectContent></Select></Field><Field label="Data da consulta"><Input type="date" value={draft.sourceCheckedAt ?? ""} onChange={(event) => set("sourceCheckedAt", event.target.value || null)} /></Field><Field label="Link público"><div className="relative"><ExternalLink className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-10" value={draft.sourceUrl ?? ""} onChange={(event) => set("sourceUrl", event.target.value || null)} placeholder="https://..." /></div></Field><Field label="Identificação da consulta"><Input value={draft.sourceTitle ?? ""} onChange={(event) => set("sourceTitle", event.target.value || null)} placeholder="Ex.: site da construtora" /></Field></div></section>
 
         <div className="sticky bottom-0 -mx-5 flex gap-3 border-t bg-background/95 px-5 pb-1 pt-4 backdrop-blur sm:static sm:mx-0 sm:justify-end sm:border-0 sm:p-0"><Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="submit" className="flex-1 sm:flex-none" disabled={saving || !draft.name.trim() || !draft.street.trim() || !draft.neighborhood.trim()}>{saving ? "Salvando..." : "Salvar edifício"}</Button></div>
       </form>

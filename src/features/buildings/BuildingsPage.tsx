@@ -12,7 +12,7 @@ import { BuildingFormDialog } from "./BuildingFormDialog";
 import { buildingAddress, newBuilding, useBuildings } from "./use-buildings";
 
 const allNeighborhoods = "todos";
-type CatalogFilter = "todos" | "com-foto" | "verificado" | "pendente";
+type CatalogFilter = "todos" | "com-foto" | "dados-publicos" | "pendente";
 
 export function BuildingsPage() {
   const { buildings, isLoading, error, saveBuilding } = useBuildings();
@@ -29,7 +29,7 @@ export function BuildingsPage() {
     return buildings.filter((building) => {
       const matchesNeighborhood = neighborhood === allNeighborhoods || building.neighborhood === neighborhood;
       const matchesSearch = !term || normalize(`${building.name} ${building.street} ${building.number ?? ""} ${building.neighborhood} ${building.postalCode ?? ""} ${building.builder ?? ""} ${building.developer ?? ""}`).includes(term);
-      const matchesCatalog = catalogFilter === "todos" || (catalogFilter === "com-foto" && Boolean(building.coverUrl)) || (catalogFilter === "verificado" && building.verificationStatus === "verificado") || (catalogFilter === "pendente" && building.verificationStatus === "pendente");
+      const matchesCatalog = catalogFilter === "todos" || (catalogFilter === "com-foto" && Boolean(building.coverUrl)) || (catalogFilter === "dados-publicos" && ["web", "verificado"].includes(building.verificationStatus ?? "")) || (catalogFilter === "pendente" && building.verificationStatus === "pendente");
       return matchesNeighborhood && matchesSearch && matchesCatalog;
     });
   }, [buildings, catalogFilter, neighborhood, query]);
@@ -51,7 +51,7 @@ export function BuildingsPage() {
   }
 
   const withPhoto = buildings.filter((building) => building.coverUrl).length;
-  const verified = buildings.filter((building) => building.verificationStatus === "verificado").length;
+  const publicData = buildings.filter((building) => ["web", "verificado"].includes(building.verificationStatus ?? "")).length;
   const pending = buildings.filter((building) => building.verificationStatus === "pendente").length;
 
   return <div className="space-y-5">
@@ -63,7 +63,7 @@ export function BuildingsPage() {
     <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       <Summary label="Empreendimentos" value={buildings.length} active={catalogFilter === "todos"} onClick={() => setCatalogFilter("todos")} />
       <Summary label="Com fachada" value={withPhoto} active={catalogFilter === "com-foto"} icon={ImageIcon} onClick={() => setCatalogFilter("com-foto")} />
-      <Summary label="Verificados" value={verified} active={catalogFilter === "verificado"} icon={ShieldCheck} onClick={() => setCatalogFilter("verificado")} />
+      <Summary label="Dados públicos" value={publicData} active={catalogFilter === "dados-publicos"} icon={ShieldCheck} onClick={() => setCatalogFilter("dados-publicos")} />
       <Summary label="A completar" value={pending} active={catalogFilter === "pendente"} icon={CalendarDays} onClick={() => setCatalogFilter("pendente")} />
     </section>
 
@@ -115,7 +115,7 @@ function BuildingCover({ building, compact = false }: { building: Building; comp
 }
 
 function Summary({ label, value, active, icon: Icon = Building2, onClick }: { label: string; value: number; active: boolean; icon?: React.ElementType; onClick: () => void }) { return <button type="button" onClick={onClick} className={cn("rounded-2xl border p-4 text-left shadow-sm transition", active ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:border-primary/35")}><div className="flex items-center justify-between gap-2"><p className={cn("text-xs font-medium uppercase", active ? "text-primary-foreground/70" : "text-muted-foreground")}>{label}</p><Icon className="h-4 w-4" /></div><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p></button>; }
-function VerificationBadge({ status }: { status?: Building["verificationStatus"] }) { const verified = status === "verificado"; return <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase", verified ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : status === "manual" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>{verified && <CheckCircle2 className="h-3 w-3" />}{verified ? "Verificado" : status === "manual" ? "Manual" : "Pendente"}</span>; }
+function VerificationBadge({ status }: { status?: Building["verificationStatus"] }) { const verified = status === "verificado"; const web = status === "web"; return <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase", verified ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : web ? "bg-sky-500/10 text-sky-700 dark:text-sky-300" : status === "manual" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>{(verified || web) && <CheckCircle2 className="h-3 w-3" />}{verified ? "Oficial" : web ? "Dados públicos" : status === "manual" ? "Manual" : "A completar"}</span>; }
 function MiniMetric({ label, value }: { label: string; value?: number | null }) { return <div><p className="font-semibold tabular-nums">{value ?? "—"}</p><p className="mt-0.5 text-[10px] text-muted-foreground">{label}</p></div>; }
 function Metric({ label, value, wide }: { label: string; value?: string | number | null; wide?: boolean }) { return <div className={cn("rounded-2xl bg-muted/55 p-3", wide && "col-span-2")}><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold">{value ?? "Não informado"}</p></div>; }
 function Detail({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) { return <div className="flex items-start gap-3 rounded-2xl bg-muted/55 p-3"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-0.5 text-sm font-semibold">{value}</p></div></div>; }

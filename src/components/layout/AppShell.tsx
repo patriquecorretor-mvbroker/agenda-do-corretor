@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, Home, Images, LandPlot, LayoutGrid, LogOut, Moon, Newspaper, Search, Settings, Sun, Target, User, Users, WalletCards } from "lucide-react";
+import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, Home, Images, LandPlot, LayoutGrid, LogOut, Moon, Newspaper, Search, Settings, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
@@ -17,6 +17,7 @@ import { FinancePage } from "@/features/finance/FinancePage";
 import { GoalsPage } from "@/features/goals/GoalsPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
+import { FocusPage } from "@/features/focus/FocusPage";
 import { useProfile } from "@/features/profile/use-profile";
 import type { PaletteId } from "@/lib/appearance";
 import type { AppView } from "@/types/ui";
@@ -25,6 +26,7 @@ const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; m
   { view: "day", label: "Meu Dia", icon: Home },
   { view: "agenda", label: "Agenda", icon: CalendarDays },
   { view: "clients", label: "Clientes", icon: Users },
+  { view: "focus", label: "Foco", icon: TimerReset },
   { view: "buildings", label: "Edifícios", icon: Building2 },
   { view: "condominiums", label: "Condomínios", icon: LandPlot },
   { view: "city-media", label: "Mídia da Cidade", icon: Images },
@@ -58,7 +60,7 @@ export function AppShell({
   const { profile } = useProfile();
   const { toast } = useToast();
   const mobileItems = navItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
-  const moreItems = navItems.filter((item) => ["buildings", "condominiums", "city-media", "news", "finance", "goals", "profile", "settings"].includes(item.view));
+  const moreItems = navItems.filter((item) => ["focus", "buildings", "condominiums", "city-media", "news", "finance", "goals", "profile", "settings"].includes(item.view));
 
   async function handleSignOut() {
     await signOut();
@@ -73,6 +75,7 @@ export function AppShell({
     else if (/condom[ií]nio|lote|resort/.test(term)) setView("condominiums");
     else if (/edif|im[oó]vel|empreendimento|apartamento/.test(term)) setView("buildings");
     else if (/foto|v[ií]deo|m[ií]dia|cidade|praia/.test(term)) setView("city-media");
+    else if (/foco|pomodoro|produtividade/.test(term)) setView("focus");
     else if (/agenda|compromisso|visita|reuni[aã]o|tarefa/.test(term)) setView("agenda");
     else if (/not[ií]cia|mercado|cr[eé]dito|investimento/.test(term)) setView("news");
     else if (/finance|receita|despesa|comiss[aã]o/.test(term)) setView("finance");
@@ -153,6 +156,7 @@ export function AppShell({
           {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
           {view === "agenda" && <AgendaPage />}
           {view === "clients" && <ClientsPage />}
+          {view === "focus" && <FocusPage onNavigate={setView} />}
           {view === "buildings" && <BuildingsPage />}
           {view === "condominiums" && <CondominiumsPage />}
           {view === "city-media" && <CityMediaPage />}

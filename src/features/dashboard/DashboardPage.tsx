@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { eachDayOfInterval, endOfMonth, endOfWeek, format, isBefore, isSameDay, isToday, parseISO, startOfMonth, startOfWeek, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -18,12 +18,9 @@ import {
   Home,
   ListChecks,
   MapPin,
-  Pause,
   Percent,
   PhoneCall,
   Plus,
-  Play,
-  RotateCcw,
   Moon,
   Sun,
   Target,
@@ -37,7 +34,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
@@ -79,15 +75,12 @@ export function DashboardPage({
   const { toast } = useToast();
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [tomorrowNotes, setTomorrowNotes] = useState("");
-  const [focusSeconds, setFocusSeconds] = useState(25 * 60);
-  const [focusRunning, setFocusRunning] = useState(false);
   const [performanceMonth, setPerformanceMonth] = useState(format(new Date(), "yyyy-MM"));
   const performanceDate = parseISO(`${performanceMonth}-01`);
   const { events: performanceEvents, isLoading: loadingPerformance } = useEvents({
     from: format(startOfMonth(subMonths(performanceDate, 5)), "yyyy-MM-dd"),
     to: format(endOfMonth(performanceDate), "yyyy-MM-dd")
   });
-  const focusProgress = clampPercent(((25 * 60 - focusSeconds) / (25 * 60)) * 100);
 
   const weatherQuery = useQuery({
     queryKey: ["weather", profile?.cidade],
@@ -145,22 +138,6 @@ export function DashboardPage({
       })
       .slice(0, 5);
   }, [tasks]);
-
-  useEffect(() => {
-    if (!focusRunning) return;
-    const timer = window.setInterval(() => {
-      setFocusSeconds((current) => {
-        if (current <= 1) {
-          window.clearInterval(timer);
-          setFocusRunning(false);
-          toast({ title: "Foco concluído. Hora de respirar e registrar o próximo passo." });
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [focusRunning, toast]);
 
   async function finishDay() {
     const tomorrow = format(new Date(Date.now() + 86_400_000), "yyyy-MM-dd");
@@ -248,23 +225,7 @@ export function DashboardPage({
       />
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <ProductivityFocusCard
-          visitedProperties={commercialMetrics.visitedProperties}
-          scheduledVisits={commercialMetrics.scheduledVisits}
-          dailyProgress={dailyProgress}
-          seconds={focusSeconds}
-          progress={focusProgress}
-          running={focusRunning}
-          onToggle={() => setFocusRunning((current) => !current)}
-          onReset={() => {
-            setFocusRunning(false);
-            setFocusSeconds(25 * 60);
-          }}
-          onShortBreak={() => {
-            setFocusRunning(false);
-            setFocusSeconds(5 * 60);
-          }}
-        />
+        <button type="button" onClick={() => onNavigate("focus")} className="group overflow-hidden rounded-[1.5rem] border border-primary/25 bg-[#05080d] p-5 text-left text-white shadow-[0_18px_50px_rgba(2,8,18,.18)] transition hover:-translate-y-0.5 hover:border-primary/45 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Módulo Foco</p><h2 className="mt-2 text-2xl font-semibold">Uma prioridade por vez</h2><p className="mt-2 max-w-md text-sm leading-6 text-white/58">Escolha uma tarefa, defina 15, 25, 45 ou 60 minutos e trabalhe sem misturar outras pendências.</p></div><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground"><TimerReset className="h-6 w-6" /></span></div><div className="mt-6 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4"><div><p className="text-xs text-white/42">Disponíveis para focar</p><p className="mt-1 text-xl font-semibold tabular-nums">{pendingTasks.length} tarefas</p></div><span className="rounded-xl bg-white px-4 py-2 text-xs font-semibold text-black transition group-hover:bg-primary group-hover:text-primary-foreground">Abrir Foco</span></div></button>
         <Card className="overflow-hidden border-primary/20 bg-[radial-gradient(circle_at_top_right,_hsl(var(--primary)/0.16),_transparent_36%),hsl(var(--card))]">
           <CardHeader>
             <CardTitle>Bloco de produtividade dos imóveis</CardTitle>
@@ -623,82 +584,6 @@ function CommercialCard({
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-2xl font-semibold">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
-    </div>
-  );
-}
-
-function ProductivityFocusCard({
-  visitedProperties,
-  scheduledVisits,
-  dailyProgress,
-  seconds,
-  progress,
-  running,
-  onToggle,
-  onReset,
-  onShortBreak
-}: {
-  visitedProperties: number;
-  scheduledVisits: number;
-  dailyProgress: number;
-  seconds: number;
-  progress: number;
-  running: boolean;
-  onToggle: () => void;
-  onReset: () => void;
-  onShortBreak: () => void;
-}) {
-  const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const rest = String(seconds % 60).padStart(2, "0");
-  return (
-    <Card className="overflow-hidden border-primary/25 bg-[#050403] text-white">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle>Foco total</CardTitle>
-            <CardDescription className="text-white/65">Pomodoro divertido para ligar, prospectar e fechar pendências.</CardDescription>
-          </div>
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-primary-foreground">
-            <TimerReset className="h-6 w-6" />
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.06] p-5 text-center">
-          <p className="text-xs uppercase tracking-[0.18em] text-white/45">{running ? "foco ligado" : "pronto para começar"}</p>
-          <p className="mt-2 text-5xl font-semibold tabular-nums">{minutes}:{rest}</p>
-          <Progress value={progress} className="mt-4 bg-white/10" />
-          <p className="mt-3 text-sm text-white/62">
-            {running ? "Modo avião mental: uma missão por vez." : "Escolha uma tarefa, respire e aperte iniciar."}
-          </p>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <Button type="button" onClick={onToggle}>
-            {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {running ? "Pausar" : "Iniciar"}
-          </Button>
-          <Button type="button" variant="outline" onClick={onShortBreak}>
-            5 min
-          </Button>
-          <Button type="button" variant="ghost" onClick={onReset}>
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-sm">
-          <FocusMini label="Visitados" value={visitedProperties} />
-          <FocusMini label="Agendas" value={scheduledVisits} />
-          <FocusMini label="Dia" value={`${dailyProgress}%`} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function FocusMini({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-      <p className="text-xs text-white/45">{label}</p>
-      <p className="mt-1 font-semibold">{value}</p>
     </div>
   );
 }
