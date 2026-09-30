@@ -11,8 +11,8 @@ import { useSaasAdmin, type MaterialInput, type SaasMaterial, type SaasMember, t
 
 type AdminTab = "overview" | "users" | "payments" | "plans" | "materials";
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const planFeatures = ["Agenda", "Clientes", "Foco", "Materiais", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade", "Gestão de equipe", "Suporte prioritário"];
-const essentialFeatures = ["Agenda", "Clientes", "Foco", "Materiais"];
+const planFeatures = ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade", "Gestão de equipe", "Suporte prioritário"];
+const essentialFeatures = ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos"];
 const professionalFeatures = [...essentialFeatures, "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade"];
 
 function hasPlanFeature(plan: SaasPlan, feature: string) {

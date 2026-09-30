@@ -117,6 +117,28 @@ export type Building = {
   notes?: string | null;
 };
 
+export type BrokerFileType = "image" | "pdf" | "link";
+
+export type BrokerFile = {
+  id: string;
+  user_id: string;
+  client_id: string | null;
+  title: string;
+  category: string;
+  file_type: BrokerFileType;
+  file_name: string | null;
+  storage_path: string | null;
+  external_url: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+  file_url?: string;
+  client_name?: string | null;
+  local_only?: boolean;
+};
+
 export type CondominiumStatus = "entregue" | "em obras" | "lançamento" | "a confirmar";
 export type CondominiumUnitType = "lotes" | "casas" | "apartamentos" | "misto" | "não informado";
 

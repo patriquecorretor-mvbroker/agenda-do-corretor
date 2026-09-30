@@ -15,9 +15,9 @@ const paymentsKey = "agenda-saas-payments";
 const plansKey = "agenda-saas-plans";
 
 const demoPlans: SaasPlan[] = [
-  { id: "plan-essencial", name: "Essencial", slug: "essencial", description: "Agenda, clientes e foco comercial.", monthly_price: 49.9, annual_price: 499, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais"] },
-  { id: "plan-profissional", name: "Profissional", slug: "profissional", description: "Gestão comercial e financeira completa.", monthly_price: 89.9, annual_price: 899, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade"] },
-  { id: "plan-equipe", name: "Equipe", slug: "equipe", description: "Operação para imobiliárias e times.", monthly_price: 169.9, annual_price: 1699, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade", "Gestão de equipe", "Suporte prioritário"] }
+  { id: "plan-essencial", name: "Essencial", slug: "essencial", description: "Agenda, clientes e foco comercial.", monthly_price: 49.9, annual_price: 499, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos"] },
+  { id: "plan-profissional", name: "Profissional", slug: "profissional", description: "Gestão comercial e financeira completa.", monthly_price: 89.9, annual_price: 899, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade"] },
+  { id: "plan-equipe", name: "Equipe", slug: "equipe", description: "Operação para imobiliárias e times.", monthly_price: 169.9, annual_price: 1699, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade", "Gestão de equipe", "Suporte prioritário"] }
 ];
 const demoMembers: SaasMember[] = [
   { id: "sub-1", user_id: "demo-user", name: "Patrique Lopes", email: "patrique@mvbroker.com.br", city: "Capão da Canoa", plan_id: "plan-profissional", status: "active", renewal: "2026-10-18", created_at: "2026-06-18" },

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
+import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, FileArchive, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
@@ -21,6 +21,7 @@ import { FocusPage } from "@/features/focus/FocusPage";
 import { AdminPage } from "@/features/admin/AdminPage";
 import { useSaasAdmin, useSubscriptionAccess } from "@/features/admin/use-saas-admin";
 import { MaterialsLibraryPage } from "@/features/library/MaterialsLibraryPage";
+import { MyFilesPage } from "@/features/files/MyFilesPage";
 import { useProfile } from "@/features/profile/use-profile";
 import type { PaletteId } from "@/lib/appearance";
 import type { AppView } from "@/types/ui";
@@ -35,9 +36,11 @@ const navSections: Array<{ id: string; label: string; plan: string; items: NavIt
     { view: "finance", label: "Financeiro", icon: WalletCards }, { view: "goals", label: "Metas", icon: Target },
     { view: "buildings", label: "Edifícios", icon: Building2 }, { view: "condominiums", label: "Condomínios", icon: LandPlot }
   ] },
-  { id: "content", label: "Conteúdo", plan: "Profissional", items: [
-    { view: "news", label: "Mercado", icon: Newspaper }, { view: "city-media", label: "Mídia da Cidade", icon: Images },
-    { view: "library", label: "Materiais", icon: Library }
+  { id: "files", label: "Arquivos", plan: "Essencial", items: [
+    { view: "library", label: "Materiais", icon: Library }, { view: "files", label: "Meus Arquivos", icon: FileArchive }
+  ] },
+  { id: "content", label: "Mercado", plan: "Profissional", items: [
+    { view: "news", label: "Notícias", icon: Newspaper }, { view: "city-media", label: "Mídia da Cidade", icon: Images }
   ] },
   { id: "account", label: "Conta", plan: "Todos", items: [
     { view: "profile", label: "Perfil", icon: User }, { view: "settings", label: "Configurações", icon: Settings }
@@ -89,7 +92,8 @@ export function AppShell({
     else if (/foco|pomodoro|produtividade/.test(term)) setView("focus");
     else if (/agenda|compromisso|visita|reuni[aã]o|tarefa/.test(term)) setView("agenda");
     else if (/not[ií]cia|mercado|cr[eé]dito|investimento/.test(term)) setView("news");
-    else if (/material|campanha|arquivo|biblioteca/.test(term)) setView("library");
+    else if (/documento|pdf|pasta|arquivo/.test(term)) setView("files");
+    else if (/material|campanha|biblioteca/.test(term)) setView("library");
     else if (saasAdmin.isAdmin && /admin|assinante|plano|pagamento|saas/.test(term)) setView("admin");
     else if (/finance|receita|despesa|comiss[aã]o/.test(term)) setView("finance");
     else if (/meta|objetivo/.test(term)) setView("goals");
@@ -162,6 +166,7 @@ export function AppShell({
           {view === "city-media" && <CityMediaPage />}
           {view === "news" && <MarketNewsPage />}
           {view === "library" && <MaterialsLibraryPage />}
+          {view === "files" && <MyFilesPage />}
           {view === "finance" && <FinancePage />}
           {view === "goals" && <GoalsPage />}
           {view === "profile" && (
