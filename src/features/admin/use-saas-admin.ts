@@ -15,9 +15,9 @@ const paymentsKey = "agenda-saas-payments";
 const plansKey = "agenda-saas-plans";
 
 const demoPlans: SaasPlan[] = [
-  { id: "plan-essencial", name: "Essencial", slug: "essencial", description: "Agenda, clientes e foco comercial.", monthly_price: 49.9, annual_price: 499, active: true, features: ["Agenda completa", "CRM de clientes", "Foco", "Materiais"] },
-  { id: "plan-profissional", name: "Profissional", slug: "profissional", description: "Gestão comercial e financeira completa.", monthly_price: 89.9, annual_price: 899, active: true, features: ["Tudo do Essencial", "Financeiro", "Relatórios", "Catálogo"] },
-  { id: "plan-equipe", name: "Equipe", slug: "equipe", description: "Operação para imobiliárias e times.", monthly_price: 169.9, annual_price: 1699, active: true, features: ["Tudo do Profissional", "Equipe", "Conteúdo central", "Suporte"] }
+  { id: "plan-essencial", name: "Essencial", slug: "essencial", description: "Agenda, clientes e foco comercial.", monthly_price: 49.9, annual_price: 499, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais"] },
+  { id: "plan-profissional", name: "Profissional", slug: "profissional", description: "Gestão comercial e financeira completa.", monthly_price: 89.9, annual_price: 899, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade"] },
+  { id: "plan-equipe", name: "Equipe", slug: "equipe", description: "Operação para imobiliárias e times.", monthly_price: 169.9, annual_price: 1699, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade", "Gestão de equipe", "Suporte prioritário"] }
 ];
 const demoMembers: SaasMember[] = [
   { id: "sub-1", user_id: "demo-user", name: "Patrique Lopes", email: "patrique@mvbroker.com.br", city: "Capão da Canoa", plan_id: "plan-profissional", status: "active", renewal: "2026-10-18", created_at: "2026-06-18" },
@@ -70,9 +70,9 @@ export function useSaasAdmin() {
     if (!hasSupabaseConfig) { const next = readLocal(materialsKey, demoMaterials).map((item) => item.id === id ? { ...item, published } : item); writeLocal(materialsKey, next); return; }
     const { error } = await (requireSupabase() as any).from("admin_materials").update({ published, published_at: published ? new Date().toISOString() : null }).eq("id", id); if (error) throw error;
   }, onSuccess: invalidate });
-  const updateMember = useMutation({ mutationFn: async ({ id, status }: { id: string; status: SaasMember["status"] }) => {
-    if (!hasSupabaseConfig) { const next = readLocal(membersKey, demoMembers).map((item) => item.id === id ? { ...item, status } : item); writeLocal(membersKey, next); return; }
-    const { error } = await (requireSupabase() as any).from("subscriptions").update({ status }).eq("id", id); if (error) throw error;
+  const updateMember = useMutation({ mutationFn: async ({ id, input }: { id: string; input: Partial<Pick<SaasMember, "status" | "plan_id">> }) => {
+    if (!hasSupabaseConfig) { const next = readLocal(membersKey, demoMembers).map((item) => item.id === id ? { ...item, ...input } : item); writeLocal(membersKey, next); return; }
+    const { error } = await (requireSupabase() as any).from("subscriptions").update(input).eq("id", id); if (error) throw error;
   }, onSuccess: invalidate });
   const updatePlan = useMutation({ mutationFn: async ({ id, input }: { id: string; input: Partial<SaasPlan> }) => {
     if (!hasSupabaseConfig) { const next = readLocal(plansKey, demoPlans).map((item) => item.id === id ? { ...item, ...input } : item); writeLocal(plansKey, next); return; }
@@ -97,9 +97,11 @@ export function usePublishedMaterials() {
 export function useSubscriptionAccess() {
   const { user, isDemo } = useAuth();
   return useQuery({ queryKey: ["subscription-access", user?.id], enabled: Boolean(user), queryFn: async () => {
-    if (!hasSupabaseConfig) return { status: isDemo ? "active" as const : null, currentPeriodEnd: null as string | null };
-    const { data, error } = await (requireSupabase() as any).from("subscriptions").select("status,current_period_end").eq("user_id", user!.id).maybeSingle();
+    if (!hasSupabaseConfig) return { status: isDemo ? "active" as const : null, currentPeriodEnd: null as string | null, planId: isDemo ? "plan-profissional" : null, planName: isDemo ? "Profissional" : null, features: isDemo ? demoPlans[1].features : [] };
+    const db = requireSupabase() as any;
+    const { data, error } = await db.from("subscriptions").select("status,current_period_end,plan_id").eq("user_id", user!.id).maybeSingle();
     if (error) throw error;
-    return { status: data?.status as SaasMember["status"] | null, currentPeriodEnd: data?.current_period_end as string | null };
+    const plan = data?.plan_id ? await db.from("subscription_plans").select("name,features").eq("id", data.plan_id).maybeSingle() : { data: null };
+    return { status: data?.status as SaasMember["status"] | null, currentPeriodEnd: data?.current_period_end as string | null, planId: data?.plan_id as string | null, planName: plan.data?.name as string | null, features: (plan.data?.features ?? []) as string[] };
   }});
 }

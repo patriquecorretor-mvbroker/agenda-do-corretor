@@ -19,28 +19,31 @@ import { ProfilePage } from "@/features/profile/ProfilePage";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { FocusPage } from "@/features/focus/FocusPage";
 import { AdminPage } from "@/features/admin/AdminPage";
-import { useSaasAdmin } from "@/features/admin/use-saas-admin";
+import { useSaasAdmin, useSubscriptionAccess } from "@/features/admin/use-saas-admin";
 import { MaterialsLibraryPage } from "@/features/library/MaterialsLibraryPage";
 import { useProfile } from "@/features/profile/use-profile";
 import type { PaletteId } from "@/lib/appearance";
 import type { AppView } from "@/types/ui";
 
-const navItems: Array<{ view: AppView; label: string; icon: React.ElementType; mobile?: boolean }> = [
-  { view: "day", label: "Meu Dia", icon: Home },
-  { view: "agenda", label: "Agenda", icon: CalendarDays },
-  { view: "clients", label: "Clientes", icon: Users },
-  { view: "focus", label: "Foco", icon: TimerReset },
-  { view: "buildings", label: "Edifícios", icon: Building2 },
-  { view: "condominiums", label: "Condomínios", icon: LandPlot },
-  { view: "city-media", label: "Mídia da Cidade", icon: Images },
-  { view: "news", label: "Mercado", icon: Newspaper },
-  { view: "library", label: "Materiais", icon: Library },
-  { view: "finance", label: "Financeiro", icon: WalletCards },
-  { view: "goals", label: "Metas", icon: Target },
-  { view: "profile", label: "Perfil", icon: User, mobile: false },
-  { view: "settings", label: "Configurações", icon: Settings },
-  { view: "admin", label: "Super Admin", icon: ShieldCheck }
+type NavItem = { view: AppView; label: string; icon: React.ElementType };
+const navSections: Array<{ id: string; label: string; plan: string; items: NavItem[] }> = [
+  { id: "routine", label: "Rotina", plan: "Essencial", items: [
+    { view: "day", label: "Meu Dia", icon: Home }, { view: "agenda", label: "Agenda", icon: CalendarDays },
+    { view: "clients", label: "Clientes", icon: Users }, { view: "focus", label: "Foco", icon: TimerReset }
+  ] },
+  { id: "business", label: "Negócio", plan: "Profissional", items: [
+    { view: "finance", label: "Financeiro", icon: WalletCards }, { view: "goals", label: "Metas", icon: Target },
+    { view: "buildings", label: "Edifícios", icon: Building2 }, { view: "condominiums", label: "Condomínios", icon: LandPlot }
+  ] },
+  { id: "content", label: "Conteúdo", plan: "Profissional", items: [
+    { view: "news", label: "Mercado", icon: Newspaper }, { view: "city-media", label: "Mídia da Cidade", icon: Images },
+    { view: "library", label: "Materiais", icon: Library }
+  ] },
+  { id: "account", label: "Conta", plan: "Todos", items: [
+    { view: "profile", label: "Perfil", icon: User }, { view: "settings", label: "Configurações", icon: Settings }
+  ] }
 ];
+const navItems = navSections.flatMap((section) => section.items);
 
 export function AppShell({
   dark,
@@ -64,10 +67,11 @@ export function AppShell({
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const saasAdmin = useSaasAdmin();
+  const subscription = useSubscriptionAccess();
   const { toast } = useToast();
-  const visibleNavItems = navItems.filter((item) => item.view !== "admin" || saasAdmin.isAdmin);
-  const mobileItems = visibleNavItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
-  const moreItems = visibleNavItems.filter((item) => ["focus", "buildings", "condominiums", "city-media", "news", "library", "finance", "goals", "profile", "settings", "admin"].includes(item.view));
+  const mobileItems = navItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
+  const moreSections = navSections.map((section) => ({ ...section, items: section.items.filter((item) => !["day", "agenda", "clients"].includes(item.view)) })).filter((section) => section.items.length);
+  const moreViews = moreSections.flatMap((section) => section.items.map((item) => item.view)).concat(saasAdmin.isAdmin ? ["admin" as AppView] : []);
 
   async function handleSignOut() {
     await signOut();
@@ -98,10 +102,10 @@ export function AppShell({
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-background transition-colors duration-300">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] overflow-hidden border-r border-white/10 bg-[hsl(var(--sidebar))] p-4 text-white transition-colors duration-300 lg:flex lg:flex-col">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[272px] overflow-hidden border-r border-white/10 bg-[hsl(var(--sidebar))] p-4 text-white transition-colors duration-300 lg:flex lg:flex-col">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] bg-[linear-gradient(180deg,transparent,rgba(3,8,16,.2)),url('/brand/capao-sunset.png')] bg-cover bg-[66%_center] opacity-20" />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,hsl(var(--sidebar))_96%)]" />
-        <div className="relative mb-7 flex items-center gap-3 px-1 pt-1">
+        <div className="relative mb-5 flex items-center gap-3 px-1 pt-1">
           <img
             src="/brand/mv-broker-logo.jpg"
             alt="MV Broker"
@@ -112,28 +116,15 @@ export function AppShell({
             <p className="text-xs text-white/45">Agenda do Corretor</p>
           </div>
         </div>
-        <nav className="relative grid gap-1.5">
-          {visibleNavItems.map((item) => (
-            <button
-              key={item.view}
-              type="button"
-              onClick={() => setView(item.view)}
-              className={cn(
-                "relative flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-medium text-white/62 transition hover:bg-white/[0.055] hover:text-white",
-                view === item.view && "border border-primary/40 bg-[linear-gradient(90deg,hsl(var(--primary)/0.22),rgba(255,255,255,.045))] text-white shadow-[0_0_28px_hsl(var(--primary)/0.16),inset_3px_0_0_hsl(var(--primary))]"
-              )}
-            >
-              <item.icon className={cn("h-[18px] w-[18px]", view === item.view && "text-primary")} />
-              {item.label}
-            </button>
-          ))}
+        <nav className="relative min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 [scrollbar-width:none]">
+          {navSections.map((section) => <div key={section.id}>
+            <div className="mb-1.5 flex items-center justify-between px-3"><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/32">{section.label}</p><span className="text-[9px] text-white/22">{section.plan}</span></div>
+            <div className="grid gap-1">{section.items.map((item) => <SideNavButton key={item.view} item={item} active={view === item.view} onClick={() => setView(item.view)} />)}</div>
+          </div>)}
+          {saasAdmin.isAdmin && <div className="border-t border-white/10 pt-4"><p className="mb-1.5 px-3 text-[9px] font-bold uppercase tracking-[0.16em] text-primary/70">Administração</p><SideNavButton item={{ view: "admin", label: "Super Admin", icon: ShieldCheck }} active={view === "admin"} onClick={() => setView("admin")} admin /></div>}
         </nav>
-        <div className="relative mt-auto grid gap-3">
-          <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-black/45 p-4 shadow-[0_16px_44px_rgba(0,0,0,.24)] backdrop-blur-sm">
-            <div className="absolute inset-0 bg-[url('/brand/capao-sunset.png')] bg-cover bg-center opacity-25" />
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(4,9,16,.45),rgba(4,9,16,.95))]" />
-            <div className="relative"><p className="text-[0.68rem] font-semibold uppercase text-primary">Disciplina gera liberdade</p><span className="mt-3 block h-0.5 w-7 bg-primary" /><p className="mt-3 text-xs leading-5 text-white/65">Grandes resultados são construídos com pequenas ações diárias.</p></div>
-          </div>
+        <div className="relative mt-4 grid gap-2 border-t border-white/10 pt-3">
+          <div className="flex items-center justify-between rounded-xl bg-white/[0.045] px-3 py-2"><div><p className="text-[9px] uppercase tracking-[0.12em] text-white/35">Plano atual</p><p className="text-xs font-semibold text-white/80">{subscription.data?.planName ?? "Sem plano"}</p></div><span className="h-2 w-2 rounded-full bg-emerald-400" /></div>
           <Button variant="outline" onClick={() => onDarkChange(!dark)}>
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {dark ? "Modo claro" : "Modo escuro"}
@@ -145,7 +136,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className={cn("min-h-screen w-full min-w-0 overflow-x-hidden px-3 pb-28 pt-3 sm:px-5 sm:pt-5 lg:ml-[248px] lg:w-auto lg:px-5 lg:pb-8 lg:pt-0 xl:px-7 2xl:px-8", view === "focus" && "bg-[#05070a]")}>
+      <main className={cn("min-h-screen w-full min-w-0 overflow-x-hidden px-3 pb-28 pt-3 sm:px-5 sm:pt-5 lg:ml-[272px] lg:w-auto lg:px-5 lg:pb-8 lg:pt-0 xl:px-7 2xl:px-8", view === "focus" && "bg-[#05070a]")}>
         <header className={cn("sticky top-0 z-20 -mx-5 hidden h-[76px] items-center justify-between border-b bg-background/86 px-5 backdrop-blur-xl lg:flex xl:-mx-7 xl:px-7 2xl:-mx-8 2xl:px-8", view === "focus" && "border-white/10 bg-[#05070a]/90 text-white")}>
           <form onSubmit={handleGlobalSearch} className="relative w-full max-w-[560px]">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -213,7 +204,7 @@ export function AppShell({
           {mobileItems.slice(2).map((item) => (
             <MobileNavItem key={item.view} active={view === item.view} icon={item.icon} label={item.label} onClick={() => setView(item.view)} />
           ))}
-          <MobileNavItem active={moreItems.some((item) => item.view === view)} icon={LayoutGrid} label="Mais" onClick={() => setMoreOpen(true)} />
+          <MobileNavItem active={moreViews.includes(view)} icon={LayoutGrid} label="Mais" onClick={() => setMoreOpen(true)} />
         </div>
       </nav>
 
@@ -221,15 +212,15 @@ export function AppShell({
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Mais áreas</DialogTitle><DialogDescription>Acesse os demais módulos e configurações.</DialogDescription></DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            {moreItems.map((item) => <button key={item.view} type="button" onClick={() => { setView(item.view); setMoreOpen(false); }} className={cn("flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-4 text-left transition hover:border-primary/45 hover:bg-primary/5", view === item.view && "border-primary bg-primary/10")}>
-              <item.icon className="h-6 w-6 text-primary" /><span className="font-semibold">{item.label}</span>
-            </button>)}
-          </div>
+          <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">{moreSections.map((section) => <section key={section.id}><div className="mb-2 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{section.label}</p><span className="text-[10px] text-muted-foreground">{section.plan}</span></div><div className="grid grid-cols-2 gap-2">{section.items.map((item) => <button key={item.view} type="button" onClick={() => { setView(item.view); setMoreOpen(false); }} className={cn("flex min-h-14 items-center gap-3 rounded-xl border bg-card px-3 text-left transition hover:border-primary/45", view === item.view && "border-primary bg-primary/10")}><item.icon className="h-5 w-5 shrink-0 text-primary" /><span className="text-sm font-semibold">{item.label}</span></button>)}</div></section>)}{saasAdmin.isAdmin && <section className="border-t pt-4"><button type="button" onClick={() => { setView("admin"); setMoreOpen(false); }} className={cn("flex min-h-16 w-full items-center gap-3 rounded-xl border border-primary/25 bg-foreground px-4 text-left text-background", view === "admin" && "ring-2 ring-primary")}><ShieldCheck className="h-5 w-5 text-primary" /><span><span className="block text-sm font-semibold">Super Admin</span><span className="block text-[10px] opacity-60">Assinantes, planos, cobrança e conteúdo</span></span></button></section>}</div>
         </DialogContent>
       </Dialog>
     </div>
   );
+}
+
+function SideNavButton({ item, active, onClick, admin = false }: { item: NavItem; active: boolean; onClick: () => void; admin?: boolean }) {
+  return <button type="button" onClick={onClick} className={cn("relative flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-white/58 transition hover:bg-white/[0.055] hover:text-white", active && "border border-primary/35 bg-[linear-gradient(90deg,hsl(var(--primary)/0.2),rgba(255,255,255,.04))] text-white shadow-[inset_3px_0_0_hsl(var(--primary))]", admin && !active && "bg-white/[0.035] text-white/75")}><item.icon className={cn("h-[17px] w-[17px]", active || admin ? "text-primary" : "")} />{item.label}{admin && <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[8px] font-bold uppercase text-primary">SaaS</span>}</button>;
 }
 
 function MobileNavItem({
