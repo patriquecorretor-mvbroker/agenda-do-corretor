@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   Clock3,
+  FilePlus2,
   Flame,
   ListChecks,
   MessageCircle,
@@ -18,11 +19,16 @@ import {
   UsersRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ClientAvatar } from "@/features/clients/ClientAvatar";
+import { useCreateClientActivity } from "@/features/clients/use-client-activities";
 import { useClients } from "@/features/clients/use-clients";
 import { useTasks } from "@/features/tasks/use-tasks";
 import { cn } from "@/lib/utils";
-import type { Client, ClientStatus, Task } from "@/types/database";
+import type { Client, ClientActivityType, ClientStatus, Task } from "@/types/database";
 import type { AppView } from "@/types/ui";
 import { useToast } from "@/components/ui/toast";
 
@@ -40,6 +46,15 @@ type FocusSession = {
   endsAt: number | null;
   completedSessions: number;
   history: FocusHistoryItem[];
+};
+type FocusResultInput = { result: string; notes: string; nextFollowUp: string };
+
+const focusResults: Record<Exclude<FocusMode, "custom">, string[]> = {
+  calls: ["Ligação atendida", "Não atendeu", "Pediu retorno", "Número inválido"],
+  messages: ["Mensagem enviada", "Cliente respondeu", "Sem resposta", "Pediu retorno"],
+  followups: ["Follow-up realizado", "Retorno reagendado", "Cliente sem interesse", "Contato não realizado"],
+  proposals: ["Proposta enviada", "Em negociação", "Aguardando decisão", "Proposta recusada"],
+  visits: ["Visita agendada", "Visita realizada", "Visita reagendada", "Visita cancelada"]
 };
 
 const focusModes: Array<{
@@ -72,8 +87,10 @@ const initialSession: FocusSession = {
 export function FocusPage({ onNavigate }: { onNavigate: (view: AppView) => void }) {
   const { tasks, updateTask } = useTasks();
   const { clients, updateClient } = useClients();
+  const createActivity = useCreateClientActivity();
   const { toast } = useToast();
   const [session, setSession] = useState<FocusSession>(readSession);
+  const [launchClient, setLaunchClient] = useState<Client | null>(null);
   const pendingTasks = useMemo(() => tasks.filter((task) => task.status === "pendente").sort((a, b) => {
     if (a.priority !== b.priority) return a.priority === "alta" ? -1 : b.priority === "alta" ? 1 : 0;
     return `${a.due_date ?? "9999"} ${a.due_time ?? "99:99"}`.localeCompare(`${b.due_date ?? "9999"} ${b.due_time ?? "99:99"}`);
@@ -134,6 +151,26 @@ export function FocusPage({ onNavigate }: { onNavigate: (view: AppView) => void 
     toast({ title: `${client.name} movido para proposta.` });
   }
 
+  async function registerResult(input: FocusResultInput) {
+    if (!launchClient) return;
+    const status = resultStatus(session.mode, input.result);
+    await createActivity.mutateAsync({
+      client_id: launchClient.id,
+      type: activityType(session.mode),
+      title: input.result,
+      details: input.notes || null
+    });
+    if (status || input.nextFollowUp) {
+      await updateClient.mutateAsync({
+        id: launchClient.id,
+        input: { ...(status ? { status } : {}), ...(input.nextFollowUp ? { next_follow_up: input.nextFollowUp } : {}) },
+        previousStatus: launchClient.status
+      });
+    }
+    toast({ title: `Resultado registrado para ${launchClient.name}.` });
+    setLaunchClient(null);
+  }
+
   const canStart = session.mode !== "custom" || Boolean(selectedTask);
 
   return <div className="-mx-3 -my-3 min-h-[calc(100vh-5.5rem)] overflow-hidden bg-[#05070a] px-3 pb-28 pt-4 text-white sm:-mx-5 sm:-my-5 sm:px-5 sm:pt-5 lg:-mx-5 lg:-my-6 lg:min-h-[calc(100vh-4.75rem)] lg:px-5 lg:pb-8 lg:pt-6 xl:-mx-7 xl:px-7 2xl:-mx-8 2xl:px-8">
@@ -170,15 +207,16 @@ export function FocusPage({ onNavigate }: { onNavigate: (view: AppView) => void 
 
       {session.mode === "custom" ? <CustomTaskPanel selectedTask={selectedTask} pendingCount={pendingTasks.length} running={session.running} onComplete={() => void completeTask()} /> : <section className="rounded-[1.5rem] border border-white/[0.07] bg-[#090c11] p-4 sm:p-5">
         <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Fila da atividade</p><h2 className="mt-1 text-lg font-semibold">Clientes para {selectedMode.shortLabel.toLocaleLowerCase("pt-BR")}</h2><p className="mt-1 text-xs text-white/38">Mais urgentes e mais quentes aparecem primeiro.</p></div><span className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/55">{relevantClients.length}</span></div>
-        {relevantClients.length ? <div className="mt-4 grid gap-2 xl:grid-cols-2">{relevantClients.slice(0, 12).map((client, index) => <FocusClientRow key={client.id} client={client} rank={index + 1} mode={session.mode} onOpenClients={() => onNavigate("clients")} onProposal={() => void markProposal(client)} />)}</div> : <div className="mt-4 rounded-2xl border border-dashed border-white/10 px-5 py-10 text-center"><UsersRound className="mx-auto h-6 w-6 text-white/25" /><p className="mt-3 text-sm font-semibold">Nenhum cliente nesta fila</p><p className="mt-1 text-xs text-white/35">Atualize a etapa dos clientes para montar esta sequência.</p><Button type="button" variant="outline" className="mt-4 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white" onClick={() => onNavigate("clients")}>Abrir clientes</Button></div>}
+        {relevantClients.length ? <div className="mt-4 grid gap-2 xl:grid-cols-2">{relevantClients.slice(0, 12).map((client, index) => <FocusClientRow key={client.id} client={client} rank={index + 1} mode={session.mode} onOpenClients={() => onNavigate("clients")} onProposal={() => void markProposal(client)} onLaunch={() => setLaunchClient(client)} />)}</div> : <div className="mt-4 rounded-2xl border border-dashed border-white/10 px-5 py-10 text-center"><UsersRound className="mx-auto h-6 w-6 text-white/25" /><p className="mt-3 text-sm font-semibold">Nenhum cliente nesta fila</p><p className="mt-1 text-xs text-white/35">Atualize a etapa dos clientes para montar esta sequência.</p><Button type="button" variant="outline" className="mt-4 border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.08] hover:text-white" onClick={() => onNavigate("clients")}>Abrir clientes</Button></div>}
       </section>}
 
       <section className="grid grid-cols-2 gap-2 sm:grid-cols-4"><FocusMetric icon={Flame} label="Minutos hoje" value={todayMinutes} /><FocusMetric icon={Target} label="Ciclos hoje" value={todayHistory.length} /><FocusMetric icon={CheckCircle2} label="Ciclos totais" value={session.completedSessions} /><FocusMetric icon={Clock3} label="Duração atual" value={session.durationMinutes} suffix="min" /></section>
     </div>
+    <FocusResultDialog client={launchClient} mode={session.mode} open={Boolean(launchClient)} pending={createActivity.isPending || updateClient.isPending} onOpenChange={(open) => !open && setLaunchClient(null)} onSubmit={registerResult} />
   </div>;
 }
 
-function FocusClientRow({ client, rank, mode, onOpenClients, onProposal }: { client: Client; rank: number; mode: FocusMode; onOpenClients: () => void; onProposal: () => void }) {
+function FocusClientRow({ client, rank, mode, onOpenClients, onProposal, onLaunch }: { client: Client; rank: number; mode: FocusMode; onOpenClients: () => void; onProposal: () => void; onLaunch: () => void }) {
   const phone = client.phone || client.whatsapp;
   const digits = client.whatsapp?.replace(/\D/g, "");
   const firstName = client.name.split(" ")[0];
@@ -193,8 +231,21 @@ function FocusClientRow({ client, rank, mode, onOpenClients, onProposal }: { cli
       {phone ? <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] text-white/58 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white" aria-label={`Ligar para ${client.name}`}><Phone className="h-4 w-4" /></a> : null}
       {digits ? <a href={`https://wa.me/${digits}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] text-emerald-400 transition hover:border-emerald-400/30 hover:bg-emerald-400/10" aria-label={`Enviar WhatsApp para ${client.name}`}><MessageCircle className="h-4 w-4" /></a> : null}
       {mode === "proposals" && client.status !== "proposta" ? <button type="button" onClick={onProposal} className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] text-primary transition hover:border-primary/30 hover:bg-primary/10" aria-label={`Mover ${client.name} para proposta`}><Send className="h-4 w-4" /></button> : null}
+      <button type="button" onClick={onLaunch} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-primary/25 bg-primary/10 px-3 text-[11px] font-semibold text-primary transition hover:bg-primary/20" aria-label={`Lançar resultado para ${client.name}`}><FilePlus2 className="h-4 w-4" /><span className="hidden sm:inline">Lançar</span></button>
     </div>
   </article>;
+}
+
+function FocusResultDialog({ client, mode, open, pending, onOpenChange, onSubmit }: { client: Client | null; mode: FocusMode; open: boolean; pending: boolean; onOpenChange: (open: boolean) => void; onSubmit: (input: FocusResultInput) => Promise<void> }) {
+  const options = mode === "custom" ? [] : focusResults[mode];
+  const [result, setResult] = useState("");
+  useEffect(() => { setResult(options[0] ?? ""); }, [client?.id, mode]);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await onSubmit({ result, notes: String(form.get("notes") ?? "").trim(), nextFollowUp: String(form.get("nextFollowUp") ?? "") });
+  }
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="border-white/10 bg-[#0b0e13] text-white sm:max-w-lg"><DialogHeader><DialogTitle>Lançar resultado</DialogTitle><DialogDescription className="text-white/45">Registre o que aconteceu com {client?.name}. Isso entra no histórico do cliente.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-5"><div><Label className="text-white/60">Resultado da atividade</Label><div className="mt-2 grid grid-cols-2 gap-2">{options.map((option) => <button key={option} type="button" onClick={() => setResult(option)} className={cn("min-h-12 rounded-xl border px-3 text-left text-xs font-semibold transition", result === option ? "border-primary/60 bg-primary/15 text-primary" : "border-white/10 bg-white/[0.025] text-white/55 hover:border-white/20 hover:text-white")}>{result === option && <Check className="mr-1.5 inline h-3.5 w-3.5" />}{option}</button>)}</div></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="focus-next-follow-up" className="text-white/60">Próximo follow-up</Label><Input id="focus-next-follow-up" name="nextFollowUp" type="date" className="mt-2 border-white/10 bg-white/[0.035] text-white [color-scheme:dark]" /></div><div><Label htmlFor="focus-notes" className="text-white/60">Observação</Label><Textarea id="focus-notes" name="notes" className="mt-2 min-h-12 border-white/10 bg-white/[0.035] text-white placeholder:text-white/25" placeholder="Resumo rápido do contato" /></div></div><Button type="submit" className="h-12 w-full" disabled={!result || pending}><FilePlus2 className="h-4 w-4" />{pending ? "Salvando..." : "Salvar lançamento"}</Button></form></DialogContent></Dialog>;
 }
 
 function CustomTaskPanel({ selectedTask, pendingCount, running, onComplete }: { selectedTask: Task | undefined; pendingCount: number; running: boolean; onComplete: () => void }) {
@@ -232,6 +283,22 @@ function followUpLabel(value: string | null) {
   if (days === 0) return { label: "Retorno hoje", urgent: true };
   if (days === 1) return { label: "Retorno amanhã", urgent: false };
   return { label: `Retorno em ${days}d`, urgent: false };
+}
+
+function activityType(mode: FocusMode): ClientActivityType {
+  if (mode === "calls") return "ligação";
+  if (mode === "messages") return "mensagem";
+  if (mode === "proposals") return "proposta";
+  if (mode === "visits") return "visita";
+  return "follow-up";
+}
+
+function resultStatus(mode: FocusMode, result: string): ClientStatus | undefined {
+  if (mode === "proposals" && result === "Proposta enviada") return "proposta";
+  if (mode === "proposals" && result === "Em negociação") return "negociação";
+  if (mode === "visits" && result === "Visita agendada") return "visita agendada";
+  if ((mode === "calls" && result === "Ligação atendida") || (mode === "messages" && result === "Cliente respondeu")) return "em contato";
+  return undefined;
 }
 
 function readSession(): FocusSession {

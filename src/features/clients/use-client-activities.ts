@@ -74,3 +74,16 @@ export function useClientActivities(client?: Client) {
 
   return { activities: query.data ?? [], isLoading: query.isLoading, error: query.error, createActivity: create };
 }
+
+export function useCreateClientActivity() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ActivityInput) => hasSupabaseConfig
+      ? createClientActivity(user!.id, input)
+      : Promise.resolve(appendLocalClientActivity(user!.id, input)),
+    onSuccess: (_activity, input) => {
+      queryClient.invalidateQueries({ queryKey: ["client-activities", user?.id, input.client_id] });
+    }
+  });
+}
