@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Building } from "@/types/database";
 
-const amenityOptions = ["Academia", "Acessibilidade", "Água quente", "Bicicletário", "Brinquedoteca", "Churrasqueira", "Coworking", "Espaço gourmet", "Gás central", "Hall decorado", "Pet place", "Piscina", "Piscina aquecida", "Playground", "Portaria 24h", "Portaria eletrônica", "Sala de cinema", "Sala de jogos", "Salão de festas", "Sauna", "Varanda", "Zeladoria"];
+const amenityOptions = ["Academia", "Acessibilidade", "Água quente", "Áreas sociais mobiliadas", "Bicicletário", "Brinquedoteca", "Churrasqueira", "Coworking", "Espaço gourmet", "Espaço kids", "Gás central", "Gerador", "Hall decorado", "Jacuzzi", "Jardim", "Pet place", "Piscina", "Piscina aquecida", "Playground", "Portaria 24h", "Portaria eletrônica", "Rooftop", "Sala de cinema", "Sala de jogos", "Salão de festas", "Sauna", "Varanda", "Vista para o mar", "Zeladoria"];
 
 export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { open: boolean; building: Building; onOpenChange: (open: boolean) => void; onSave: (building: Building) => Promise<void> }) {
   const [draft, setDraft] = useState(building);
