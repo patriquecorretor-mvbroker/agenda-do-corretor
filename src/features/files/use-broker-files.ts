@@ -7,8 +7,8 @@ const bucket = "broker-files";
 const databaseName = "agenda-corretor-files";
 const storeName = "files";
 
-type UploadInput = { file: File; title?: string; category: string; clientId?: string | null; clientName?: string | null; tags?: string[] };
-type LinkInput = { title: string; url: string; category: string; clientId?: string | null; clientName?: string | null; tags?: string[] };
+type UploadInput = { file: File; title?: string; category: string; folder: string; clientId?: string | null; clientName?: string | null; tags?: string[] };
+type LinkInput = { title: string; url: string; category: string; folder: string; clientId?: string | null; clientName?: string | null; tags?: string[] };
 type LocalRecord = { id: string; asset: BrokerFile; blob?: Blob };
 
 export function useBrokerFiles(clientId?: string | null) {
@@ -40,8 +40,13 @@ export function useBrokerFiles(clientId?: string | null) {
     else await localRemove(asset.id);
   }, onSuccess: refresh });
 
+  const updateMeta = useMutation({ mutationFn: async ({ asset, changes }: { asset: BrokerFile; changes: Partial<Pick<BrokerFile, "folder" | "is_favorite">> }) => {
+    if (hasSupabaseConfig && user && !asset.local_only) return remoteUpdateMeta(userId, asset.id, changes);
+    return localUpdateMeta(asset.id, changes);
+  }, onSuccess: refresh });
+
   const all = query.data ?? [];
-  return { files: clientId ? all.filter((file) => file.client_id === clientId) : all, allFiles: all, isLoading: query.isLoading, error: query.error, upload, addLink, remove };
+  return { files: clientId ? all.filter((file) => file.client_id === clientId) : all, allFiles: all, isLoading: query.isLoading, error: query.error, upload, addLink, remove, updateMeta };
 }
 
 async function listFiles(userId: string) {
@@ -58,7 +63,7 @@ async function remoteList(userId: string): Promise<BrokerFile[]> {
   const { data, error } = await client.from("broker_files").select("*,clients(name)").eq("user_id", userId).order("created_at", { ascending: false });
   if (error) throw error;
   return Promise.all((data ?? []).map(async (row: any) => {
-    const asset = { ...row, client_name: row.clients?.name ?? null } as BrokerFile;
+    const asset = { folder: "Geral", is_favorite: false, ...row, client_name: row.clients?.name ?? null } as BrokerFile;
     delete (asset as any).clients;
     if (!asset.storage_path) return asset;
     const { data: signed } = await client.storage.from(bucket).createSignedUrl(asset.storage_path, 3600);
@@ -96,9 +101,16 @@ async function remoteRemove(userId: string, asset: BrokerFile) {
   if (error) throw error;
 }
 
+async function remoteUpdateMeta(userId: string, id: string, changes: Partial<Pick<BrokerFile, "folder" | "is_favorite">>) {
+  const client = requireSupabase() as any;
+  const { data, error } = await client.from("broker_files").update(changes).eq("id", id).eq("user_id", userId).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
 async function localList(): Promise<BrokerFile[]> {
   const records = await allLocal();
-  return records.sort((a, b) => b.asset.created_at.localeCompare(a.asset.created_at)).map((record) => ({ ...record.asset, file_url: record.blob ? URL.createObjectURL(record.blob) : undefined, local_only: true }));
+  return records.sort((a, b) => b.asset.created_at.localeCompare(a.asset.created_at)).map((record) => ({ ...record.asset, folder: record.asset.folder ?? "Geral", is_favorite: record.asset.is_favorite ?? false, file_url: record.blob ? URL.createObjectURL(record.blob) : undefined, local_only: true }));
 }
 
 async function localUpload(userId: string, input: UploadInput) {
@@ -116,16 +128,17 @@ async function localAddLink(userId: string, input: LinkInput) {
 }
 
 async function localRemove(id: string) { const database = await openDatabase(); await transactionPromise(database, "readwrite", (store) => store.delete(id)); }
+async function localUpdateMeta(id: string, changes: Partial<Pick<BrokerFile, "folder" | "is_favorite">>) { const database = await openDatabase(); const record = await requestPromise<LocalRecord | undefined>(database.transaction(storeName).objectStore(storeName).get(id)); if (!record) throw new Error("Arquivo não encontrado."); await putLocal({ ...record, asset: { ...record.asset, ...changes, updated_at: new Date().toISOString() } }); return { ...record.asset, ...changes }; }
 
 function fileRecord(userId: string, id: string, input: UploadInput, path: string): BrokerFile {
   const now = new Date().toISOString();
   const fileType: BrokerFileType = input.file.type.startsWith("image/") ? "image" : "pdf";
-  return { id, user_id: userId, client_id: input.clientId ?? null, title: input.title?.trim() || titleFromName(input.file.name), category: input.category.trim() || "Geral", file_type: fileType, file_name: input.file.name, storage_path: path, external_url: null, mime_type: input.file.type || null, file_size: input.file.size, tags: input.tags ?? [], created_at: now, updated_at: now };
+  return { id, user_id: userId, client_id: input.clientId ?? null, title: input.title?.trim() || titleFromName(input.file.name), category: input.category.trim() || "Geral", folder: input.folder.trim() || "Geral", is_favorite: false, file_type: fileType, file_name: input.file.name, storage_path: path, external_url: null, mime_type: input.file.type || null, file_size: input.file.size, tags: input.tags ?? [], created_at: now, updated_at: now };
 }
 
 function linkRecord(userId: string, id: string, input: LinkInput): BrokerFile {
   const now = new Date().toISOString();
-  return { id, user_id: userId, client_id: input.clientId ?? null, title: input.title.trim(), category: input.category.trim() || "Links", file_type: "link", file_name: null, storage_path: null, external_url: input.url, mime_type: null, file_size: null, tags: input.tags ?? [], created_at: now, updated_at: now };
+  return { id, user_id: userId, client_id: input.clientId ?? null, title: input.title.trim(), category: input.category.trim() || "Links", folder: input.folder.trim() || "Geral", is_favorite: false, file_type: "link", file_name: null, storage_path: null, external_url: input.url, mime_type: null, file_size: null, tags: input.tags ?? [], created_at: now, updated_at: now };
 }
 
 function validateFile(file: File) {

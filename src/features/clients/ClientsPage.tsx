@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Bot, Building2, CalendarClock, CalendarPlus, Camera, Check, ChevronRight, CircleDollarSign, Crown, ExternalLink, Grid2X2, Layers3, LayoutList, LocateFixed, Map, MapPin, Megaphone, MessageCircle, Navigation, Phone, Plus, Route, Search, SlidersHorizontal, Thermometer, Trophy, UserRoundSearch, Users, X } from "lucide-react";
+import { ArrowLeft, Bot, Building2, CalendarClock, CalendarPlus, Camera, Check, ChevronRight, CircleDollarSign, Crown, ExternalLink, Grid2X2, Layers3, LayoutList, LocateFixed, Map, MapPin, Megaphone, MessageCircle, Phone, Plus, Route, Search, SlidersHorizontal, Thermometer, Trophy, UserRoundSearch, Users, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ import { ClientDetailDialog } from "./ClientDetailDialog";
 import { ClientForm, clientPaymentConditions } from "./ClientForm";
 import type { ClientInput } from "./client-service";
 import { Button } from "@/components/ui/button";
+import { RouteButton } from "@/components/RouteButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -712,9 +713,9 @@ export function ClientsPage() {
                 {selectedClient && !mapDetailsOpen && <div className="absolute inset-x-3 bottom-3 z-[4] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-[0_16px_40px_rgba(16,24,40,.24)] backdrop-blur dark:border-white/10 dark:bg-[#10151f]/95">
                   <div className="flex items-center gap-3"><span className="h-10 w-10 shrink-0"><ClientAvatar name={selectedClient.name} photo={selectedClient.photo} /></span><button type="button" className="min-w-0 flex-1 text-left" onClick={() => setMapDetailsOpen(true)}><span className="block truncate text-sm font-bold">{selectedClient.name}</span><span className="block truncate text-xs text-muted-foreground">{selectedClient.profile} • {selectedClient.city}</span></button><button type="button" className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted" aria-label="Fechar ficha" onClick={() => setSelectedClientId(null)}><X className="h-4 w-4" /></button></div>
                   <div className="mt-2 flex items-center gap-2 overflow-x-auto text-xs"><span className="shrink-0 rounded-full bg-muted px-2.5 py-1 font-semibold">{nextActionFromMap(selectedClient)}</span><span className="shrink-0 rounded-full bg-muted px-2.5 py-1">{locationPrecisionLabel(selectedClient)}</span>{userLocation && selectedClient.lat !== undefined && selectedClient.lng !== undefined && <span className="shrink-0 rounded-full bg-muted px-2.5 py-1">{distanceKm(userLocation, { lat: selectedClient.lat, lng: selectedClient.lng }).toFixed(1).replace('.', ',')} km</span>}</div>
-                  <div className="mt-3 grid grid-cols-3 gap-2">{selectedClient.whatsapp ? <a href={whatsappUrl(selectedClient.whatsapp, selectedClient.name)} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border text-xs font-semibold"><MessageCircle className="h-4 w-4" /><span className="hidden sm:inline">WhatsApp</span></a> : <Button variant="outline" disabled>Sem WhatsApp</Button>}<a href={mapsUrl(selectedClient)} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold"><Navigation className="h-4 w-4" />Ir</a><Button type="button" className="min-h-10 text-xs" onClick={() => setMapDetailsOpen(true)}>Abrir cliente</Button></div>
+                  <div className="mt-3 grid grid-cols-3 gap-2">{selectedClient.whatsapp ? <a href={whatsappUrl(selectedClient.whatsapp, selectedClient.name)} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border text-xs font-semibold"><MessageCircle className="h-4 w-4" /><span className="hidden sm:inline">WhatsApp</span></a> : <Button variant="outline" disabled>Sem WhatsApp</Button>}<RouteButton label={selectedClient.name} address={`${selectedClient.neighborhood}, ${selectedClient.city}`} latitude={selectedClient.lat} longitude={selectedClient.lng} className="min-h-10 rounded-xl border text-xs font-semibold" /><Button type="button" className="min-h-10 text-xs" onClick={() => setMapDetailsOpen(true)}>Abrir cliente</Button></div>
                 </div>}
-                {selectedBuilding && <div className="absolute inset-x-3 bottom-3 z-[4] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-[0_16px_40px_rgba(16,24,40,.24)] backdrop-blur dark:border-white/10 dark:bg-[#10151f]/95"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0B1220] text-white"><Building2 className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{selectedBuilding.name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{buildingAddress(selectedBuilding)}</p><p className="mt-2 text-xs font-medium text-[#667085] dark:text-muted-foreground">Localização do catálogo de edifícios</p></div><button type="button" className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted" aria-label="Fechar edifício" onClick={() => setSelectedBuildingId(null)}><X className="h-4 w-4" /></button></div><a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedBuilding.latitude},${selectedBuilding.longitude}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#0B1220] px-3 text-sm font-semibold text-white dark:bg-foreground dark:text-background"><Navigation className="h-4 w-4" />Ir agora</a></div>}
+                {selectedBuilding && <div className="absolute inset-x-3 bottom-3 z-[4] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-[0_16px_40px_rgba(16,24,40,.24)] backdrop-blur dark:border-white/10 dark:bg-[#10151f]/95"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0B1220] text-white"><Building2 className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{selectedBuilding.name}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{buildingAddress(selectedBuilding)}</p><p className="mt-2 text-xs font-medium text-[#667085] dark:text-muted-foreground">Localização do catálogo de edifícios</p></div><button type="button" className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted" aria-label="Fechar edifício" onClick={() => setSelectedBuildingId(null)}><X className="h-4 w-4" /></button></div><RouteButton label={selectedBuilding.name} address={buildingAddress(selectedBuilding)} latitude={selectedBuilding.latitude} longitude={selectedBuilding.longitude} text="Ir agora" className="mt-3 min-h-10 w-full rounded-xl bg-[#0B1220] px-3 text-sm font-semibold text-white dark:bg-foreground dark:text-background" /></div>}
               </>}
             />
             {routeMode && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border bg-muted/50 p-3"><Route className="h-4 w-4" /><p className="mr-auto text-sm font-semibold">{routeClientIds.length ? `${routeClientIds.length} parada(s) selecionada(s)` : "Toque nos clientes para montar a rota"}</p><Button type="button" variant="ghost" size="sm" onClick={() => setRouteClientIds([])} disabled={!routeClientIds.length}>Limpar</Button><Button type="button" size="sm" onClick={openPlannedRoute} disabled={!routeClientIds.length}>Abrir rota</Button></div>}
@@ -740,15 +741,7 @@ export function ClientsPage() {
                     </Button>
                     <Button type="button" variant="outline" className={cn("min-h-11", selectedClient.bought && "text-emerald-600")} aria-pressed={selectedClient.bought} disabled={marks.save.isPending || marks.loading || Boolean(marks.error)} onClick={() => markSold(selectedClient)}><Trophy className="h-4 w-4" />{selectedClient.bought ? "Vendido" : "Vendi"}</Button>
                     <Button type="button" className="col-span-2 min-h-11" onClick={() => { setScheduleClient(selectedClient); setSelectedClientId(null); }}><CalendarPlus className="h-4 w-4" />Agendar visita</Button>
-                    <a
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold"
-                      href={mapsUrl(selectedClient)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Rota
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
+                    <RouteButton label={selectedClient.name} address={`${selectedClient.neighborhood}, ${selectedClient.city}`} latitude={selectedClient.lat} longitude={selectedClient.lng} text="Rota" className="min-h-11 rounded-lg border px-3 text-sm font-semibold" />
                     <label className="relative inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium"><Camera className="h-4 w-4" />Foto<input aria-label={`Foto de ${selectedClient.name}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={marks.save.isPending || marks.loading || Boolean(marks.error)} className="absolute inset-0 w-full cursor-pointer opacity-0" onChange={(event) => { void changePhoto(selectedClient, event.target.files?.[0]); event.target.value = ""; }} /></label>
                   </div>
                   {(scheduled.data ?? []).filter((event) => event.notes === `client-map:${selectedClient.id}`).map((event) => <div key={event.id} className="mt-3 flex items-center justify-between gap-2 border-t pt-3 text-sm"><span>Visita: {formatVisitDate(`${event.date}T${event.start_time}`)}</span><Button variant="ghost" disabled={calendar.updateEvent.isPending} aria-label="Cancelar visita" onClick={async () => { try { await calendar.updateEvent.mutateAsync({ id: event.id, input: { status: "cancelado" } }); toast({ title: "Visita cancelada." }); } catch { toast({ title: "Não foi possível cancelar.", variant: "error" }); } }}><X className="h-4 w-4" /></Button></div>)}
@@ -774,7 +767,7 @@ export function ClientsPage() {
         <ChampionCard icon={MapPin} label="Cidade campeã" value={cityChampion?.label ?? "Dados insuficientes"} helper={`${cityChampion?.score ?? 0} clientes`} active={cardFilterLabel === "Cidade campeã"} onClick={cityChampion ? () => applyCardFilter("Cidade campeã", { city: cityChampion.label }) : undefined} actionLabel="Ver todas as cidades" onAction={() => openCityExplorer()} />
         <ChampionCard icon={Trophy} label="Cidade que mais vendeu" value={citySalesChampion?.label ?? "Dados insuficientes"} helper={`${citySalesChampion?.score ?? 0} vendas`} active={cardFilterLabel === "Cidade que mais vendeu"} onClick={citySalesChampion ? () => applyCardFilter("Cidade que mais vendeu", { city: citySalesChampion.label, insight: "sales" }) : undefined} />
         <ChampionCard icon={Check} label="Visitas no mês" value={String(visitsThisMonth)} helper="visitas registradas" active={cardFilterLabel === "Visitas no mês"} onClick={() => applyCardFilter("Visitas no mês", { insight: "visited-month", view: "map", mapFilter: "visitei" })} />
-        <ChampionCard icon={Navigation} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} active={cardFilterLabel === "Visitas no ano"} onClick={() => applyCardFilter("Visitas no ano", { insight: "visited-year", view: "map", mapFilter: "visitei" })} />
+        <ChampionCard icon={Route} label="Visitas no ano" value={String(visitsThisYear)} helper={`${now.getFullYear()} até agora`} active={cardFilterLabel === "Visitas no ano"} onClick={() => applyCardFilter("Visitas no ano", { insight: "visited-year", view: "map", mapFilter: "visitei" })} />
         <ChampionCard icon={Users} label="Clientes visitados" value={String(visitedClientIds.size)} helper="clientes únicos" active={cardFilterLabel === "Clientes visitados"} onClick={() => applyCardFilter("Clientes visitados", { insight: "visited", view: "map", mapFilter: "visitei" })} />
       </div></section>
 
@@ -865,7 +858,7 @@ function PremiumClientRow({ client, onOpen, onMap }: { client: ClientMapItem; on
     </button>
     <div className="flex shrink-0 items-center gap-1">
       <Button size="icon" variant="ghost" className="h-9 w-9" onClick={onMap} aria-label={`Ver ${client.name} no mapa`} title="Ver no mapa"><MapPin className="h-4 w-4" /></Button>
-      <a href={mapsUrl(client)} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-xl text-primary hover:bg-primary/10" aria-label={`Ir até ${client.name}`} title="Ir pelo Maps"><Navigation className="h-4 w-4" /></a>
+      <RouteButton label={client.name} address={`${client.neighborhood}, ${client.city}`} latitude={client.lat} longitude={client.lng} text="" className="h-9 w-9 rounded-xl text-primary hover:bg-primary/10" />
       {client.whatsapp && <a href={whatsappUrl(client.whatsapp, client.name)} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-xl text-[#0F8A65] hover:bg-[#0F8A65]/10" aria-label={`WhatsApp de ${client.name}`}><MessageCircle className="h-4 w-4" /></a>}
       {phone && <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="hidden h-9 w-9 place-items-center rounded-xl text-[#475467] hover:bg-[#F2F4F7] sm:grid dark:text-muted-foreground dark:hover:bg-muted" aria-label={`Ligar para ${client.name}`}><Phone className="h-4 w-4" /></a>}
       <Button size="icon" variant="ghost" className="h-9 w-9" onClick={onOpen} aria-label={`Abrir ${client.name}`}><ExternalLink className="h-4 w-4" /></Button>
@@ -885,7 +878,7 @@ function PremiumClientCard({ client, editable, onOpen, onMap, onStatus, onTemper
     </div>
     <div className="mt-3 grid grid-cols-[2.5rem_2.5rem_1fr_1fr_1fr] gap-2">
       <Button size="icon" variant="outline" className="h-10 w-10 rounded-xl" onClick={onMap} aria-label={`Ver ${client.name} no mapa`} title="Ver no mapa"><MapPin className="h-4 w-4" /></Button>
-      <Button size="icon" variant="outline" className="h-10 w-10 rounded-xl" asChild title="Ir pelo Maps"><a href={mapsUrl(client)} target="_blank" rel="noreferrer" aria-label={`Ir até ${client.name}`}><Navigation className="h-4 w-4" /></a></Button>
+      <RouteButton label={client.name} address={`${client.neighborhood}, ${client.city}`} latitude={client.lat} longitude={client.lng} text="" className="h-10 w-10 rounded-xl border bg-background" />
       {client.whatsapp ? <a href={whatsappUrl(client.whatsapp, client.name)} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#EAECF0] text-xs font-semibold text-[#0F8A65] hover:bg-[#0F8A65]/5 dark:border-border"><MessageCircle className="h-4 w-4" />WhatsApp</a> : <span className="min-h-10" />}
       {phone ? <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-[#EAECF0] text-xs font-semibold text-[#475467] hover:bg-[#F7F8FA] dark:border-border dark:text-muted-foreground"><Phone className="h-4 w-4" />Ligar</a> : <span className="min-h-10" />}
       <Button size="sm" variant="outline" className="min-h-10 px-2 text-xs" onClick={onOpen}>Abrir</Button>
@@ -1177,13 +1170,6 @@ function mapStageToClientStatus(stage: ClientStage): ClientStatus {
 function coordinatesForCity(city: string) {
   const base = cityCoordinates[city.trim().toLowerCase()];
   return { lat: base?.lat, lng: base?.lng, locationPrecision: "city" as const };
-}
-
-function mapsUrl(client: ClientMapItem) {
-  if (client.locationPrecision === "exact" && client.lat !== undefined && client.lng !== undefined) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${client.lat},${client.lng}`;
-  }
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${client.neighborhood} ${client.city}`)}`;
 }
 
 function whatsappUrl(phone: string, name: string) {

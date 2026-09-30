@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Check, CircleDollarSign, CreditCard, History, MapPin, Megaphone, MessageCircle, Navigation, Pencil, Phone, Plus, Thermometer, UserRound } from "lucide-react";
+import { Check, CircleDollarSign, CreditCard, History, MapPin, Megaphone, MessageCircle, Pencil, Phone, Plus, Thermometer, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RouteButton } from "@/components/RouteButton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,7 +90,7 @@ function ClientDetailContent({ client, open, onOpenChange, onEdit, onStatus, onF
           <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {client.whatsapp && <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 text-sm font-semibold hover:bg-white/10" href={`https://wa.me/${client.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 text-primary" />WhatsApp</a>}
             {client.phone && <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 text-sm font-semibold hover:bg-white/10" href={`tel:${client.phone}`}><Phone className="h-4 w-4 text-primary" />Ligar</a>}
-            {client.lat !== null && client.lng !== null && <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 text-sm font-semibold hover:bg-white/10" href={directionsUrl(client.lat, client.lng)} target="_blank" rel="noreferrer"><Navigation className="h-4 w-4 text-primary" />Ir</a>}
+            <RouteButton label={client.name} address={[client.neighborhood, client.city].filter(Boolean).join(", ")} latitude={client.lat} longitude={client.lng} className="min-h-11 rounded-lg border border-white/15 bg-white/5 px-3 text-sm font-semibold hover:bg-white/10" iconClassName="text-primary" />
             <Button className="min-h-11" variant="outline" onClick={() => onEdit(client)}><Pencil className="h-4 w-4" />Editar</Button>
           </div>
         </div>
@@ -179,8 +180,4 @@ function budgetLabel(client: Client) {
 
 function formatActivityDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
-
-function directionsUrl(lat: number, lng: number) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }

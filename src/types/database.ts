@@ -125,6 +125,8 @@ export type BrokerFile = {
   client_id: string | null;
   title: string;
   category: string;
+  folder: string;
+  is_favorite: boolean;
   file_type: BrokerFileType;
   file_name: string | null;
   storage_path: string | null;
