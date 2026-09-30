@@ -115,7 +115,7 @@ export const condominiumCatalog: Condominium[] = seeds.map(([name, city, neighbo
   areaMax,
   hasBeachClub,
   amenities: hasBeachClub ? ["Paradouro"] : [],
-  description: `Condomínio ${name} em ${city}${neighborhood ? `, no bairro ${neighborhood}` : ""}. Dados cadastrais compilados de fonte pública e sujeitos à confirmação comercial.`,
+  description: `Condomínio ${name} em ${city}${neighborhood ? `, no bairro ${neighborhood}` : ""}.`,
   coverUrl: null,
   sourceUrl: SOURCE_URL,
   sourceTitle: SOURCE_TITLE,

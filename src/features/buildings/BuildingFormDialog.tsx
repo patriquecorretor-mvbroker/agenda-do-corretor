@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Building2, Check, Globe2, Image as ImageIcon } from "lucide-react";
+import { Building2, Check, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { o
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="sm:max-w-3xl">
-      <DialogHeader className="pr-10"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary"><Building2 className="h-5 w-5" /></span><div><DialogTitle>{building.name ? "Editar edifício" : "Novo edifício"}</DialogTitle><DialogDescription>Ficha comercial, técnica e fonte das informações.</DialogDescription></div></div></DialogHeader>
+      <DialogHeader className="pr-10"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary"><Building2 className="h-5 w-5" /></span><div><DialogTitle>{building.name ? "Editar edifício" : "Novo edifício"}</DialogTitle><DialogDescription>Ficha comercial e técnica do empreendimento.</DialogDescription></div></div></DialogHeader>
       <form onSubmit={submit} className="space-y-6">
         <FormSection title="Identificação">
           <Field label="Nome do edifício" required className="sm:col-span-2"><Input value={draft.name} onChange={(event) => set("name", event.target.value)} placeholder="Ex.: Via Del Mare" /></Field>
@@ -63,12 +63,9 @@ export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { o
 
         <div><p className="mb-3 text-sm font-semibold">Infraestrutura</p><div className="flex flex-wrap gap-2">{amenityOptions.map((item) => <button key={item} type="button" onClick={() => toggleAmenity(item)} className={cn("inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition", draft.amenities?.includes(item) ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Check className={cn("h-3.5 w-3.5", !draft.amenities?.includes(item) && "opacity-0")} />{item}</button>)}</div></div>
 
-        <FormSection title="Apresentação e fontes">
+        <FormSection title="Apresentação">
           <Field label="URL da foto de capa" className="sm:col-span-2"><div className="relative"><ImageIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-10" value={draft.coverUrl ?? ""} onChange={(event) => set("coverUrl", event.target.value || null)} placeholder="https://..." /></div></Field>
-          <Field label="Fonte da foto"><Input value={draft.coverSourceUrl ?? ""} onChange={(event) => set("coverSourceUrl", event.target.value || null)} placeholder="Link do anúncio ou fotógrafo" /></Field>
-          <Field label="Nome da fonte da foto"><Input value={draft.coverSourceTitle ?? ""} onChange={(event) => set("coverSourceTitle", event.target.value || null)} placeholder="Ex.: Imobiliária local" /></Field>
           <Field label="Site do empreendimento"><Input value={draft.websiteUrl ?? ""} onChange={(event) => set("websiteUrl", event.target.value || null)} /></Field>
-          <Field label="Fonte consultada"><div className="relative"><Globe2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-10" value={draft.sourceUrl ?? ""} onChange={(event) => set("sourceUrl", event.target.value || null)} placeholder="Link da fonte" /></div></Field>
           <Field label="Descrição" className="sm:col-span-2"><Textarea value={draft.description ?? ""} onChange={(event) => set("description", event.target.value || null)} /></Field>
           <Field label="Observações internas" className="sm:col-span-2"><Textarea value={draft.notes ?? ""} onChange={(event) => set("notes", event.target.value || null)} /></Field>
         </FormSection>

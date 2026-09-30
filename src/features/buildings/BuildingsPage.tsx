@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Building2, CalendarDays, CheckCircle2, Copy, ExternalLink, Image as ImageIcon, MapPin, Navigation, Pencil, Plus, Search, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Copy, ExternalLink, Image as ImageIcon, MapPin, Navigation, Pencil, Plus, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,7 +56,7 @@ export function BuildingsPage() {
 
   return <div className="space-y-5">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-sm font-medium text-primary">Inteligência imobiliária</p><h1 className="mt-1 text-3xl font-semibold">Edifícios</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Catálogo vivo com localização, ficha técnica, infraestrutura, construtora e fontes verificáveis.</p></div>
+      <div><p className="text-sm font-medium text-primary">Inteligência imobiliária</p><h1 className="mt-1 text-3xl font-semibold">Edifícios</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Catálogo vivo com localização, ficha técnica, infraestrutura e construtora.</p></div>
       <Button className="h-11 w-full sm:w-auto" onClick={() => setEditing(newBuilding())}><Plus className="h-4 w-4" />Novo edifício</Button>
     </header>
 
@@ -97,6 +97,7 @@ function BuildingCard({ building, onOpen }: { building: Building; onOpen: () => 
 
 function BuildingDetails({ building, onClose, onCopy, onEdit }: { building?: Building; onClose: () => void; onCopy: (building: Building) => void; onEdit: (building: Building) => void }) {
   return <Dialog open={Boolean(building)} onOpenChange={(open) => !open && onClose()}>{building && <DialogContent className="sm:max-w-3xl">
+    <Button type="button" variant="outline" size="sm" onClick={onClose} className="absolute left-4 top-4 z-20 border-white/25 bg-black/55 text-white shadow-lg backdrop-blur hover:bg-black/75 hover:text-white"><ArrowLeft className="h-4 w-4" />Voltar</Button>
     <div className="-mx-5 -mt-5 mb-5 sm:-mx-5 sm:-mt-5"><BuildingCover building={building} /></div>
     <DialogHeader><div className="flex items-start justify-between gap-4 pr-8"><div><DialogTitle className="text-2xl">{building.name}</DialogTitle><DialogDescription className="mt-1">{buildingAddress(building)} · {building.city ?? "Capão da Canoa"}/{building.state ?? "RS"}</DialogDescription></div><VerificationBadge status={building.verificationStatus} /></div></DialogHeader>
     {building.description && <p className="text-sm leading-6 text-muted-foreground">{building.description}</p>}
@@ -105,8 +106,6 @@ function BuildingDetails({ building, onClose, onCopy, onEdit }: { building?: Bui
     <section className="mt-5"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Apartamentos</p><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Metric label="Dormitórios" value={formatRange(building.bedroomsMin, building.bedroomsMax)} /><Metric label="Área privativa" value={formatAreaRange(building.privateAreaMin, building.privateAreaMax)} /><Metric label="Vagas" value={building.parkingSpaces} /></div></section>
     {Boolean(building.amenities?.length) && <section className="mt-5"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Infraestrutura</p><div className="flex flex-wrap gap-2">{building.amenities!.map((item) => <span key={item} className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">{item}</span>)}</div></section>}
     <section className="mt-5 grid gap-2 sm:grid-cols-2"><Detail icon={MapPin} label="Endereço" value={`${buildingAddress(building)}${building.postalCode ? ` · CEP ${building.postalCode}` : ""}`} /><Detail icon={Navigation} label="Coordenadas" value={`${building.latitude.toFixed(6)}, ${building.longitude.toFixed(6)}`} /></section>
-    {building.coverSourceUrl && <a href={building.coverSourceUrl} target="_blank" rel="noreferrer" className="mt-4 flex items-center justify-between rounded-2xl border bg-muted/35 p-4 text-sm transition hover:bg-muted"><span><span className="block text-xs text-muted-foreground">Origem da fotografia</span><span className="mt-0.5 block font-semibold">{building.coverSourceTitle ?? "Abrir fonte da foto"}</span></span><ExternalLink className="h-4 w-4" /></a>}
-    {building.sourceUrl && <a href={building.sourceUrl} target="_blank" rel="noreferrer" className="mt-4 flex items-center justify-between rounded-2xl border bg-muted/35 p-4 text-sm transition hover:bg-muted"><span><span className="block text-xs text-muted-foreground">Fonte consultada {building.sourceCheckedAt ? `em ${new Date(`${building.sourceCheckedAt}T12:00:00`).toLocaleDateString("pt-BR")}` : ""}</span><span className="mt-0.5 block font-semibold">{building.sourceTitle ?? "Abrir fonte"}</span></span><ExternalLink className="h-4 w-4" /></a>}
     <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4"><Button variant="outline" onClick={() => onCopy(building)}><Copy className="h-4 w-4" />Copiar</Button><Button variant="outline" onClick={() => onEdit(building)}><Pencil className="h-4 w-4" />Editar</Button><Button variant="outline" asChild><a href={building.mapsUrl} target="_blank" rel="noreferrer"><Navigation className="h-4 w-4" />Mapa</a></Button>{building.websiteUrl ? <Button asChild><a href={building.websiteUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />Site</a></Button> : <Button disabled><ExternalLink className="h-4 w-4" />Site</Button>}</div>
   </DialogContent>}</Dialog>;
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, ExternalLink, FileImage, FileText, Film, FolderOpen, LandPlot, MapPin, Navigation, Pencil, Plus, Search, ShieldCheck, Umbrella, Waves } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, ExternalLink, FileImage, FileText, Film, FolderOpen, LandPlot, MapPin, Navigation, Pencil, Plus, Search, Umbrella, Waves } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -57,7 +57,7 @@ export function CondominiumsPage() {
 
   return <div className="space-y-5">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-sm font-medium text-primary">Inteligência do litoral</p><h1 className="mt-1 text-3xl font-semibold">Condomínios</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Base comercial de Capão da Canoa e Xangri-Lá, com situação, localização, construtora e metragem.</p></div>
+      <div><p className="text-sm font-medium text-primary">Inteligência do litoral</p><h1 className="mt-1 text-3xl font-semibold">Condomínios</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Catálogo comercial de Capão da Canoa e Xangri-Lá, com situação, localização, construtora e metragem.</p></div>
       <Button className="h-11 w-full sm:w-auto" onClick={() => setEditing(newCondominium())}><Plus className="h-4 w-4" />Novo condomínio</Button>
     </header>
 
@@ -107,12 +107,12 @@ function CondominiumCover({ item }: { item: Condominium }) {
 
 function CondominiumDetails({ item, onClose, onEdit, onMaterials }: { item?: Condominium; onClose: () => void; onEdit: (item: Condominium) => void; onMaterials: (item: Condominium) => void }) {
   return <Dialog open={Boolean(item)} onOpenChange={(open) => !open && onClose()}>{item && <DialogContent className="sm:max-w-3xl">
+    <Button type="button" variant="outline" size="sm" onClick={onClose} className="absolute left-4 top-4 z-20 border-white/25 bg-black/55 text-white shadow-lg backdrop-blur hover:bg-black/75 hover:text-white"><ArrowLeft className="h-4 w-4" />Voltar</Button>
     <div className="-mx-5 -mt-5 mb-5 overflow-hidden rounded-t-[2rem]"><CondominiumCover item={item} /></div>
-    <DialogHeader><div className="flex items-start justify-between gap-3 pr-8"><div><DialogTitle className="text-2xl">{item.name}</DialogTitle><DialogDescription className="mt-1">{item.neighborhood ?? "Bairro a confirmar"} · {item.city}/RS</DialogDescription></div><VerificationBadge status={item.verificationStatus} /></div></DialogHeader>
-    {item.description && <p className="text-sm leading-6 text-muted-foreground">{item.description}</p>}
+    <DialogHeader><div className="pr-8"><DialogTitle className="text-2xl">{item.name}</DialogTitle><DialogDescription className="mt-1">{item.neighborhood ?? "Bairro a confirmar"} · {item.city}/RS</DialogDescription></div></DialogHeader>
+    {catalogDescription(item.description) && <p className="text-sm leading-6 text-muted-foreground">{catalogDescription(item.description)}</p>}
     <section className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4"><Metric label="Situação" value={item.status} /><Metric label="Construtora" value={item.developer} wide /><Metric label="Lançamento" value={item.launchYear} /><Metric label="Unidades" value={item.totalUnits} /><Metric label="Área total" value={item.areaHa ? `${item.areaHa} ha` : null} /><Metric label="Tipologia" value={item.unitType} /><Metric label="Metragem" value={areaLabel(item)} /></section>
     <section className="mt-5"><p className="mb-3 text-xs font-semibold uppercase text-muted-foreground">Estrutura comercial</p><div className="flex flex-wrap gap-2">{item.hasBeachClub && <Chip icon={Umbrella} label="Paradouro" />}{item.amenities.filter((value) => value !== "Paradouro").map((value) => <Chip key={value} icon={CheckCircle2} label={value} />)}{!item.amenities.length && !item.hasBeachClub && <span className="text-sm text-muted-foreground">Infraestrutura ainda não cadastrada.</span>}</div></section>
-    {item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="mt-5 flex items-center justify-between rounded-2xl border bg-muted/35 p-4 text-sm transition hover:bg-muted"><span><span className="block text-xs text-muted-foreground">Fonte consultada em {item.sourceCheckedAt ? new Date(`${item.sourceCheckedAt}T12:00:00`).toLocaleDateString("pt-BR") : "data não informada"}</span><span className="mt-0.5 block font-semibold">{item.sourceTitle ?? "Abrir fonte"}</span></span><ExternalLink className="h-4 w-4" /></a>}
     <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4"><Button variant="outline" onClick={() => onEdit(item)}><Pencil className="h-4 w-4" />Editar</Button><Button variant="outline" onClick={() => onMaterials(item)}><FolderOpen className="h-4 w-4" />Materiais</Button><Button variant="outline" asChild><a href={condominiumMapsUrl(item)} target="_blank" rel="noreferrer"><Navigation className="h-4 w-4" />Abrir no mapa</a></Button><Button onClick={async () => navigator.clipboard.writeText(`${item.name} · ${item.city} · ${item.neighborhood ?? ""}`)}><ExternalLink className="h-4 w-4" />Copiar ficha</Button></div>
   </DialogContent>}</Dialog>;
 }
@@ -123,6 +123,6 @@ function MiniMetric({ label, value }: { label: string; value: string | number | 
 function Metric({ label, value, wide }: { label: string; value: string | number | null; wide?: boolean }) { return <div className={cn("rounded-2xl bg-muted/55 p-3", wide && "col-span-2")}><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold capitalize">{value ?? "Não informado"}</p></div>; }
 function Chip({ icon: Icon, label }: { icon: React.ElementType; label: string }) { return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold"><Icon className="h-3.5 w-3.5 text-primary" />{label}</span>; }
 function StatusBadge({ status }: { status: Condominium["status"] }) { return <span className={cn("shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase", status === "entregue" ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : status === "lançamento" ? "bg-primary/12 text-primary" : "bg-amber-500/12 text-amber-700 dark:text-amber-300")}>{status}</span>; }
-function VerificationBadge({ status }: { status: Condominium["verificationStatus"] }) { return <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase", status === "verificado" ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : status === "manual" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>{status === "verificado" ? <ShieldCheck className="h-3 w-3" /> : null}{status === "web" ? "Fonte web" : status}</span>; }
+function catalogDescription(value: string | null) { return value?.replace(/\s*Dados cadastrais compilados de fonte pública[^.]*\.?/gi, "").trim() || null; }
 function areaLabel(item: Condominium) { if (item.areaMin == null && item.areaMax == null) return null; if (item.areaMin === item.areaMax || item.areaMax == null) return `${item.areaMin} m²`; if (item.areaMin == null) return `Até ${item.areaMax} m²`; return `${item.areaMin} a ${item.areaMax} m²`; }
 function normalize(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim(); }
