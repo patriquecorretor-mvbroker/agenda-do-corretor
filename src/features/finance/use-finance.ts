@@ -6,6 +6,7 @@ import {
   createCommission,
   createCommissionInstallments,
   createFinancialTransaction,
+  createFinancialTransactions,
   listCommissionInstallments,
   listCommissions,
   listFinancialTransactions,
@@ -108,6 +109,35 @@ export function useFinance() {
         };
         writeLocal(keys.transactions, [...readLocal(keys.transactions, demoFinancialTransactions), next]);
         return next;
+      },
+      onSuccess: invalidate
+    }),
+    createTransactions: useMutation({
+      mutationFn: async (inputs: Array<Omit<FinancialTransactionInsert, "user_id">>) => {
+        if (hasSupabaseConfig) return createFinancialTransactions(inputs.map((input) => ({ ...input, user_id: userId! })));
+        const created = inputs.map((input) => ({
+          id: createId(),
+          user_id: userId!,
+          type: input.type,
+          category: input.category,
+          description: input.description,
+          amount: input.amount,
+          due_date: input.due_date ?? null,
+          paid_date: input.paid_date ?? null,
+          status: input.status ?? "pendente",
+          payment_method: input.payment_method ?? null,
+          client_id: input.client_id ?? null,
+          property_id: input.property_id ?? null,
+          sale_id: input.sale_id ?? null,
+          commission_id: input.commission_id ?? null,
+          is_recurring: input.is_recurring ?? false,
+          recurrence_rule: input.recurrence_rule ?? null,
+          notes: input.notes ?? null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })) as FinancialTransaction[];
+        writeLocal(keys.transactions, [...readLocal(keys.transactions, demoFinancialTransactions), ...created]);
+        return created;
       },
       onSuccess: invalidate
     }),

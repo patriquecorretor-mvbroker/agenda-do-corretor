@@ -17,6 +17,12 @@ export async function createFinancialTransaction(input: FinancialTransactionInse
   return data as FinancialTransaction;
 }
 
+export async function createFinancialTransactions(input: FinancialTransactionInsert[]) {
+  const { data, error } = await (requireSupabase() as any).from("financial_transactions").insert(input).select("*");
+  if (error) throw error;
+  return data as FinancialTransaction[];
+}
+
 export async function updateFinancialTransaction(id: string, userId: string, input: Partial<FinancialTransaction>) {
   const { data, error } = await (requireSupabase() as any)
     .from("financial_transactions")

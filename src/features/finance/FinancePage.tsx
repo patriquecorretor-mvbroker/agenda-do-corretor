@@ -12,6 +12,7 @@ import {
   Car,
   Crown,
   Download,
+  FileUp,
   Home,
   LineChart,
   MapPin,
@@ -37,6 +38,7 @@ import { useProfile } from "@/features/profile/use-profile";
 import { useClients } from "@/features/clients/use-clients";
 import { expenseCategories, incomeCategories, installmentBalance, paymentMethods, sum } from "@/features/finance/finance-utils";
 import { useFinance } from "@/features/finance/use-finance";
+import { FinanceDataTransfer } from "@/features/finance/FinanceDataTransfer";
 import type { Client, Commission, CommissionInstallment, FinancialTransaction } from "@/types/database";
 
 type FinanceTab = "dashboard" | "commissions" | "receivable" | "payable" | "cashflow" | "result" | "calendar";
@@ -61,6 +63,7 @@ export function FinancePage() {
   const [form, setForm] = useState<FinanceForm>(null);
   const [filter, setFilter] = useState("todos");
   const [search, setSearch] = useState("");
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const monthReceivedSales = finance.commissions.filter((item) => item.status === "recebida" && item.sale_date && isSameMonth(parseISO(item.sale_date), new Date()));
   const avgGross = monthReceivedSales.length ? sum(monthReceivedSales.map((item) => item.gross_commission)) / monthReceivedSales.length : null;
@@ -118,10 +121,7 @@ export function FinancePage() {
                 Separação clara entre realizado, confirmado, previsto, potencial e atrasado. Sem misturar promessa com caixa.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:min-w-[420px] sm:gap-3">
-              <HeroMetric label="Resultado mês" value={formatCurrency(finance.metrics.netResultMonth)} />
-              <HeroMetric label="Receber hoje" value={formatCurrency(finance.metrics.receiveToday)} />
-            </div>
+            <Button variant="outline" className="w-full bg-card sm:w-auto dark:border-white/15 dark:bg-white/[0.04] dark:text-white" onClick={() => setTransferOpen(true)}><FileUp className="h-4 w-4" />Importar ou exportar</Button>
           </div>
         </div>
       </section>
@@ -156,6 +156,10 @@ export function FinancePage() {
           <Input className="pl-11" placeholder="Pesquisar cliente, imóvel, categoria..." value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 md:mt-0 md:flex">
+          <Button className="col-span-2 min-h-11 px-2 text-xs sm:text-sm md:col-span-1" variant="outline" onClick={() => setTransferOpen(true)}>
+            <FileUp className="h-4 w-4" />
+            Dados
+          </Button>
           <Button className="min-h-11 px-2 text-xs sm:text-sm" onClick={() => setForm("income")}>
             <Plus className="h-4 w-4" />
             Receita
@@ -200,6 +204,7 @@ export function FinancePage() {
             <DialogDescription>
               {form === "commission" ? "Cadastre venda, comissão e parcelamento automático." : form === "payable" ? "A conta ficará pendente até você registrar o pagamento." : form === "expense" ? "A despesa será registrada como paga e entrará no resultado do mês." : "Cadastro rápido para poucos toques no celular."}
             </DialogDescription>
+            {form !== "commission" && <Button type="button" variant="outline" size="sm" className="mt-2 w-fit" onClick={() => { setForm(null); setTransferOpen(true); }}><FileUp className="h-4 w-4" />Importar extrato ou exportar</Button>}
           </DialogHeader>
           {form === "commission" ? (
             <CommissionForm onSaved={() => setForm(null)} />
@@ -208,6 +213,7 @@ export function FinancePage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      <FinanceDataTransfer open={transferOpen} onOpenChange={setTransferOpen} />
     </div>
   );
 }
@@ -236,8 +242,8 @@ function DashboardFinance({
 
   return (
     <div className="space-y-5">
-      <SalesPortfolio commissions={finance.commissions} installments={finance.installments} onOpen={() => onOpen("commissions")} />
       <FinancialPerformance transactions={finance.transactions} installments={finance.installments} />
+      <SalesPortfolio commissions={finance.commissions} onOpen={() => onOpen("commissions")} />
       <CommissionRankings commissions={finance.commissions} clients={clients} />
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
       <div className="space-y-5">
@@ -253,18 +259,6 @@ function DashboardFinance({
             <ForecastItem label="60 dias" value={finance.metrics.forecast.next60} />
             <ForecastItem label="90 dias" value={finance.metrics.forecast.next90} />
             <ForecastItem label="Após 90 dias" value={finance.metrics.forecast.after90} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Projeção financeira</CardTitle>
-            <CardDescription>Recebido, confirmado e potencial ficam sempre separados.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3">
-            <ProjectionCard label="Recebido" value={finance.metrics.commissionReceivedMonth} />
-            <ProjectionCard label="Confirmado" value={finance.metrics.commissionReceivable} />
-            <ProjectionCard label="Potencial" value={finance.metrics.commissionPotential} muted />
           </CardContent>
         </Card>
 
@@ -329,7 +323,7 @@ function DashboardFinance({
   );
 }
 
-function SalesPortfolio({ commissions, installments, onOpen }: { commissions: Commission[]; installments: CommissionInstallment[]; onOpen: () => void }) {
+function SalesPortfolio({ commissions, onOpen }: { commissions: Commission[]; onOpen: () => void }) {
   const [query, setQuery] = useState("");
   const now = new Date();
   const monthKey = format(now, "yyyy-MM");
@@ -338,7 +332,6 @@ function SalesPortfolio({ commissions, installments, onOpen }: { commissions: Co
   const monthSales = sales.filter((item) => item.sale_date?.startsWith(monthKey));
   const yearSales = sales.filter((item) => item.sale_date?.startsWith(yearKey));
   const totalCommission = sum(sales.map((item) => item.net_commission));
-  const receivedCommission = sum(installments.map((item) => item.received_amount));
   const yearVgv = sum(yearSales.map((item) => item.vgv));
   const months = Array.from({ length: 6 }, (_, index) => {
     const date = subMonths(now, 5 - index);
@@ -353,11 +346,10 @@ function SalesPortfolio({ commissions, installments, onOpen }: { commissions: Co
 
   return <section className="motion-rise space-y-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase text-primary"><BriefcaseBusiness className="h-4 w-4" />Carteira de vendas</div><h2 className="mt-1 text-xl font-semibold">Vendas e comissões</h2><p className="mt-1 text-sm text-muted-foreground">Visão consolidada das vendas cadastradas, sem contar cancelamentos.</p></div><Button variant="outline" onClick={onOpen}>Abrir comissões</Button></div>
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <SalesMetric label="Vendas no mês" value={String(monthSales.length)} helper={format(now, "MMMM", { locale: ptBR })} />
       <SalesMetric label="Vendas no ano" value={String(yearSales.length)} helper={yearKey} />
       <SalesMetric label="Comissão gerada" value={formatCurrency(totalCommission)} helper="total não cancelado" wide />
-      <SalesMetric label="Comissão recebida" value={formatCurrency(receivedCommission)} helper="parcelas recebidas" />
       <SalesMetric label="VGV no ano" value={formatCurrency(yearVgv)} helper={`${yearSales.length} venda(s)`} />
     </div>
     <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -412,11 +404,9 @@ function FinancialPerformance({ transactions, installments }: { transactions: Fi
         </div>
       </CardHeader>
       <CardContent className="space-y-5 p-3 sm:p-5">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-          <DarkMetric label="Resultado filtrado" value={formatCurrency(current.result)} helper={`${formatCurrency(current.income)} recebidos`} featured />
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <DarkMetric label="Melhor mês" value={best ? formatCurrency(best.result) : "Sem dados"} helper={best ? format(parseISO(`${best.key}-01`), "MMMM 'de' yyyy", { locale: ptBR }) : "Registre movimentos"} />
           <DarkMetric label="Comparativo anterior" value={comparison === null ? "Sem base" : `${comparison >= 0 ? "+" : ""}${comparison}%`} helper={`Anterior: ${formatCurrency(previous.result)}`} positive={comparison !== null && comparison >= 0} />
-          <DarkMetric label="Despesas do período" value={formatCurrency(current.expenses)} helper={`${current.movements} movimento(s)`} />
         </div>
         <div className="rounded-[1.4rem] border bg-background/45 p-4 dark:border-white/10 dark:bg-white/[0.035]">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -440,9 +430,9 @@ function FinancialPerformance({ transactions, installments }: { transactions: Fi
   );
 }
 
-function DarkMetric({ label, value, helper, featured, positive }: { label: string; value: string; helper: string; featured?: boolean; positive?: boolean }) {
+function DarkMetric({ label, value, helper, positive }: { label: string; value: string; helper: string; positive?: boolean }) {
   return (
-    <div className={cn("min-w-0 rounded-[1.35rem] border bg-card p-4 dark:border-white/10 dark:bg-white/[0.045]", featured && "border-primary/35 bg-primary/5 dark:bg-primary/10")}>
+    <div className="min-w-0 rounded-[1.35rem] border bg-card p-4 dark:border-white/10 dark:bg-white/[0.045]">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className={cn("mt-2 truncate text-xl font-semibold sm:text-2xl", positive && "text-emerald-600 dark:text-emerald-400")}>{value}</p>
       <p className="mt-2 truncate text-[0.68rem] text-muted-foreground">{helper}</p>
@@ -1221,15 +1211,6 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: str
   );
 }
 
-function HeroMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border bg-background/45 p-3 sm:rounded-3xl sm:p-4 dark:border-white/10 dark:bg-white/[0.06]">
-      <p className="text-xs text-muted-foreground dark:text-white/55">{label}</p>
-      <p className="mt-1 text-lg font-semibold sm:text-xl">{value}</p>
-    </div>
-  );
-}
-
 function FinanceCard({ label, value, icon: Icon, onClick, featured }: { label: string; value: string; icon: React.ElementType; onClick?: () => void; featured?: boolean }) {
   const Comp = onClick ? "button" : "div";
   return (
@@ -1255,15 +1236,6 @@ function ForecastItem({ label, value }: { label: string; value: number }) {
     <div className="rounded-2xl border bg-background/40 p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-semibold">{formatCurrency(value)}</p>
-    </div>
-  );
-}
-
-function ProjectionCard({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
-  return (
-    <div className={cn("rounded-3xl border p-4", muted ? "bg-muted/60" : "bg-card")}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{formatCurrency(value)}</p>
     </div>
   );
 }
