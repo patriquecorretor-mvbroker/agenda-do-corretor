@@ -2,12 +2,19 @@ import type { CityMedia } from "@/types/database";
 
 export type CityPageProfile = {
   name: string;
+  folderName: string;
   state: string;
   tagline: string;
   description: string;
   coverUrl: string;
   driveUrl: string;
   tourUrl: string;
+};
+
+export type SharedCityBroker = {
+  name: string;
+  brand: string;
+  logo: string;
 };
 
 export type SharedCityMedia = Pick<CityMedia, "title" | "media_type" | "category" | "neighborhood" | "orientation"> & {
@@ -17,6 +24,7 @@ export type SharedCityMedia = Pick<CityMedia, "title" | "media_type" | "category
 export type SharedCityPage = {
   version: 1;
   profile: CityPageProfile;
+  broker?: SharedCityBroker;
   media: SharedCityMedia[];
 };
 
@@ -33,6 +41,7 @@ export const categoryLabels: Record<CityMedia["category"], string> = {
 const defaultProfiles: Record<string, CityPageProfile> = {
   "Capão da Canoa": {
     name: "Capão da Canoa",
+    folderName: "Guia de Capão da Canoa",
     state: "Rio Grande do Sul",
     tagline: "Viva o litoral de um jeito especial.",
     description: "Conheça praias, bairros, gastronomia e o estilo de vida de Capão da Canoa em uma seleção preparada pelo seu corretor.",
@@ -42,6 +51,7 @@ const defaultProfiles: Record<string, CityPageProfile> = {
   },
   "Xangri-Lá": {
     name: "Xangri-Lá",
+    folderName: "Guia de Xangri-Lá",
     state: "Rio Grande do Sul",
     tagline: "Um novo olhar para viver junto ao mar.",
     description: "Explore praias, condomínios, gastronomia e experiências de Xangri-Lá em uma apresentação organizada para você.",
@@ -54,6 +64,7 @@ const defaultProfiles: Record<string, CityPageProfile> = {
 export function cityProfile(city: string, media: CityMedia[] = []): CityPageProfile {
   const fallback = defaultProfiles[city] ?? {
     name: city,
+    folderName: `Guia de ${city}`,
     state: "Rio Grande do Sul",
     tagline: "Descubra cada detalhe desta cidade.",
     description: `Uma seleção de imagens e experiências de ${city}, organizada pelo seu corretor.`,
@@ -73,10 +84,11 @@ export function saveCityProfile(profile: CityPageProfile) {
   localStorage.setItem(`agenda-city-page:${profile.name}`, JSON.stringify(profile));
 }
 
-export function makeSharedCityPage(profile: CityPageProfile, media: CityMedia[]): SharedCityPage {
+export function makeSharedCityPage(profile: CityPageProfile, media: CityMedia[], broker: SharedCityBroker): SharedCityPage {
   return {
     version: 1,
     profile,
+    broker,
     media: media.filter((item) => Boolean(item.media_url)).slice(0, 12).map((item) => ({
       title: item.title,
       media_type: item.media_type,

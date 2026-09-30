@@ -12,15 +12,18 @@ export function PublicCityPage({ page }: { page: SharedCityPage }) {
   const [category, setCategory] = useState<string>("todos");
   const categories = useMemo(() => Array.from(new Set(page.media.map((item) => item.category))), [page.media]);
   const visible = page.media.filter((item) => (filter === "todos" || item.media_type === filter) && (category === "todos" || item.category === category));
+  const folderName = page.profile.folderName || `Guia de ${page.profile.name}`;
+  const brokerName = page.broker?.name || "Seu corretor";
 
   return <main className="min-h-screen bg-[#f4f6f8] text-[#0b1220] dark:bg-[#05080d] dark:text-white">
     <section className="relative min-h-[54vh] overflow-hidden bg-[#07111d] text-white">
       <img src={page.profile.coverUrl} alt={page.profile.name} className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#05080d] via-[#05080d]/35 to-black/10" />
       <div className="relative mx-auto flex min-h-[54vh] max-w-6xl flex-col justify-end px-5 pb-10 pt-24 sm:px-8 lg:px-10">
-        <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/75"><MapPin className="h-4 w-4" />{page.profile.state}</div>
-        <h1 className="max-w-4xl text-4xl font-semibold sm:text-6xl">{page.profile.name}</h1>
+        <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/75"><MapPin className="h-4 w-4" />{page.profile.name} · {page.profile.state}</div>
+        <h1 className="max-w-4xl text-4xl font-semibold sm:text-6xl">{folderName}</h1>
         <p className="mt-3 max-w-xl text-lg text-white/82">{page.profile.tagline}</p>
+        <div className="mt-5 flex w-fit items-center gap-3 rounded-2xl border border-white/15 bg-black/25 px-3 py-2.5 backdrop-blur"><img src={page.broker?.logo || "/brand/mv-broker-logo.jpg"} alt="" className="h-10 w-10 rounded-full border border-white/20 object-cover" /><div><p className="text-xs text-white/60">Apresentado por</p><p className="text-sm font-semibold">{brokerName}{page.broker?.brand ? ` · ${page.broker.brand}` : ""}</p></div></div>
         <div className="mt-6 flex flex-wrap gap-2">{page.profile.tourUrl && <Button asChild className="bg-white text-black hover:bg-white/90"><a href={safeExternalUrl(page.profile.tourUrl)} target="_blank" rel="noreferrer"><ScanLine className="h-4 w-4" />Tour 360</a></Button>}{page.profile.driveUrl && <Button asChild variant="outline" className="border-white/25 bg-black/20 text-white hover:bg-black/40 hover:text-white"><a href={safeExternalUrl(page.profile.driveUrl)} target="_blank" rel="noreferrer"><FolderOpen className="h-4 w-4" />Abrir materiais</a></Button>}</div>
       </div>
     </section>
@@ -32,7 +35,7 @@ export function PublicCityPage({ page }: { page: SharedCityPage }) {
         <div className="flex gap-2 overflow-x-auto pb-1"><Topic active={category === "todos"} label="Todos os assuntos" onClick={() => setCategory("todos")} />{categories.map((item) => <Topic key={item} active={category === item} label={categoryLabels[item]} onClick={() => setCategory(item)} />)}</div>
         {visible.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{visible.map((item, index) => <PublicMediaCard key={`${item.title}-${index}`} item={item} />)}</div> : <div className="rounded-2xl border border-dashed border-black/10 bg-white px-5 py-12 text-center dark:border-white/10 dark:bg-white/5"><ImageIcon className="mx-auto h-7 w-7 text-[#98a2b3]" /><p className="mt-3 font-semibold">Nenhuma mídia neste assunto</p></div>}
       </section>
-      <footer className="border-t border-black/8 py-6 text-center text-xs text-[#667085] dark:border-white/10 dark:text-white/45">Apresentação preparada pelo seu corretor de imóveis.</footer>
+      <footer className="border-t border-black/8 py-6 text-center text-xs text-[#667085] dark:border-white/10 dark:text-white/45">Pasta preparada por <strong className="font-semibold text-[#0b1220] dark:text-white/75">{brokerName}</strong>.</footer>
     </div>
   </main>;
 }
