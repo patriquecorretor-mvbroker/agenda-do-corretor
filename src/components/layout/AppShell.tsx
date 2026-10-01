@@ -111,8 +111,8 @@ export function AppShell({
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,hsl(var(--sidebar))_96%)]" />
         <div className="relative mb-5 flex items-center gap-3 px-1 pt-1">
           <img
-            src="/brand/mv-broker-logo.jpg"
-            alt="MV Broker"
+            src="/icons/app-icon-master.png"
+            alt="Agenda do Corretor"
             className="h-14 w-14 rounded-2xl border border-primary/40 object-cover shadow-[0_8px_28px_rgba(218,165,57,0.25)]"
           />
           <div>

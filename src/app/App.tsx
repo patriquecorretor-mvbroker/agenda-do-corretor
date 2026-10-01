@@ -155,7 +155,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: bool
     return (
       <main className="grid min-h-screen place-items-center bg-background px-5 text-foreground">
         <section className="w-full max-w-md rounded-3xl border bg-card p-6 text-center shadow-soft">
-          <img src="/brand/mv-broker-logo.jpg" alt="MV Broker" className="mx-auto h-16 w-16 rounded-2xl object-cover" />
+          <img src="/icons/app-icon-master.png" alt="Agenda do Corretor" className="mx-auto h-16 w-16 rounded-2xl object-cover" />
           <h1 className="mt-5 text-2xl font-semibold">Vamos atualizar o aplicativo</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Uma versão antiga ficou salva neste dispositivo. Atualize para carregar a versão mais recente.

@@ -46,8 +46,8 @@ export function AuthPage() {
         <section className="rounded-[2rem] p-4 text-white md:p-8">
           <div className="mb-10 flex items-center gap-3">
             <img
-              src="/brand/mv-broker-logo.jpg"
-              alt="MV Broker"
+              src="/icons/app-icon-master.png"
+              alt="Agenda do Corretor"
               className="h-16 w-16 rounded-2xl border border-primary/40 object-cover shadow-[0_18px_44px_rgba(218,165,57,0.28)]"
             />
             <div>
