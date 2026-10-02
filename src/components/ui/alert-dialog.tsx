@@ -10,13 +10,15 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  onConfirm
+  onConfirm,
+  confirmLabel = "Excluir"
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string;
   onConfirm: () => void;
+  confirmLabel?: string;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -37,7 +39,7 @@ export function ConfirmDialog({
             </AlertDialogPrimitive.Cancel>
             <AlertDialogPrimitive.Action asChild>
               <Button variant="destructive" onClick={onConfirm}>
-                Excluir
+                {confirmLabel}
               </Button>
             </AlertDialogPrimitive.Action>
           </div>

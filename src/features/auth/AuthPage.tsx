@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import { useAuth } from "@/features/auth/auth-context";
+import { LegalDocumentDialog } from "@/features/legal/LegalDocumentDialog";
+import { legalVersions, type LegalDocumentType } from "@/features/legal/legal-content";
 
 type Mode = "login" | "signup" | "reset";
 
@@ -17,13 +19,22 @@ export function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [legalDocument, setLegalDocument] = useState<LegalDocumentType | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
     try {
       if (mode === "login") await signIn(email, password);
-      if (mode === "signup") await signUp(email, password);
+      if (mode === "signup") {
+        if (!acceptedLegal) throw new Error("Aceite os Termos de Uso e a Política de Privacidade para criar a conta.");
+        await signUp(email, password, {
+          termsVersion: legalVersions.terms,
+          privacyVersion: legalVersions.privacy,
+          acceptedAt: new Date().toISOString()
+        });
+      }
       if (mode === "reset") await resetPassword(email);
       toast({
         title:
@@ -79,6 +90,7 @@ export function AuthPage() {
                 <div className="rounded-2xl border bg-muted/50 p-4 text-sm text-muted-foreground">
                   Os dados desse modo ficam somente neste navegador. Para login real e sincronização entre dispositivos, basta configurar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
                 </div>
+                <LegalLinks onOpen={setLegalDocument} />
               </div>
             ) : (
               <form className="space-y-5" onSubmit={handleSubmit}>
@@ -110,6 +122,14 @@ export function AuthPage() {
                     </div>
                   </div>
                 )}
+                {mode === "signup" && (
+                  <label className="flex items-start gap-3 rounded-2xl border bg-muted/35 p-4 text-sm leading-5">
+                    <input type="checkbox" checked={acceptedLegal} onChange={(event) => setAcceptedLegal(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
+                    <span>
+                      Li e aceito os <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setLegalDocument("terms")}>Termos de Uso</button> e a <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setLegalDocument("privacy")}>Política de Privacidade</button>.
+                    </span>
+                  </label>
+                )}
                 <Button className="w-full" size="lg" disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                   {mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Enviar recuperação"}
@@ -123,11 +143,17 @@ export function AuthPage() {
                     Esqueci a senha
                   </button>
                 </div>
+                <LegalLinks onOpen={setLegalDocument} />
               </form>
             )}
           </CardContent>
         </Card>
       </div>
+      <LegalDocumentDialog document={legalDocument} onOpenChange={(open) => !open && setLegalDocument(null)} />
     </main>
   );
+}
+
+function LegalLinks({ onOpen }: { onOpen: (document: LegalDocumentType) => void }) {
+  return <div className="flex justify-center gap-4 text-xs text-muted-foreground"><button type="button" className="hover:text-foreground" onClick={() => onOpen("terms")}>Termos de Uso</button><button type="button" className="hover:text-foreground" onClick={() => onOpen("privacy")}>Privacidade</button></div>;
 }

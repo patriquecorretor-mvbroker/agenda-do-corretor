@@ -3,6 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
 
 type AppUser = Pick<User, "id" | "email">;
+type LegalAcceptance = { termsVersion: string; privacyVersion: string; acceptedAt: string };
 
 type AuthContextValue = {
   user: AppUser | null;
@@ -10,7 +11,7 @@ type AuthContextValue = {
   loading: boolean;
   isDemo: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, legal: LegalAcceptance) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -73,13 +74,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       },
-      async signUp(email, password) {
+      async signUp(email, password, legal) {
         if (!supabase) {
+          safeStorageSet("agenda-legal-acceptance", JSON.stringify(legal));
           safeStorageSet("agenda-demo-session", "true");
           setDemoEnabled(true);
           return;
         }
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              terms_version: legal.termsVersion,
+              privacy_version: legal.privacyVersion,
+              legal_accepted_at: legal.acceptedAt
+            }
+          }
+        });
         if (error) throw error;
       },
       async resetPassword(email) {

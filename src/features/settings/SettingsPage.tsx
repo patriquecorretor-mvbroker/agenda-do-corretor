@@ -1,10 +1,17 @@
-import { Check, Moon, Palette, Sparkles, Sun } from "lucide-react";
+import { useState } from "react";
+import { Check, Download, Loader2, Moon, Palette, ShieldCheck, Sparkles, Sun, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { getPalette, palettes, type PaletteId } from "@/lib/appearance";
+import { useAuth } from "@/features/auth/auth-context";
+import { useToast } from "@/components/ui/toast";
+import { downloadAccountExport, exportAccountData, requestAccountDeletion } from "@/features/legal/account-data";
+import { LegalDocumentDialog } from "@/features/legal/LegalDocumentDialog";
+import type { LegalDocumentType } from "@/features/legal/legal-content";
 
 export function SettingsPage({
   dark,
@@ -22,6 +29,35 @@ export function SettingsPage({
   onCustomColorChange: (color: string) => void;
 }) {
   const selected = getPalette(palette);
+  const { user, isDemo } = useAuth();
+  const { toast } = useToast();
+  const [legalDocument, setLegalDocument] = useState<LegalDocumentType | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
+
+  async function handleExport() {
+    if (!user) return;
+    setExporting(true);
+    try {
+      downloadAccountExport(await exportAccountData(user.id));
+      toast({ title: "Seus dados foram exportados." });
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Não foi possível exportar os dados.", variant: "error" });
+    } finally { setExporting(false); }
+  }
+
+  async function handleDeletionRequest() {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      await requestAccountDeletion(user.id, user.email);
+      setConfirmDeletion(false);
+      toast({ title: isDemo ? "Solicitação registrada neste navegador." : "Solicitação de exclusão registrada." });
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Não foi possível registrar a solicitação.", variant: "error" });
+    } finally { setDeleting(false); }
+  }
 
   return (
     <div className="space-y-5">
@@ -109,6 +145,21 @@ export function SettingsPage({
           </CardContent>
         </Card>
       </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="h-5 w-5" /></span><div><CardTitle>Privacidade e seus dados</CardTitle><CardDescription>Consulte os documentos, baixe uma cópia dos dados da conta ou solicite a exclusão.</CardDescription></div></div>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Button variant="outline" onClick={() => setLegalDocument("terms")}>Termos de Uso</Button>
+          <Button variant="outline" onClick={() => setLegalDocument("privacy")}>Política de Privacidade</Button>
+          <Button variant="outline" onClick={() => void handleExport()} disabled={exporting}>{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}Exportar meus dados</Button>
+          <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setConfirmDeletion(true)}><Trash2 className="h-4 w-4" />Solicitar exclusão</Button>
+          <p className="md:col-span-2 xl:col-span-4 text-xs leading-5 text-muted-foreground">A exclusão é processada após validação administrativa e pode preservar registros exigidos por lei. {isDemo && "No modo demonstração, a solicitação fica registrada apenas neste navegador."}</p>
+        </CardContent>
+      </Card>
+      <LegalDocumentDialog document={legalDocument} onOpenChange={(open) => !open && setLegalDocument(null)} />
+      <ConfirmDialog open={confirmDeletion} onOpenChange={setConfirmDeletion} title="Solicitar exclusão da conta?" description="A solicitação será registrada para análise. Seus dados não serão apagados imediatamente e você continuará com acesso até o processamento." confirmLabel="Registrar solicitação" onConfirm={() => void handleDeletionRequest()} />
+      {deleting && <span className="sr-only" role="status">Registrando solicitação de exclusão.</span>}
     </div>
   );
 }
