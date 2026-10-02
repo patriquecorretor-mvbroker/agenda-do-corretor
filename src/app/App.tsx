@@ -11,6 +11,7 @@ import { getPalette, hexToHsl, primaryForegroundFor, type PaletteId } from "@/li
 import { PublicCityPage } from "@/features/city-media/PublicCityPage";
 import { readSharedCityPage } from "@/features/city-media/city-pages";
 import { useSubscriptionAccess } from "@/features/admin/use-saas-admin";
+import { hasSubscriptionAccess } from "@/features/admin/subscription-access";
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -58,8 +59,20 @@ function AppContent() {
     );
   }
 
-  if (["suspended", "canceled"].includes(access.data?.status ?? "")) {
-    return <main className="grid min-h-screen place-items-center bg-[#05070a] px-5 text-white"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0e13] p-7 text-center shadow-2xl"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary"><CreditCard className="h-6 w-6" /></span><p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">Assinatura</p><h1 className="mt-2 text-2xl font-semibold">Acesso temporariamente indisponível</h1><p className="mt-3 text-sm leading-6 text-white/50">Sua conta está {access.data?.status === "suspended" ? "suspensa" : "cancelada"}. Entre em contato com a MV Broker para regularizar o plano sem perder seus dados.</p><Button className="mt-6 w-full" asChild><a href="mailto:suporte@mvbroker.com.br">Regularizar assinatura</a></Button><Button variant="ghost" className="mt-2 w-full text-white/60 hover:bg-white/5 hover:text-white" onClick={() => void signOut()}><LogOut className="h-4 w-4" />Sair</Button></section></main>;
+  if (access.error || !hasSubscriptionAccess(access.data)) {
+    const status = access.data?.status;
+    const detail = access.error
+      ? "Não foi possível confirmar sua assinatura. Verifique a conexão e tente novamente."
+      : status === "past_due"
+        ? "Existe uma mensalidade pendente. Regularize o pagamento para recuperar o acesso sem perder seus dados."
+        : status === "trialing"
+          ? "Seu período de teste terminou. Escolha um plano para continuar usando a agenda."
+          : status === "suspended"
+            ? "Sua conta está suspensa. Entre em contato com a MV Broker para regularizar o acesso."
+            : status === "canceled"
+              ? "Sua assinatura foi cancelada. Escolha um plano para voltar a usar a agenda."
+              : "Sua conta ainda não possui um plano ativo. Entre em contato para liberar o acesso.";
+    return <main className="grid min-h-screen place-items-center bg-[#05070a] px-5 text-white"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0e13] p-7 text-center shadow-2xl"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary"><CreditCard className="h-6 w-6" /></span><p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">Assinatura</p><h1 className="mt-2 text-2xl font-semibold">Acesso temporariamente indisponível</h1><p className="mt-3 text-sm leading-6 text-white/50">{detail}</p>{access.error && <Button className="mt-6 w-full" onClick={() => void access.refetch()}><RefreshCw className="h-4 w-4" />Tentar novamente</Button>} {!access.error && <Button className="mt-6 w-full" asChild><a href="mailto:suporte@mvbroker.com.br">Regularizar assinatura</a></Button>}<Button variant="ghost" className="mt-2 w-full text-white/60 hover:bg-white/5 hover:text-white" onClick={() => void signOut()}><LogOut className="h-4 w-4" />Sair</Button></section></main>;
   }
 
   const onboardingComplete = Boolean(

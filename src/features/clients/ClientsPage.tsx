@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowLeft, Bot, Building2, CalendarClock, CalendarPlus, Camera, Check, ChevronRight, CircleDollarSign, Crown, ExternalLink, Grid2X2, Layers3, LayoutList, LocateFixed, Map, MapPin, Megaphone, MessageCircle, Phone, Plus, Route, Search, SlidersHorizontal, Thermometer, Trophy, UserRoundSearch, Users, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -13,7 +13,7 @@ import { ClientMap } from "./ClientMap";
 import { useClients } from "./use-clients";
 import { AiClientIntake } from "./AiClientIntake";
 import { ClientDetailDialog } from "./ClientDetailDialog";
-import { ClientForm, clientPaymentConditions } from "./ClientForm";
+import { ClientForm } from "./ClientForm";
 import type { ClientInput } from "./client-service";
 import { Button } from "@/components/ui/button";
 import { RouteButton } from "@/components/RouteButton";
@@ -23,7 +23,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCurrency } from "@/lib/utils";
-import { useFinance } from "@/features/finance/use-finance";
 import { buildingAddress, useBuildings } from "@/features/buildings/use-buildings";
 
 type ClientStage = "lead" | "em contato" | "visita agendada" | "comprador" | "pós-venda";
@@ -85,7 +84,6 @@ const demoClients: ClientMapItem[] = [
 ];
 
 const allValue = "todos";
-const clientStorageKey = "mv-broker-clients";
 const visitStorageKey = "mv-broker-client-visits";
 const cityCoordinates: Record<string, { lat: number; lng: number }> = {
   "são paulo": { lat: -23.5558, lng: -46.6396 },
@@ -103,7 +101,6 @@ const cityCoordinates: Record<string, { lat: number; lng: number }> = {
 };
 
 export function ClientsPage() {
-  const finance = useFinance();
   const { toast } = useToast();
   const { user, isDemo } = useAuth();
   const marks = useClientMarks();
@@ -133,13 +130,6 @@ export function ClientsPage() {
       return data;
     }
   });
-  const [customClients, setCustomClients] = useState<ClientMapItem[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(clientStorageKey) ?? "[]") as ClientMapItem[];
-    } catch {
-      return [];
-    }
-  });
   const [query, setQuery] = useState("");
   const [city, setCity] = useState(allValue);
   const [profile, setProfile] = useState(allValue);
@@ -166,10 +156,6 @@ export function ClientsPage() {
     }
   });
 
-  useEffect(() => {
-    localStorage.setItem(clientStorageKey, JSON.stringify(customClients));
-  }, [customClients]);
-
   const visitLog = [...(isDemo ? legacyVisits : []), ...marks.marks.flatMap((mark) => (mark.visits ?? []).map((date) => ({ clientId: mark.client_id, date })))];
   const visitedClientIds = new Set(visitLog.map((visit) => visit.clientId));
   const now = new Date();
@@ -178,50 +164,38 @@ export function ClientsPage() {
   const visitedThisYearIds = new Set(visitLog.filter((visit) => new Date(visit.date).getFullYear() === now.getFullYear()).map((visit) => visit.clientId));
   const scheduledIds = new Set((scheduled.data ?? []).map((event) => event.notes?.slice("client-map:".length)));
 
-  const financeClients = finance.commissions
-    .filter((commission) => commission.client)
-    .map((commission, index) => ({
-      id: `sale-${commission.id}`,
-      name: commission.client ?? "Cliente",
-      city: "Cidade não informada",
-      neighborhood: commission.builder ?? "Venda vinculada",
-      profile: commission.property ?? commission.development ?? "Imóvel vendido",
-      stage: "comprador" as ClientStage,
-      bought: true,
-      downloads: 1,
-      x: 42 + (index % 4) * 8,
-      y: 38 + (index % 3) * 12
-    }));
-
-  const crmClients: ClientMapItem[] = crm.clients.map((client) => ({
-    id: client.id,
-    name: client.name,
-    city: client.city ?? "Cidade não informada",
-    neighborhood: client.neighborhood ?? "Bairro não informado",
-    profile: client.property_profile ?? "Perfil não informado",
-    stage: clientStatusToMapStage(client.status),
-    bought: client.status === "venda realizada" || client.status === "pós-venda",
-    downloads: 0,
-    x: 50,
-    y: 50,
-    lat: client.lat ?? undefined,
-    lng: client.lng ?? undefined,
-    locationPrecision: client.lat !== null && client.lng !== null ? "exact" : "city",
-    whatsapp: client.whatsapp ?? client.phone ?? undefined,
-    phone: client.phone ?? undefined,
-    crmStatus: client.status,
-    budgetMin: client.budget_min ?? undefined,
-    budgetMax: client.budget_max ?? undefined,
-    paymentCondition: client.payment_condition ?? undefined,
-    bedrooms: client.bedrooms ?? undefined,
-    nextFollowUp: client.next_follow_up ?? undefined,
-    source: client.source ?? undefined,
-    temperature: client.temperature ?? undefined
-  }));
-  const clients: ClientMapItem[] = [...(isDemo ? demoClients.map((client, index) => ({ ...client, photo: `https://i.pravatar.cc/96?img=${[47,12,44,13,49,14,45,15,48,16][index]}`, source: ["Instagram", "Indicação", "Portal imobiliário", "WhatsApp"][index % 4], temperature: (["quente", "morno", "frio"] as ClientTemperature[])[index % 3], budgetMin: [600000, 900000, 1500000, 450000][index % 4], budgetMax: [900000, 1500000, 2800000, 700000][index % 4], paymentCondition: clientPaymentConditions[index % (clientPaymentConditions.length - 1)] })) : []), ...crmClients, ...financeClients, ...customClients].map((client) => {
+  const clients: ClientMapItem[] = crm.clients.map((client, index) => {
+    const demo = isDemo ? demoClients.find((item) => normalizeText(item.name) === normalizeText(client.name)) : undefined;
     const mark = marks.marks.find((item) => item.client_id === client.id);
-    const coordinates = !("lat" in client) || !("lng" in client) || client.lat === undefined || client.lng === undefined ? coordinatesForCity(client.city) : {};
-    return { ...client, ...coordinates, photo: mark?.photo ?? ("photo" in client ? client.photo as string : undefined), bought: mark?.sold ?? client.bought };
+    const city = client.city ?? demo?.city ?? "Cidade não informada";
+    const storedCoordinates = client.lat !== null && client.lng !== null ? { lat: client.lat, lng: client.lng } : undefined;
+    const coordinates = storedCoordinates ?? (demo?.lat !== undefined && demo.lng !== undefined ? { lat: demo.lat, lng: demo.lng } : coordinatesForCity(city));
+    const bought = client.status === "venda realizada" || client.status === "pós-venda";
+    return {
+      id: client.id,
+      name: client.name,
+      city,
+      neighborhood: client.neighborhood ?? demo?.neighborhood ?? "Bairro não informado",
+      profile: client.property_profile ?? demo?.profile ?? "Perfil não informado",
+      stage: clientStatusToMapStage(client.status),
+      bought: mark?.sold ?? bought,
+      downloads: demo?.downloads ?? 0,
+      x: demo?.x ?? 30 + (index % 6) * 8,
+      y: demo?.y ?? 30 + (index % 5) * 10,
+      ...coordinates,
+      locationPrecision: storedCoordinates || demo?.lat !== undefined ? "exact" : "city",
+      photo: mark?.photo ?? (isDemo ? `https://i.pravatar.cc/96?img=${[47, 44, 49, 45, 12, 13, 14, 15][index % 8]}` : undefined),
+      whatsapp: client.whatsapp ?? client.phone ?? demo?.whatsapp ?? undefined,
+      phone: client.phone ?? undefined,
+      crmStatus: client.status,
+      budgetMin: client.budget_min ?? undefined,
+      budgetMax: client.budget_max ?? undefined,
+      paymentCondition: client.payment_condition ?? undefined,
+      bedrooms: client.bedrooms ?? undefined,
+      nextFollowUp: client.next_follow_up ?? undefined,
+      source: client.source ?? undefined,
+      temperature: client.temperature ?? undefined
+    };
   });
   const cities = Array.from(new Set(clients.map((client) => client.city)));
   const profiles = Array.from(new Set(clients.map((client) => client.profile)));
@@ -505,35 +479,6 @@ export function ClientsPage() {
     }
   }
 
-  function addClient(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const name = String(form.get("name") || "").trim();
-    const nextCity = String(form.get("city") || "").trim();
-    const nextProfile = String(form.get("profile") || "").trim();
-    if (!name || !nextCity || !nextProfile) return;
-    const index = customClients.length + demoClients.length;
-    const coordinates = coordinatesForCity(nextCity);
-    const next: ClientMapItem = {
-      id: `custom-${Date.now()}`,
-      name,
-      city: nextCity,
-      neighborhood: String(form.get("neighborhood") || "").trim() || "Bairro não informado",
-      profile: nextProfile,
-      stage: String(form.get("stage") || "lead") as ClientStage,
-      bought: form.get("bought") === "on",
-      downloads: Number(form.get("downloads") || 1),
-      x: 18 + (index * 13) % 66,
-      y: 24 + (index * 17) % 58,
-      ...coordinates
-    };
-    setCustomClients((current) => [...current, next]);
-    setCity(nextCity);
-    setSelectedClientId(null);
-    toast({ title: coordinates.lat !== undefined ? "Cliente cadastrado com localização aproximada." : "Cliente cadastrado. Localização não identificada." });
-    event.currentTarget.reset();
-  }
-
   async function markVisit(client: ClientMapItem) {
     if (marks.save.isPending || visitLog.some((visit) => visit.clientId === client.id && isTodayKey(visit.date))) return;
     try {
@@ -659,7 +604,7 @@ export function ClientsPage() {
         <div className="client-map-strip -mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
           <div className="flex w-max gap-2">
             {funnelStatuses.map((item) => {
-              const count = item.value === "all" ? crm.clients.length : crm.clients.filter((client) => client.status === item.value).length;
+              const count = item.value === "all" ? clients.length : clients.filter((client) => client.crmStatus === item.value).length;
               return <button key={item.value} type="button" onClick={() => setFunnelStage(item.value)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-2xl border border-[#EAECF0] bg-white px-3.5 text-sm font-semibold text-[#475467] transition duration-200 hover:-translate-y-0.5 hover:border-[#98A2B3] dark:border-border dark:bg-card dark:text-muted-foreground", funnelStage === item.value && "border-[#0B1220] bg-[#0B1220] text-white shadow-[0_8px_20px_rgba(11,18,32,0.16)] hover:border-[#0B1220]")}><span>{item.label}</span><span className={cn("tabular-nums", funnelStage === item.value ? "text-white/65" : "text-[#98A2B3]")}>{count}</span></button>;
             })}
           </div>

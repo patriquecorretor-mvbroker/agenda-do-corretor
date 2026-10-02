@@ -20,10 +20,7 @@ export async function getWeather(city?: string | null): Promise<WeatherData> {
       return response.json();
     }
 
-    const locationResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=pt&format=json`);
-    if (!locationResponse.ok) return unavailableWeather();
-    const locationPayload = await locationResponse.json() as { results?: Array<{ latitude: number; longitude: number; timezone?: string }> };
-    const location = locationPayload.results?.[0];
+    const location = await findLocation(city);
     if (!location) return unavailableWeather();
 
     const params = new URLSearchParams({
@@ -66,11 +63,22 @@ export async function getWeather(city?: string | null): Promise<WeatherData> {
 }
 
 export function weatherMessage(weather: WeatherData) {
-  if (weather.source === "unavailable") return "Clima pronto para integração. Configure a API para exibir dados reais.";
+  if (weather.source === "unavailable") return "Clima indisponível no momento. Tente novamente em alguns minutos.";
   if (weather.rainChance !== null && weather.rainChance >= 50) return "Há possibilidade de chuva. Vale confirmar visitas externas.";
   if (weather.wind !== null && weather.wind > 35) return "Vento forte. Cuidado com gravações externas.";
   if (weather.temperature !== null) return "Boa condição para organizar visitas e compromissos externos.";
   return "Dados de clima disponíveis parcialmente.";
+}
+
+async function findLocation(city: string) {
+  const candidates = Array.from(new Set([city.trim(), city.split(",")[0]?.trim()].filter(Boolean)));
+  for (const candidate of candidates) {
+    const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(candidate)}&count=1&language=pt&format=json`);
+    if (!response.ok) continue;
+    const payload = await response.json() as { results?: Array<{ latitude: number; longitude: number; timezone?: string }> };
+    if (payload.results?.[0]) return payload.results[0];
+  }
+  return null;
 }
 
 function unavailableWeather(): WeatherData {

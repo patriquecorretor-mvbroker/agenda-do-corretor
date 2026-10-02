@@ -1,30 +1,32 @@
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, FileArchive, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/auth-context";
-import { QuickAddDialog } from "@/components/layout/QuickAddDialog";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
-import { AgendaPage } from "@/features/calendar/AgendaPage";
-import { ClientsPage } from "@/features/clients/ClientsPage";
-import { BuildingsPage } from "@/features/buildings/BuildingsPage";
-import { CondominiumsPage } from "@/features/condominiums/CondominiumsPage";
-import { CityMediaPage } from "@/features/city-media/CityMediaPage";
-import { MarketNewsPage } from "@/features/news/MarketNewsPage";
-import { FinancePage } from "@/features/finance/FinancePage";
-import { GoalsPage } from "@/features/goals/GoalsPage";
-import { ProfilePage } from "@/features/profile/ProfilePage";
-import { SettingsPage } from "@/features/settings/SettingsPage";
-import { FocusPage } from "@/features/focus/FocusPage";
-import { AdminPage } from "@/features/admin/AdminPage";
 import { useSaasAdmin, useSubscriptionAccess } from "@/features/admin/use-saas-admin";
-import { MaterialsLibraryPage } from "@/features/library/MaterialsLibraryPage";
-import { MyFilesPage } from "@/features/files/MyFilesPage";
 import { useProfile } from "@/features/profile/use-profile";
 import type { PaletteId } from "@/lib/appearance";
 import type { AppView } from "@/types/ui";
+import { canAccessView } from "@/features/admin/subscription-access";
+
+const QuickAddDialog = lazy(() => import("@/components/layout/QuickAddDialog").then((module) => ({ default: module.QuickAddDialog })));
+const AgendaPage = lazy(() => import("@/features/calendar/AgendaPage").then((module) => ({ default: module.AgendaPage })));
+const ClientsPage = lazy(() => import("@/features/clients/ClientsPage").then((module) => ({ default: module.ClientsPage })));
+const BuildingsPage = lazy(() => import("@/features/buildings/BuildingsPage").then((module) => ({ default: module.BuildingsPage })));
+const CondominiumsPage = lazy(() => import("@/features/condominiums/CondominiumsPage").then((module) => ({ default: module.CondominiumsPage })));
+const CityMediaPage = lazy(() => import("@/features/city-media/CityMediaPage").then((module) => ({ default: module.CityMediaPage })));
+const MarketNewsPage = lazy(() => import("@/features/news/MarketNewsPage").then((module) => ({ default: module.MarketNewsPage })));
+const FinancePage = lazy(() => import("@/features/finance/FinancePage").then((module) => ({ default: module.FinancePage })));
+const GoalsPage = lazy(() => import("@/features/goals/GoalsPage").then((module) => ({ default: module.GoalsPage })));
+const ProfilePage = lazy(() => import("@/features/profile/ProfilePage").then((module) => ({ default: module.ProfilePage })));
+const SettingsPage = lazy(() => import("@/features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const FocusPage = lazy(() => import("@/features/focus/FocusPage").then((module) => ({ default: module.FocusPage })));
+const AdminPage = lazy(() => import("@/features/admin/AdminPage").then((module) => ({ default: module.AdminPage })));
+const MaterialsLibraryPage = lazy(() => import("@/features/library/MaterialsLibraryPage").then((module) => ({ default: module.MaterialsLibraryPage })));
+const MyFilesPage = lazy(() => import("@/features/files/MyFilesPage").then((module) => ({ default: module.MyFilesPage })));
 
 type NavItem = { view: AppView; label: string; icon: React.ElementType };
 const navSections: Array<{ id: string; label: string; plan: string; items: NavItem[] }> = [
@@ -46,8 +48,6 @@ const navSections: Array<{ id: string; label: string; plan: string; items: NavIt
     { view: "profile", label: "Perfil", icon: User }, { view: "settings", label: "Configurações", icon: Settings }
   ] }
 ];
-const navItems = navSections.flatMap((section) => section.items);
-
 export function AppShell({
   dark,
   onDarkChange,
@@ -72,9 +72,15 @@ export function AppShell({
   const saasAdmin = useSaasAdmin();
   const subscription = useSubscriptionAccess();
   const { toast } = useToast();
-  const mobileItems = navItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
-  const moreSections = navSections.map((section) => ({ ...section, items: section.items.filter((item) => !["day", "agenda", "clients"].includes(item.view)) })).filter((section) => section.items.length);
+  const accessibleSections = useMemo(() => navSections.map((section) => ({ ...section, items: section.items.filter((item) => canAccessView(item.view, subscription.data)) })).filter((section) => section.items.length), [subscription.data]);
+  const accessibleItems = accessibleSections.flatMap((section) => section.items);
+  const mobileItems = accessibleItems.filter((item) => ["day", "agenda", "clients"].includes(item.view));
+  const moreSections = accessibleSections.map((section) => ({ ...section, items: section.items.filter((item) => !["day", "agenda", "clients"].includes(item.view)) })).filter((section) => section.items.length);
   const moreViews = moreSections.flatMap((section) => section.items.map((item) => item.view)).concat(saasAdmin.isAdmin ? ["admin" as AppView] : []);
+
+  useEffect(() => {
+    if (view !== "admin" && !canAccessView(view, subscription.data)) setView("day");
+  }, [subscription.data, view]);
 
   async function handleSignOut() {
     await signOut();
@@ -121,7 +127,7 @@ export function AppShell({
           </div>
         </div>
         <nav className="relative min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 [scrollbar-width:none]">
-          {navSections.map((section) => <div key={section.id}>
+          {accessibleSections.map((section) => <div key={section.id}>
             <div className="mb-1.5 flex items-center justify-between px-3"><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/32">{section.label}</p><span className="text-[9px] text-white/22">{section.plan}</span></div>
             <div className="grid gap-1">{section.items.map((item) => <SideNavButton key={item.view} item={item} active={view === item.view} onClick={() => setView(item.view)} />)}</div>
           </div>)}
@@ -157,39 +163,41 @@ export function AppShell({
           </div>
         </header>
         <div className="w-full min-w-0 lg:py-6">
-          {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
-          {view === "agenda" && <AgendaPage />}
-          {view === "clients" && <ClientsPage />}
-          {view === "focus" && <FocusPage onNavigate={setView} />}
-          {view === "buildings" && <BuildingsPage />}
-          {view === "condominiums" && <CondominiumsPage />}
-          {view === "city-media" && <CityMediaPage />}
-          {view === "news" && <MarketNewsPage />}
-          {view === "library" && <MaterialsLibraryPage />}
-          {view === "files" && <MyFilesPage />}
-          {view === "finance" && <FinancePage />}
-          {view === "goals" && <GoalsPage />}
-          {view === "profile" && (
-            <ProfilePage
-              dark={dark}
-              onDarkChange={onDarkChange}
-              palette={palette}
-              onPaletteChange={onPaletteChange}
-              customColor={customColor}
-              onCustomColorChange={onCustomColorChange}
-            />
-          )}
-          {view === "settings" && (
-            <SettingsPage
-              dark={dark}
-              onDarkChange={onDarkChange}
-              palette={palette}
-              onPaletteChange={onPaletteChange}
-              customColor={customColor}
-              onCustomColorChange={onCustomColorChange}
-            />
-          )}
-          {view === "admin" && saasAdmin.isAdmin && <AdminPage />}
+          <Suspense fallback={<PageLoading />}>
+            {view === "day" && <DashboardPage onNavigate={setView} dark={dark} onDarkChange={onDarkChange} />}
+            {view === "agenda" && <AgendaPage />}
+            {view === "clients" && <ClientsPage />}
+            {view === "focus" && <FocusPage onNavigate={setView} />}
+            {view === "buildings" && <BuildingsPage />}
+            {view === "condominiums" && <CondominiumsPage />}
+            {view === "city-media" && <CityMediaPage />}
+            {view === "news" && <MarketNewsPage />}
+            {view === "library" && <MaterialsLibraryPage />}
+            {view === "files" && <MyFilesPage />}
+            {view === "finance" && <FinancePage />}
+            {view === "goals" && <GoalsPage />}
+            {view === "profile" && (
+              <ProfilePage
+                dark={dark}
+                onDarkChange={onDarkChange}
+                palette={palette}
+                onPaletteChange={onPaletteChange}
+                customColor={customColor}
+                onCustomColorChange={onCustomColorChange}
+              />
+            )}
+            {view === "settings" && (
+              <SettingsPage
+                dark={dark}
+                onDarkChange={onDarkChange}
+                palette={palette}
+                onPaletteChange={onPaletteChange}
+                customColor={customColor}
+                onCustomColorChange={onCustomColorChange}
+              />
+            )}
+            {view === "admin" && saasAdmin.isAdmin && <AdminPage />}
+          </Suspense>
         </div>
       </main>
 
@@ -213,7 +221,7 @@ export function AppShell({
         </div>
       </nav>
 
-      <QuickAddDialog open={quickAddOpen} onOpenChange={setQuickAddOpen} />
+      {quickAddOpen && <Suspense fallback={null}><QuickAddDialog open onOpenChange={setQuickAddOpen} financeEnabled={canAccessView("finance", subscription.data)} /></Suspense>}
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Mais áreas</DialogTitle><DialogDescription>Acesse os demais módulos e configurações.</DialogDescription></DialogHeader>
@@ -222,6 +230,10 @@ export function AppShell({
       </Dialog>
     </div>
   );
+}
+
+function PageLoading() {
+  return <div className="animate-pulse space-y-4" role="status" aria-label="Carregando módulo"><div className="h-8 w-48 rounded-lg bg-muted" /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 rounded-2xl bg-muted" />)}</div><div className="h-72 rounded-2xl bg-muted" /></div>;
 }
 
 function SideNavButton({ item, active, onClick, admin = false }: { item: NavItem; active: boolean; onClick: () => void; admin?: boolean }) {

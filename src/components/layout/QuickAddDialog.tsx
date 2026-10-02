@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Banknote, CalendarClock, CalendarPlus, CheckSquare, Receipt, UserPlus, WalletCards } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,11 @@ import type { ClientInput } from "@/features/clients/client-service";
 
 type QuickAddMode = "event" | "task" | "client" | "income" | "expense" | "payable" | "commission";
 
-export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function QuickAddDialog({ open, onOpenChange, financeEnabled = true }: { open: boolean; onOpenChange: (open: boolean) => void; financeEnabled?: boolean }) {
   const [mode, setMode] = useState<QuickAddMode>("event");
+  useEffect(() => {
+    if (!financeEnabled && ["income", "expense", "payable", "commission"].includes(mode)) setMode("event");
+  }, [financeEnabled, mode]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -35,22 +38,22 @@ export function QuickAddDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <UserPlus className="h-4 w-4" />
             Cliente
           </Button>
-          <Button type="button" variant={mode === "income" ? "default" : "outline"} onClick={() => setMode("income")}>
+          {financeEnabled && <Button type="button" variant={mode === "income" ? "default" : "outline"} onClick={() => setMode("income")}>
             <Banknote className="h-4 w-4" />
             Receita
-          </Button>
-          <Button type="button" variant={mode === "expense" ? "default" : "outline"} onClick={() => setMode("expense")}>
+          </Button>}
+          {financeEnabled && <Button type="button" variant={mode === "expense" ? "default" : "outline"} onClick={() => setMode("expense")}>
             <Receipt className="h-4 w-4" />
             Despesa
-          </Button>
-          <Button type="button" variant={mode === "payable" ? "default" : "outline"} onClick={() => setMode("payable")}>
+          </Button>}
+          {financeEnabled && <Button type="button" variant={mode === "payable" ? "default" : "outline"} onClick={() => setMode("payable")}>
             <CalendarClock className="h-4 w-4" />
             Conta a pagar
-          </Button>
-          <Button type="button" variant={mode === "commission" ? "default" : "outline"} onClick={() => setMode("commission")}>
+          </Button>}
+          {financeEnabled && <Button type="button" variant={mode === "commission" ? "default" : "outline"} onClick={() => setMode("commission")}>
             <WalletCards className="h-4 w-4" />
             Comissão
-          </Button>
+          </Button>}
         </div>
         {mode === "event" && <EventForm onSaved={() => onOpenChange(false)} />}
         {mode === "task" && <TaskForm onSaved={() => onOpenChange(false)} />}

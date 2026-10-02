@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays, endOfMonth, format, isAfter, isBefore, isSameMonth, parseISO, startOfMonth } from "date-fns";
+import { addDays, addMonths, differenceInCalendarDays, endOfMonth, format, isAfter, isBefore, isSameMonth, parseISO, startOfMonth } from "date-fns";
 import type { Commission, CommissionInstallment, FinancialTransaction, MonthlyBudget } from "@/types/database";
 
 export const expenseCategories = [
@@ -169,7 +169,7 @@ export function buildEqualInstallments({
       user_id: userId,
       commission_id: commissionId,
       installment_number: index + 1,
-      due_date: format(addDays(parseISO(firstDate), index * 30), "yyyy-MM-dd"),
+      due_date: format(addMonths(parseISO(firstDate), index), "yyyy-MM-dd"),
       expected_amount: expected,
       received_amount: 0,
       received_date: null,

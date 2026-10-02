@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/auth-context";
 import { hasSupabaseConfig, requireSupabase } from "@/lib/supabase";
+import type { SubscriptionAccess } from "@/features/admin/subscription-access";
 
 export type SaasPlan = { id: string; name: string; slug: string; description: string; monthly_price: number; annual_price: number; features: string[]; active: boolean };
 export type SaasMember = { id: string; user_id: string; name: string; email: string; city: string; plan_id: string; status: "trialing" | "active" | "past_due" | "suspended" | "canceled"; renewal: string; created_at: string };
@@ -97,11 +98,13 @@ export function usePublishedMaterials() {
 export function useSubscriptionAccess() {
   const { user, isDemo } = useAuth();
   return useQuery({ queryKey: ["subscription-access", user?.id], enabled: Boolean(user), queryFn: async () => {
-    if (!hasSupabaseConfig) return { status: isDemo ? "active" as const : null, currentPeriodEnd: null as string | null, planId: isDemo ? "plan-profissional" : null, planName: isDemo ? "Profissional" : null, features: isDemo ? demoPlans[1].features : [] };
+    if (!hasSupabaseConfig) return { status: isDemo ? "active" as const : null, currentPeriodEnd: null, trialEndsAt: null, planId: isDemo ? "plan-profissional" : null, planName: isDemo ? "Profissional" : null, planSlug: isDemo ? "profissional" : null, features: isDemo ? demoPlans[1].features : [], isAdmin: isDemo } satisfies SubscriptionAccess;
     const db = requireSupabase() as any;
-    const { data, error } = await db.from("subscriptions").select("status,current_period_end,plan_id").eq("user_id", user!.id).maybeSingle();
+    const admin = await db.from("app_admins").select("user_id").eq("user_id", user!.id).maybeSingle();
+    if (admin.data) return { status: "active", currentPeriodEnd: null, trialEndsAt: null, planId: null, planName: "Administração", planSlug: "equipe", features: demoPlans[2].features, isAdmin: true } satisfies SubscriptionAccess;
+    const { data, error } = await db.from("subscriptions").select("status,current_period_end,trial_ends_at,plan_id").eq("user_id", user!.id).maybeSingle();
     if (error) throw error;
-    const plan = data?.plan_id ? await db.from("subscription_plans").select("name,features").eq("id", data.plan_id).maybeSingle() : { data: null };
-    return { status: data?.status as SaasMember["status"] | null, currentPeriodEnd: data?.current_period_end as string | null, planId: data?.plan_id as string | null, planName: plan.data?.name as string | null, features: (plan.data?.features ?? []) as string[] };
+    const plan = data?.plan_id ? await db.from("subscription_plans").select("name,slug,features").eq("id", data.plan_id).maybeSingle() : { data: null };
+    return { status: data?.status as SaasMember["status"] | null, currentPeriodEnd: data?.current_period_end as string | null, trialEndsAt: data?.trial_ends_at as string | null, planId: data?.plan_id as string | null, planName: plan.data?.name as string | null, planSlug: plan.data?.slug as string | null, features: (plan.data?.features ?? []) as string[], isAdmin: false } satisfies SubscriptionAccess;
   }});
 }
