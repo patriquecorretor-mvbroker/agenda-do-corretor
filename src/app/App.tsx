@@ -84,8 +84,6 @@ function AppContent() {
       profile.cidade &&
       profile.horario_inicio &&
       profile.horario_fim &&
-      profile.meta_vendas_mensal !== null &&
-      profile.meta_vgv_mensal !== null &&
       profile.meta_comissao_mensal !== null
   );
 

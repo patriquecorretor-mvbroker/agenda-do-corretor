@@ -97,6 +97,9 @@ export function DashboardPage({
   const dailyGoalTotal = Math.max(events.length + todayTasks.length, 1);
   const dailyDone = completedEvents.length + todayTasks.filter((task) => task.status === "concluída").length;
   const dailyProgress = clampPercent((dailyDone / dailyGoalTotal) * 100);
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const monthCommissionRecords = finance.commissions.filter((item) => item.sale_date?.startsWith(currentMonth) && item.status !== "cancelada");
+  const monthCommissionTotal = monthCommissionRecords.reduce((total, item) => total + item.net_commission, 0);
   const commercialMetrics = useMemo(() => ({
     ...buildCommercialMetrics({ clients, events, commissions: finance.commissions }),
     demoMode: !hasSupabaseConfig
@@ -254,9 +257,9 @@ export function DashboardPage({
             <CardDescription>Sem dados inventados nesta etapa.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <GoalLine label="Vendas" value={`0 / ${profile?.meta_vendas_mensal ?? 0}`} />
-            <GoalLine label="VGV" value={`${formatCurrency(0)} / ${formatCurrency(profile?.meta_vgv_mensal)}`} />
-            <GoalLine label="Comissão" value={`${formatCurrency(0)} / ${formatCurrency(profile?.meta_comissao_mensal)}`} />
+            <GoalLine label="Comissões registradas" value={`${monthCommissionRecords.length} lançamentos`} />
+            <GoalLine label="Comissão do mês" value={formatCurrency(monthCommissionTotal)} />
+            <GoalLine label="Meta de comissão" value={`${formatCurrency(monthCommissionTotal)} / ${formatCurrency(profile?.meta_comissao_mensal)}`} />
           </CardContent>
         </Card>
         <Card className="bg-accent text-accent-foreground">

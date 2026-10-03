@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BellRing, Check, Download, Loader2, Moon, Palette, ShieldCheck, Sparkles, Sun, Trash2 } from "lucide-react";
+import { BellRing, Check, Download, Laptop, Loader2, Moon, Palette, ShieldCheck, Sparkles, Sun, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { downloadAccountExport, exportAccountData, requestAccountDeletion } from
 import { LegalDocumentDialog } from "@/features/legal/LegalDocumentDialog";
 import type { LegalDocumentType } from "@/features/legal/legal-content";
 import { useNotifications } from "@/features/notifications/use-notifications";
+import { usePwaInstall } from "@/lib/pwa-install";
 
 export function SettingsPage({
   dark,
@@ -37,6 +38,16 @@ export function SettingsPage({
   const [deleting, setDeleting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
   const notifications = useNotifications();
+  const pwaInstall = usePwaInstall();
+
+  async function handleInstall() {
+    if (pwaInstall.state === "available") {
+      const installed = await pwaInstall.install();
+      toast({ title: installed ? "Agenda instalada neste computador." : "Instalação cancelada." });
+      return;
+    }
+    toast({ title: pwaInstall.state === "installed" ? "A Agenda já está instalada." : "Abra o menu do Chrome e escolha Instalar Agenda do Corretor." });
+  }
 
   async function handleExport() {
     if (!user) return;
@@ -147,6 +158,15 @@ export function SettingsPage({
           </CardContent>
         </Card>
       </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Laptop className="h-5 w-5" /></span><div><CardTitle>Instalar aplicativo</CardTitle><CardDescription>Use a Agenda em uma janela própria, com ícone no computador e acesso rápido.</CardDescription></div></div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="text-sm font-semibold">{pwaInstall.state === "installed" ? "Instalada neste dispositivo" : pwaInstall.state === "available" ? "Pronta para instalar" : "Instalação pelo navegador"}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{pwaInstall.state === "unavailable" ? "No Chrome, abra o menu de três pontos, procure Salvar e compartilhar e escolha Instalar Agenda do Corretor." : pwaInstall.state === "installed" ? "Você pode abrir a Agenda pelo menu Iniciar ou pelo atalho criado." : "O Chrome abrirá a confirmação nativa de instalação."}</p></div>
+          <Button className="w-full sm:w-auto" onClick={() => void handleInstall()} disabled={pwaInstall.state === "installed"}><Download className="h-4 w-4" />{pwaInstall.state === "installed" ? "Já instalada" : "Instalar aplicativo"}</Button>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><BellRing className="h-5 w-5" /></span><div><CardTitle>Lembretes e notificações</CardTitle><CardDescription>Escolha o que merece interromper seu dia. O pedido de permissão só acontece quando você tocar em ativar.</CardDescription></div></div>

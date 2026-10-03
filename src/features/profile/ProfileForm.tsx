@@ -45,8 +45,8 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
       empresa: String(form.get("empresa") || "").trim(),
       horario_inicio: String(form.get("horario_inicio") || "08:00"),
       horario_fim: String(form.get("horario_fim") || "18:00"),
-      meta_vendas_mensal: Number(form.get("meta_vendas_mensal") || 0),
-      meta_vgv_mensal: Number(form.get("meta_vgv_mensal") || 0),
+      meta_vendas_mensal: profile?.meta_vendas_mensal ?? 0,
+      meta_vgv_mensal: profile?.meta_vgv_mensal ?? 0,
       meta_comissao_mensal: Number(form.get("meta_comissao_mensal") || 0)
     };
 
@@ -83,8 +83,6 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
           <Field label="Início" name="horario_inicio" type="time" defaultValue={profile?.horario_inicio?.slice(0, 5) ?? "08:00"} required />
           <Field label="Fim" name="horario_fim" type="time" defaultValue={profile?.horario_fim?.slice(0, 5) ?? "18:00"} required />
         </div>
-        <Field label="Meta mensal de vendas" name="meta_vendas_mensal" type="number" defaultValue={String(profile?.meta_vendas_mensal ?? 5)} required />
-        <Field label="Meta mensal de VGV" name="meta_vgv_mensal" type="number" defaultValue={String(profile?.meta_vgv_mensal ?? 5000000)} required />
         <Field label="Meta mensal de comissão" name="meta_comissao_mensal" type="number" defaultValue={String(profile?.meta_comissao_mensal ?? 50000)} required />
       </div>
       <Button disabled={saveProfile.isPending} size="lg">

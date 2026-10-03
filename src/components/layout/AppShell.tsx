@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, CreditCard, FileArchive, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
+import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, CreditCard, Download, FileArchive, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
@@ -14,6 +14,7 @@ import { canAccessView } from "@/features/admin/subscription-access";
 import { NotificationCenter } from "@/features/notifications/NotificationCenter";
 import { useNotifications } from "@/features/notifications/use-notifications";
 import { BillingPage } from "@/features/billing/BillingPage";
+import { usePwaInstall } from "@/lib/pwa-install";
 
 const QuickAddDialog = lazy(() => import("@/components/layout/QuickAddDialog").then((module) => ({ default: module.QuickAddDialog })));
 const AgendaPage = lazy(() => import("@/features/calendar/AgendaPage").then((module) => ({ default: module.AgendaPage })));
@@ -76,6 +77,7 @@ export function AppShell({
   const saasAdmin = useSaasAdmin();
   const subscription = useSubscriptionAccess();
   const notifications = useNotifications();
+  const pwaInstall = usePwaInstall();
   const { toast } = useToast();
   const accessibleSections = useMemo(() => navSections.map((section) => ({ ...section, items: section.items.filter((item) => canAccessView(item.view, subscription.data)) })).filter((section) => section.items.length), [subscription.data]);
   const accessibleItems = accessibleSections.flatMap((section) => section.items);
@@ -90,6 +92,15 @@ export function AppShell({
   async function handleSignOut() {
     await signOut();
     toast({ title: "Sessão encerrada." });
+  }
+
+  async function handleInstall() {
+    if (pwaInstall.state === "available") {
+      const installed = await pwaInstall.install();
+      toast({ title: installed ? "Agenda instalada neste computador." : "Instalação cancelada." });
+      return;
+    }
+    toast({ title: pwaInstall.state === "installed" ? "A Agenda já está instalada." : "No Chrome, abra o menu de três pontos e escolha Instalar Agenda do Corretor." });
   }
 
   function handleGlobalSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -140,6 +151,10 @@ export function AppShell({
         </nav>
         <div className="relative mt-4 grid gap-2 border-t border-white/10 pt-3">
           <div className="flex items-center justify-between rounded-xl bg-white/[0.045] px-3 py-2"><div><p className="text-[9px] uppercase tracking-[0.12em] text-white/35">Plano atual</p><p className="text-xs font-semibold text-white/80">{subscription.data?.planName ?? "Sem plano"}</p></div><span className="h-2 w-2 rounded-full bg-emerald-400" /></div>
+          <Button variant="outline" onClick={() => void handleInstall()} disabled={pwaInstall.state === "installed"}>
+            <Download className="h-4 w-4" />
+            {pwaInstall.state === "installed" ? "Aplicativo instalado" : "Instalar aplicativo"}
+          </Button>
           <Button variant="outline" onClick={() => onDarkChange(!dark)}>
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {dark ? "Modo claro" : "Modo escuro"}

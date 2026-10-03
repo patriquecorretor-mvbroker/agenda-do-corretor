@@ -1,4 +1,4 @@
-const CACHE_NAME = "agenda-corretor-v67";
+const CACHE_NAME = "agenda-corretor-v68";
 const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/favicon-32.png", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/mv-broker-logo.jpg"];
 
 self.addEventListener("install", (event) => {

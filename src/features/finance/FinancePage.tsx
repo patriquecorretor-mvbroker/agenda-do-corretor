@@ -65,10 +65,8 @@ export function FinancePage() {
   const [search, setSearch] = useState("");
   const [transferOpen, setTransferOpen] = useState(false);
 
-  const monthReceivedSales = finance.commissions.filter((item) => item.status === "recebida" && item.sale_date && isSameMonth(parseISO(item.sale_date), new Date()));
-  const avgGross = monthReceivedSales.length ? sum(monthReceivedSales.map((item) => item.gross_commission)) / monthReceivedSales.length : null;
-  const avgNet = monthReceivedSales.length ? sum(monthReceivedSales.map((item) => item.net_commission)) / monthReceivedSales.length : null;
-  const ticketMonth = monthReceivedSales.length ? sum(monthReceivedSales.map((item) => item.vgv)) / monthReceivedSales.length : null;
+  const monthReceivedCommissions = finance.commissions.filter((item) => item.status === "recebida" && item.sale_date && isSameMonth(parseISO(item.sale_date), new Date()));
+  const avgNet = monthReceivedCommissions.length ? sum(monthReceivedCommissions.map((item) => item.net_commission)) / monthReceivedCommissions.length : null;
 
   const filteredTransactions = finance.transactions.filter((item) => {
     const haystack = `${item.description} ${item.category} ${item.payment_method ?? ""}`.toLowerCase();
@@ -183,9 +181,7 @@ export function FinancePage() {
         <DashboardFinance
           finance={finance}
           profile={profile}
-          avgGross={avgGross}
           avgNet={avgNet}
-          ticketMonth={ticketMonth}
           clients={clients}
           onOpen={(next) => setTab(next)}
         />
@@ -194,7 +190,7 @@ export function FinancePage() {
       {tab === "receivable" && <ReceivableList installments={finance.installments} commissions={finance.commissions} filter={filter} onFilter={setFilter} onReceive={markInstallmentReceived} onExport={() => exportCsv("installments")} />}
       {tab === "payable" && <TransactionList title="Contas a pagar e despesas" type="expense" transactions={filteredTransactions} onExport={() => exportCsv("transactions")} onPay={(transaction) => finance.updateTransaction.mutate({ id: transaction.id, input: { status: "pago", paid_date: format(new Date(), "yyyy-MM-dd") } })} />}
       {tab === "cashflow" && <CashFlow transactions={finance.transactions} installments={finance.installments} />}
-      {tab === "result" && <FinancialResult finance={finance} profile={profile} avgGross={avgGross} avgNet={avgNet} ticketMonth={ticketMonth} />}
+      {tab === "result" && <FinancialResult finance={finance} />}
       {tab === "calendar" && <FinancialCalendar transactions={finance.transactions} installments={finance.installments} />}
 
       <Dialog open={Boolean(form)} onOpenChange={() => setForm(null)}>
@@ -202,7 +198,7 @@ export function FinancePage() {
           <DialogHeader>
             <DialogTitle>{form === "commission" ? "Nova comissão" : form === "expense" ? "Nova despesa paga" : form === "payable" ? "Nova conta a pagar" : "Nova receita"}</DialogTitle>
             <DialogDescription>
-              {form === "commission" ? "Cadastre venda, comissão e parcelamento automático." : form === "payable" ? "A conta ficará pendente até você registrar o pagamento." : form === "expense" ? "A despesa será registrada como paga e entrará no resultado do mês." : "Cadastro rápido para poucos toques no celular."}
+              {form === "commission" ? "Informe o imóvel vendido, o valor pronto da comissão e como será o recebimento." : form === "payable" ? "A conta ficará pendente até você registrar o pagamento." : form === "expense" ? "A despesa será registrada como paga e entrará no resultado do mês." : "Cadastro rápido para poucos toques no celular."}
             </DialogDescription>
             {form !== "commission" && <Button type="button" variant="outline" size="sm" className="mt-2 w-fit" onClick={() => { setForm(null); setTransferOpen(true); }}><FileUp className="h-4 w-4" />Importar extrato ou exportar</Button>}
           </DialogHeader>
@@ -221,24 +217,23 @@ export function FinancePage() {
 function DashboardFinance({
   finance,
   profile,
-  avgGross,
   avgNet,
-  ticketMonth,
   clients,
   onOpen
 }: {
   finance: ReturnType<typeof useFinance>;
   profile: any;
-  avgGross: number | null;
   avgNet: number | null;
-  ticketMonth: number | null;
   clients: Client[];
   onOpen: (tab: FinanceTab) => void;
 }) {
   const commissionGoal = profile?.meta_comissao_mensal ?? 0;
-  const vgvGoal = profile?.meta_vgv_mensal ?? 0;
   const commissionProgress = commissionGoal ? clampPercent((finance.metrics.commissionReceivedMonth / commissionGoal) * 100) : 0;
-  const vgvProgress = vgvGoal ? clampPercent((finance.metrics.vgvMonth / vgvGoal) * 100) : 0;
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const confirmedMonth = sum(finance.commissions
+    .filter((item) => item.sale_date?.startsWith(currentMonth) && ["confirmada", "parcialmente recebida", "recebida", "atrasada"].includes(item.status))
+    .map((item) => item.net_commission));
+  const confirmedProgress = commissionGoal ? clampPercent((confirmedMonth / commissionGoal) * 100) : 0;
 
   return (
     <div className="space-y-5">
@@ -295,8 +290,8 @@ function DashboardFinance({
           </CardHeader>
           <CardContent className="space-y-4">
             <GoalProgress label="Meta comissão" value={finance.metrics.commissionReceivedMonth} target={commissionGoal} progress={commissionProgress} />
-            <GoalProgress label="Meta VGV" value={finance.metrics.vgvMonth} target={vgvGoal} progress={vgvProgress} />
-            <GoalProgress label="Meta resultado líquido" value={finance.metrics.netResultMonth} target={profile?.meta_comissao_mensal ?? 0} progress={commissionProgress} />
+            <GoalProgress label="Comissão confirmada" value={confirmedMonth} target={commissionGoal} progress={confirmedProgress} />
+            <GoalProgress label="Meta resultado líquido" value={finance.metrics.netResultMonth} target={commissionGoal} progress={commissionProgress} />
           </CardContent>
         </Card>
 
@@ -308,9 +303,9 @@ function DashboardFinance({
             <CardDescription>Calculados apenas quando há dados suficientes.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <DataLine label="Comissão média bruta" value={avgGross === null ? "Dados insuficientes para calcular." : formatCurrency(avgGross)} />
-            <DataLine label="Comissão média líquida" value={avgNet === null ? "Dados insuficientes para calcular." : formatCurrency(avgNet)} />
-            <DataLine label="Ticket médio mensal" value={ticketMonth === null ? "Dados insuficientes para calcular." : formatCurrency(ticketMonth)} />
+            <DataLine label="Comissão média recebida" value={avgNet === null ? "Dados insuficientes para calcular." : formatCurrency(avgNet)} />
+            <DataLine label="Comissões registradas no mês" value={String(finance.commissions.filter((item) => item.sale_date?.startsWith(currentMonth) && item.status !== "cancelada").length)} />
+            <DataLine label="Valor confirmado no mês" value={formatCurrency(confirmedMonth)} />
           </CardContent>
         </Card>
 
@@ -328,35 +323,35 @@ function SalesPortfolio({ commissions, onOpen }: { commissions: Commission[]; on
   const now = new Date();
   const monthKey = format(now, "yyyy-MM");
   const yearKey = format(now, "yyyy");
-  const sales = commissions.filter((item) => item.status !== "cancelada").sort((a, b) => (b.sale_date ?? b.created_at).localeCompare(a.sale_date ?? a.created_at));
-  const monthSales = sales.filter((item) => item.sale_date?.startsWith(monthKey));
-  const yearSales = sales.filter((item) => item.sale_date?.startsWith(yearKey));
-  const totalCommission = sum(sales.map((item) => item.net_commission));
-  const yearVgv = sum(yearSales.map((item) => item.vgv));
+  const records = commissions.filter((item) => item.status !== "cancelada").sort((a, b) => (b.sale_date ?? b.created_at).localeCompare(a.sale_date ?? a.created_at));
+  const monthRecords = records.filter((item) => item.sale_date?.startsWith(monthKey));
+  const yearRecords = records.filter((item) => item.sale_date?.startsWith(yearKey));
+  const totalCommission = sum(records.map((item) => item.net_commission));
+  const averageCommission = yearRecords.length ? sum(yearRecords.map((item) => item.net_commission)) / yearRecords.length : 0;
   const months = Array.from({ length: 6 }, (_, index) => {
     const date = subMonths(now, 5 - index);
     const key = format(date, "yyyy-MM");
-    const rows = sales.filter((item) => item.sale_date?.startsWith(key));
-    return { key, label: format(date, "MMM", { locale: ptBR }).replace(".", ""), count: rows.length, vgv: sum(rows.map((item) => item.vgv)), commission: sum(rows.map((item) => item.net_commission)) };
+    const rows = records.filter((item) => item.sale_date?.startsWith(key));
+    return { key, label: format(date, "MMM", { locale: ptBR }).replace(".", ""), count: rows.length, commission: sum(rows.map((item) => item.net_commission)) };
   });
   const maxCommission = Math.max(...months.map((item) => item.commission), 1);
-  const statusGroups = ["recebida", "parcialmente recebida", "confirmada", "atrasada", "em negociação", "estimada"].map((status) => ({ status, count: sales.filter((item) => item.status === status).length, value: sum(sales.filter((item) => item.status === status).map((item) => item.net_commission)) })).filter((item) => item.count);
+  const statusGroups = ["recebida", "parcialmente recebida", "confirmada", "atrasada", "em negociação", "estimada"].map((status) => ({ status, count: records.filter((item) => item.status === status).length, value: sum(records.filter((item) => item.status === status).map((item) => item.net_commission)) })).filter((item) => item.count);
   const maxStatus = Math.max(...statusGroups.map((item) => item.value), 1);
-  const visibleSales = sales.filter((item) => `${item.client ?? ""} ${item.property ?? ""} ${item.development ?? ""} ${item.builder ?? ""}`.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR")));
+  const visibleRecords = records.filter((item) => `${item.client ?? ""} ${item.property ?? ""}`.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR")));
 
   return <section className="motion-rise space-y-4">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase text-primary"><BriefcaseBusiness className="h-4 w-4" />Carteira de vendas</div><h2 className="mt-1 text-xl font-semibold">Vendas e comissões</h2><p className="mt-1 text-sm text-muted-foreground">Visão consolidada das vendas cadastradas, sem contar cancelamentos.</p></div><Button variant="outline" onClick={onOpen}>Abrir comissões</Button></div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase text-primary"><BriefcaseBusiness className="h-4 w-4" />Histórico financeiro</div><h2 className="mt-1 text-xl font-semibold">Comissões registradas</h2><p className="mt-1 text-sm text-muted-foreground">Lançamentos manuais do corretor, sem cálculo automático ou cadastro separado de imóvel.</p></div><Button variant="outline" onClick={onOpen}>Abrir comissões</Button></div>
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <SalesMetric label="Vendas no mês" value={String(monthSales.length)} helper={format(now, "MMMM", { locale: ptBR })} />
-      <SalesMetric label="Vendas no ano" value={String(yearSales.length)} helper={yearKey} />
+      <SalesMetric label="Registros no mês" value={String(monthRecords.length)} helper={format(now, "MMMM", { locale: ptBR })} />
+      <SalesMetric label="Registros no ano" value={String(yearRecords.length)} helper={yearKey} />
       <SalesMetric label="Comissão gerada" value={formatCurrency(totalCommission)} helper="total não cancelado" wide />
-      <SalesMetric label="VGV no ano" value={formatCurrency(yearVgv)} helper={`${yearSales.length} venda(s)`} />
+      <SalesMetric label="Comissão média" value={formatCurrency(averageCommission)} helper={`${yearRecords.length} registro(s) no ano`} />
     </div>
     <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-      <Card className="overflow-hidden"><CardHeader><div className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><CardTitle>Evolução das vendas</CardTitle></div><CardDescription>Comissão líquida gerada e quantidade de vendas nos últimos seis meses.</CardDescription></CardHeader><CardContent><div className="grid h-56 grid-cols-6 items-end gap-2 border-b border-border/70 pt-4 sm:gap-5">{months.map((item, index) => <div key={item.key} className="flex h-full min-w-0 flex-col justify-end gap-2" style={{ animationDelay: `${index * 45}ms` }}><div className="flex h-40 items-end justify-center"><div title={`${formatCurrency(item.commission)} · ${item.count} venda(s)`} className="w-full max-w-10 rounded-t-lg border border-primary/25 bg-primary/15 transition-all duration-700 dark:bg-primary/35" style={{ height: `${item.commission ? Math.max((item.commission / maxCommission) * 100, 8) : 3}%` }} /></div><div className="text-center"><p className="text-xs font-semibold tabular-nums">{item.count}</p><p className="truncate text-[0.65rem] font-medium uppercase text-muted-foreground">{item.label}</p></div></div>)}</div><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>Altura: comissão gerada</span><span>Número: vendas</span></div></CardContent></Card>
-      <Card><CardHeader><CardTitle>Status das comissões</CardTitle><CardDescription>Valores mantidos separados por estágio financeiro.</CardDescription></CardHeader><CardContent className="space-y-4">{statusGroups.length ? statusGroups.map((item) => <div key={item.status}><div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span className="capitalize text-muted-foreground">{item.status} · {item.count}</span><strong>{formatCurrency(item.value)}</strong></div><div className="h-2 overflow-hidden rounded-full border bg-background"><div className="h-full rounded-full bg-foreground/75 transition-all duration-700 dark:bg-primary" style={{ width: `${Math.max((item.value / maxStatus) * 100, 3)}%` }} /></div></div>) : <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">Cadastre vendas para visualizar a distribuição.</p>}</CardContent></Card>
+      <Card className="overflow-hidden"><CardHeader><div className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><CardTitle>Evolução das comissões</CardTitle></div><CardDescription>Valor registrado e quantidade de comissões nos últimos seis meses.</CardDescription></CardHeader><CardContent><div className="grid h-56 grid-cols-6 items-end gap-2 border-b border-border/70 pt-4 sm:gap-5">{months.map((item, index) => <div key={item.key} className="flex h-full min-w-0 flex-col justify-end gap-2" style={{ animationDelay: `${index * 45}ms` }}><div className="flex h-40 items-end justify-center"><div title={`${formatCurrency(item.commission)} · ${item.count} registro(s)`} className="w-full max-w-10 rounded-t-lg border border-primary/25 bg-primary/15 transition-all duration-700 dark:bg-primary/35" style={{ height: `${item.commission ? Math.max((item.commission / maxCommission) * 100, 8) : 3}%` }} /></div><div className="text-center"><p className="text-xs font-semibold tabular-nums">{item.count}</p><p className="truncate text-[0.65rem] font-medium uppercase text-muted-foreground">{item.label}</p></div></div>)}</div><div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>Altura: comissão registrada</span><span>Número: registros</span></div></CardContent></Card>
+      <Card><CardHeader><CardTitle>Status das comissões</CardTitle><CardDescription>Valores mantidos separados por estágio financeiro.</CardDescription></CardHeader><CardContent className="space-y-4">{statusGroups.length ? statusGroups.map((item) => <div key={item.status}><div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span className="capitalize text-muted-foreground">{item.status} · {item.count}</span><strong>{formatCurrency(item.value)}</strong></div><div className="h-2 overflow-hidden rounded-full border bg-background"><div className="h-full rounded-full bg-foreground/75 transition-all duration-700 dark:bg-primary" style={{ width: `${Math.max((item.value / maxStatus) * 100, 3)}%` }} /></div></div>) : <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">Cadastre uma comissão para visualizar a distribuição.</p>}</CardContent></Card>
     </div>
-    <Card><CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between"><div><CardTitle>Todas as vendas</CardTitle><CardDescription>Cliente, imóvel, data, VGV, comissão e situação.</CardDescription></div><div className="relative w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Buscar venda" /></div></CardHeader><CardContent>{visibleSales.length ? <div className="max-h-[520px] overflow-auto rounded-2xl border"><div className="hidden min-w-[760px] grid-cols-[1.2fr_1.3fr_110px_130px_140px_120px] gap-3 border-b bg-muted/45 px-4 py-3 text-[0.68rem] font-semibold uppercase text-muted-foreground md:grid"><span>Cliente</span><span>Imóvel</span><span>Data</span><span>VGV</span><span>Comissão</span><span>Status</span></div>{visibleSales.map((sale) => <article key={sale.id} className="grid gap-2 border-b p-4 last:border-b-0 md:min-w-[760px] md:grid-cols-[1.2fr_1.3fr_110px_130px_140px_120px] md:items-center md:gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{sale.client || "Cliente não informado"}</p><p className="truncate text-xs text-muted-foreground md:hidden">{sale.property ?? sale.development ?? "Imóvel não informado"}</p></div><p className="hidden truncate text-sm text-muted-foreground md:block">{sale.property ?? sale.development ?? "Imóvel não informado"}</p><p className="text-xs text-muted-foreground">{sale.sale_date ? format(parseISO(sale.sale_date), "dd/MM/yyyy") : "Sem data"}</p><p className="text-sm font-medium">{formatCurrency(sale.vgv)}</p><p className="text-sm font-semibold">{formatCurrency(sale.net_commission)}</p><StatusBadge status={sale.status} /></article>)}</div> : <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhuma venda encontrada.</div>}</CardContent></Card>
+    <Card><CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between"><div><CardTitle>Histórico de comissões</CardTitle><CardDescription>Cliente, imóvel vendido, data, valor e situação.</CardDescription></div><div className="relative w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Buscar imóvel ou cliente" /></div></CardHeader><CardContent>{visibleRecords.length ? <div className="max-h-[520px] overflow-auto rounded-2xl border"><div className="hidden min-w-[660px] grid-cols-[1.2fr_1.5fr_110px_140px_120px] gap-3 border-b bg-muted/45 px-4 py-3 text-[0.68rem] font-semibold uppercase text-muted-foreground md:grid"><span>Cliente</span><span>Imóvel vendido</span><span>Data</span><span>Comissão</span><span>Status</span></div>{visibleRecords.map((record) => <article key={record.id} className="grid gap-2 border-b p-4 last:border-b-0 md:min-w-[660px] md:grid-cols-[1.2fr_1.5fr_110px_140px_120px] md:items-center md:gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{record.client || "Cliente não informado"}</p><p className="truncate text-xs text-muted-foreground md:hidden">{record.property || "Imóvel não informado"}</p></div><p className="hidden truncate text-sm text-muted-foreground md:block">{record.property || "Imóvel não informado"}</p><p className="text-xs text-muted-foreground">{record.sale_date ? format(parseISO(record.sale_date), "dd/MM/yyyy") : "Sem data"}</p><p className="text-sm font-semibold">{formatCurrency(record.net_commission)}</p><StatusBadge status={record.status} /></article>)}</div> : <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Nenhuma comissão encontrada.</div>}</CardContent></Card>
   </section>;
 }
 
@@ -479,7 +474,7 @@ function CommissionRankings({ commissions, clients }: { commissions: Commission[
 
     const sales = generated
       .map((commission) => ({
-        label: commission.property ?? commission.development ?? "Venda sem imóvel informado",
+        label: commission.property ?? "Imóvel não informado",
         detail: commission.client ?? "Cliente não informado",
         value: commission.net_commission
       }))
@@ -488,7 +483,7 @@ function CommissionRankings({ commissions, clients }: { commissions: Commission[
 
     return {
       sales,
-      customers: groupRanking(generated, (commission) => commission.client, "venda", "vendas"),
+      customers: groupRanking(generated, (commission) => commission.client, "comissão", "comissões"),
       cities: groupRanking(generated, (commission) => {
         if (!commission.client) return null;
         return cityByClient.get(normalizeName(commission.client)) ?? null;
@@ -506,13 +501,13 @@ function CommissionRankings({ commissions, clients }: { commissions: Commission[
           <div>
             <CardTitle>Ranking de comissões</CardTitle>
             <CardDescription className="mt-1">
-              Somente vendas confirmadas, recebidas, parciais ou atrasadas entram no ranking.
+              Somente comissões confirmadas, recebidas, parciais ou atrasadas entram no ranking.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="grid gap-0 p-0 lg:grid-cols-3">
-        <RankingColumn title="Melhores vendas" icon={TrendingUp} items={rankings.sales} empty="Nenhuma comissão gerada ainda." />
+        <RankingColumn title="Maiores comissões" icon={TrendingUp} items={rankings.sales} empty="Nenhuma comissão gerada ainda." />
         <RankingColumn title="Melhores clientes" icon={Crown} items={rankings.customers} empty="Nenhum cliente com comissão gerada." />
         <RankingColumn title="Melhores cidades" icon={MapPin} items={rankings.cities} empty="Cadastre a cidade do cliente para formar este ranking." />
       </CardContent>
@@ -615,15 +610,14 @@ function CommissionList({
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap gap-2">
                     <StatusBadge status={commission.status} />
-                    <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{commission.builder ?? "sem construtora"}</span>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{commission.installments_count} {commission.installments_count === 1 ? "parcela" : "parcelas"}</span>
                   </div>
                   <h3 className="truncate text-base font-semibold sm:text-lg">{commission.client ?? "Cliente não informado"}</h3>
                   <p className="truncate text-sm text-muted-foreground">{commission.property ?? commission.development ?? "Imóvel não informado"}</p>
                 </div>
                 <div className="rounded-2xl bg-muted p-3 text-left lg:bg-transparent lg:p-0 lg:text-right">
-                  <p className="text-xs text-muted-foreground">Comissão líquida</p>
+                  <p className="text-xs text-muted-foreground">Valor da comissão</p>
                   <p className="text-xl font-semibold sm:text-2xl">{formatCurrency(commission.net_commission)}</p>
-                  <p className="text-xs text-muted-foreground">VGV {formatCurrency(commission.vgv)}</p>
                 </div>
               </div>
               <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1 md:grid md:grid-cols-3 md:overflow-visible">
@@ -632,7 +626,7 @@ function CommissionList({
                 ))}
               </div>
               <div className="mt-4 border-l-2 border-primary/40 pl-3 text-xs text-muted-foreground">
-                <p>Venda cadastrada {commission.sale_date ?? "sem data"}</p>
+                <p>Comissão registrada {commission.sale_date ?? "sem data"}</p>
                 <p>Comissão {commission.status}</p>
                 {linked.map((item) => (
                   <p key={item.id}>
@@ -855,19 +849,7 @@ function CashFlow({ transactions, installments }: { transactions: FinancialTrans
   );
 }
 
-function FinancialResult({
-  finance,
-  profile,
-  avgGross,
-  avgNet,
-  ticketMonth
-}: {
-  finance: ReturnType<typeof useFinance>;
-  profile: any;
-  avgGross: number | null;
-  avgNet: number | null;
-  ticketMonth: number | null;
-}) {
+function FinancialResult({ finance }: { finance: ReturnType<typeof useFinance> }) {
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
   const settledTransactions = finance.transactions.filter((item) => {
     const settled = item.type === "income" ? item.status === "recebido" : item.status === "pago";
@@ -876,16 +858,13 @@ function FinancialResult({
   const receivedInstallments = finance.installments.filter((item) => item.received_amount > 0 && item.received_date?.startsWith(month));
   const expenseGroups = groupByCategory(settledTransactions.filter((item) => item.type === "expense"));
   const incomeGroups = groupByCategory(settledTransactions.filter((item) => item.type === "income"));
-  const sales = finance.commissions.filter((item) => item.sale_date?.startsWith(month) && item.status !== "cancelada");
-  const salesCount = sales.length;
+  const commissionRecords = finance.commissions.filter((item) => item.sale_date?.startsWith(month) && item.status !== "cancelada");
+  const commissionCount = commissionRecords.length;
   const totalExpenses = sum(settledTransactions.filter((item) => item.type === "expense").map((item) => item.amount));
   const totalIncome = sum(settledTransactions.filter((item) => item.type === "income").map((item) => item.amount)) + sum(receivedInstallments.map((item) => item.received_amount));
   const result = totalIncome - totalExpenses;
-  const vgv = sum(sales.map((item) => item.vgv));
-  const filteredAvgGross = salesCount ? sum(sales.map((item) => item.gross_commission)) / salesCount : null;
-  const filteredAvgNet = salesCount ? sum(sales.map((item) => item.net_commission)) / salesCount : null;
-  const filteredTicket = salesCount ? vgv / salesCount : null;
-  const costPerSale = salesCount ? totalExpenses / salesCount : null;
+  const registeredCommission = sum(commissionRecords.map((item) => item.net_commission));
+  const averageCommission = commissionCount ? registeredCommission / commissionCount : null;
   const visits = 0;
   const captures = 0;
   const leads = 0;
@@ -922,15 +901,12 @@ function FinancialResult({
         </CardHeader>
         <CardContent className="grid gap-3">
           <DataLine label="Custo total do mês" value={formatCurrency(totalExpenses)} />
-          <DataLine label="Custo por venda" value={costPerSale === null ? "Dados insuficientes para calcular." : formatCurrency(costPerSale)} />
           <DataLine label="Custo por lead" value={leads ? formatCurrency(totalExpenses / leads) : "Dados insuficientes para calcular."} />
           <DataLine label="Custo por visita" value={visits ? formatCurrency(totalExpenses / visits) : "Dados insuficientes para calcular."} />
           <DataLine label="Custo por captação" value={captures ? formatCurrency(totalExpenses / captures) : "Dados insuficientes para calcular."} />
-          <DataLine label="VGV mês" value={formatCurrency(vgv)} />
-          <DataLine label="Meta VGV" value={formatCurrency(profile?.meta_vgv_mensal ?? 0)} />
-          <DataLine label="Comissão média bruta" value={filteredAvgGross === null ? "Dados insuficientes para calcular." : formatCurrency(filteredAvgGross)} />
-          <DataLine label="Comissão média líquida" value={filteredAvgNet === null ? "Dados insuficientes para calcular." : formatCurrency(filteredAvgNet)} />
-          <DataLine label="Ticket médio" value={filteredTicket === null ? "Dados insuficientes para calcular." : formatCurrency(filteredTicket)} />
+          <DataLine label="Comissões registradas" value={String(commissionCount)} />
+          <DataLine label="Total em comissões" value={formatCurrency(registeredCommission)} />
+          <DataLine label="Comissão média" value={averageCommission === null ? "Dados insuficientes para calcular." : formatCurrency(averageCommission)} />
         </CardContent>
       </Card>
       </div>
@@ -1136,15 +1112,14 @@ export function CommissionForm({ onSaved }: { onSaved: () => void }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const vgv = Number(form.get("vgv") || 0);
     const commissionAmount = Number(form.get("commission_amount") || 0);
     await finance.createCommission.mutateAsync({
-      client: String(form.get("client") || ""),
+      client: String(form.get("client") || "") || null,
       property: String(form.get("property") || ""),
-      development: String(form.get("development") || "") || null,
-      builder: String(form.get("builder") || "") || null,
+      development: null,
+      builder: null,
       sale_date: String(form.get("sale_date") || format(new Date(), "yyyy-MM-dd")),
-      vgv,
+      vgv: 0,
       total_commission_percent: 0,
       gross_commission: commissionAmount,
       broker_percent: 100,
@@ -1164,16 +1139,13 @@ export function CommissionForm({ onSaved }: { onSaved: () => void }) {
   return (
     <form className="grid gap-4" onSubmit={submit}>
       <div className="grid gap-3 md:grid-cols-2">
-        <Field name="client" label="Cliente" required />
-        <Field name="property" label="Imóvel" required />
-        <Field name="development" label="Empreendimento" />
-        <Field name="builder" label="Construtora" />
-        <Field name="sale_date" label="Data da comissão" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} />
-        <Field name="commission_amount" label="Valor da comissão" type="number" min="0.01" step="0.01" required />
-        <Field name="installments_count" label="Número de parcelas" type="number" defaultValue="1" />
+        <Field name="property" label="Imóvel vendido" placeholder="Ex.: Apto 802 - Edifício Via del Mare" required />
+        <Field name="client" label="Cliente (opcional)" placeholder="Nome do comprador" />
+        <Field name="sale_date" label="Data do registro" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+        <Field name="commission_amount" label="Valor pronto da comissão" type="number" min="0.01" step="0.01" required />
+        <Field name="installments_count" label="Número de parcelas" type="number" min="1" defaultValue="1" required />
         <Field name="first_expected_date" label="1º recebimento" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} />
       </div>
-      <details className="rounded-2xl border p-4"><summary className="cursor-pointer text-sm font-semibold">Informações opcionais</summary><div className="mt-4 grid gap-3 md:grid-cols-2"><Field name="vgv" label="VGV de referência" type="number" min="0" step="0.01" /><p className="self-end text-xs leading-5 text-muted-foreground">O VGV é apenas informativo. A agenda não calcula comissão por percentual.</p></div></details>
       <div className="space-y-2">
         <Label>Status</Label>
         <Select name="status" defaultValue="confirmada">
@@ -1185,8 +1157,8 @@ export function CommissionForm({ onSaved }: { onSaved: () => void }) {
           </SelectContent>
         </Select>
       </div>
-      <Textarea name="notes" placeholder="Observações sobre pagamento, condição ou construtora" />
-      <Button>Salvar comissão</Button>
+      <Textarea name="notes" placeholder="Observações sobre o recebimento (opcional)" />
+      <Button>Registrar comissão</Button>
     </form>
   );
 }
