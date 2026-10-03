@@ -4,6 +4,11 @@ import { ptBR } from "date-fns/locale";
 import {
   CalendarRange,
   Building2,
+  Cloud,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
+  CloudSun,
   ChevronLeft,
   ChevronRight,
   Check,
@@ -14,8 +19,12 @@ import {
   MoreHorizontal,
   Sparkles,
   StickyNote,
+  Sun,
+  Sunrise,
+  Sunset,
   Trash2
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
@@ -33,6 +42,7 @@ import { DailyArtDialog } from "./DailyArtDialog";
 import { getSpecialDate, getUpcomingSpecialDate } from "./special-dates";
 import { cn, clampPercent } from "@/lib/utils";
 import type { CalendarEvent, Task } from "@/types/database";
+import { getWeatherForecast, type DailyWeather } from "@/features/dashboard/weather-service";
 
 export function AgendaPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -52,6 +62,14 @@ export function AgendaPage() {
   const [artOpen, setArtOpen] = useState(false);
   const specialDate = getSpecialDate(selectedDate);
   const upcomingSpecial = getUpcomingSpecialDate(selectedDate);
+  const visibleWeekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const visibleWeekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
+  const weatherForecast = useQuery({
+    queryKey: ["agenda-weather", profile?.cidade, format(visibleWeekStart, "yyyy-MM-dd"), format(visibleWeekEnd, "yyyy-MM-dd")],
+    queryFn: () => getWeatherForecast(profile?.cidade, format(visibleWeekStart, "yyyy-MM-dd"), format(visibleWeekEnd, "yyyy-MM-dd")),
+    enabled: Boolean(profile?.cidade),
+    staleTime: 30 * 60 * 1000
+  });
 
   const sortedEvents = useMemo(
     () => events.slice().sort((a, b) => a.start_time.localeCompare(b.start_time)),
@@ -136,7 +154,7 @@ export function AgendaPage() {
               </button>
             ))}
           </div>
-          <WeekStrip selectedDate={selectedDate} onSelect={setSelectedDate} events={events} />
+          <WeekStrip selectedDate={selectedDate} onSelect={setSelectedDate} events={events} forecast={weatherForecast.data ?? []} loading={weatherForecast.isLoading} />
         </div>
       </section>
 
@@ -338,18 +356,31 @@ function periodLabel(date: Date, view: "day" | "week" | "month") {
   return `${format(start, "dd MMM", { locale: ptBR })} - ${format(end, "dd MMM", { locale: ptBR })}`;
 }
 
-function WeekStrip({ selectedDate, onSelect, events }: { selectedDate: Date; onSelect: (date: Date) => void; events: CalendarEvent[] }) {
+function WeekStrip({ selectedDate, onSelect, events, forecast, loading }: { selectedDate: Date; onSelect: (date: Date) => void; events: CalendarEvent[]; forecast: DailyWeather[]; loading: boolean }) {
   const days = eachDayOfInterval({ start: startOfWeek(selectedDate, { weekStartsOn: 1 }), end: endOfWeek(selectedDate, { weekStartsOn: 1 }) });
-  return <div className="grid grid-cols-7 gap-1">
+  return <div className="scrollbar-none -mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-7 sm:overflow-visible sm:px-0">
     {days.map((day) => {
-      const count = events.filter((event) => event.date === format(day, "yyyy-MM-dd")).length;
-      return <button key={day.toISOString()} type="button" onClick={() => onSelect(day)} className={cn("relative grid min-h-14 place-items-center rounded-xl px-1 text-center transition", isSameDay(day, selectedDate) ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted", isToday(day) && !isSameDay(day, selectedDate) && "ring-1 ring-primary/45")}>
-        <span className="text-[10px] font-semibold uppercase">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span>
-        <span className="text-sm font-semibold">{format(day, "dd")}</span>
-        {count > 0 && <span className={cn("absolute bottom-1 h-1 w-1 rounded-full", isSameDay(day, selectedDate) ? "bg-primary-foreground" : "bg-primary")} />}
+      const key = format(day, "yyyy-MM-dd");
+      const count = events.filter((event) => event.date === key).length;
+      const weather = forecast.find((item) => item.date === key);
+      const selected = isSameDay(day, selectedDate);
+      return <button key={day.toISOString()} type="button" onClick={() => onSelect(day)} className={cn("relative min-h-[126px] w-[96px] shrink-0 snap-start rounded-2xl border px-2 py-2.5 text-center transition duration-300 hover:-translate-y-0.5 hover:border-primary/45 sm:w-auto", selected ? "border-primary bg-primary text-primary-foreground shadow-[0_10px_24px_hsl(var(--primary)/0.22)]" : "bg-card hover:bg-muted/55", isToday(day) && !selected && "ring-1 ring-primary/45")}>
+        <span className="block text-[9px] font-semibold uppercase opacity-70">{format(day, "EEE", { locale: ptBR }).slice(0, 3)}</span>
+        <span className="mt-0.5 block text-base font-semibold">{format(day, "dd")}</span>
+        <WeatherGlyph weather={weather} loading={loading} selected={selected} />
+        <span className="mt-0.5 block text-[11px] font-semibold tabular-nums">{weather?.max !== null && weather?.max !== undefined ? `${weather.max}°` : "--"}<span className="font-normal opacity-55"> / {weather?.min !== null && weather?.min !== undefined ? `${weather.min}°` : "--"}</span></span>
+        <span className="mt-1 flex items-center justify-center gap-2 text-[9px] tabular-nums opacity-65"><span className="flex items-center gap-0.5"><Sunrise className="h-2.5 w-2.5" />{weather?.sunrise ?? "--:--"}</span><span className="flex items-center gap-0.5"><Sunset className="h-2.5 w-2.5" />{weather?.sunset ?? "--:--"}</span></span>
+        {count > 0 && <span className={cn("absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[8px] font-bold", selected ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground")}>{count}</span>}
       </button>;
     })}
   </div>;
+}
+
+function WeatherGlyph({ weather, loading, selected }: { weather?: DailyWeather; loading: boolean; selected: boolean }) {
+  if (loading) return <span className={cn("mx-auto mt-1 block h-5 w-5 animate-pulse rounded-full", selected ? "bg-primary-foreground/25" : "bg-muted")} />;
+  const condition = weather?.condition?.toLocaleLowerCase("pt-BR") ?? "";
+  const Icon = condition.includes("temporal") ? CloudLightning : condition.includes("chuva") || condition.includes("garoa") ? CloudRain : condition.includes("neblina") ? CloudFog : condition.includes("nublado") && !condition.includes("parcialmente") ? Cloud : condition.includes("parcialmente") ? CloudSun : Sun;
+  return <span title={weather?.condition ?? "Previsão indisponível"} className="mx-auto mt-1 grid h-6 w-6 place-items-center"><Icon className={cn("h-4 w-4", weather && "animate-[pulse_3s_ease-in-out_infinite]", selected ? "text-primary-foreground" : condition.includes("chuva") || condition.includes("temporal") ? "text-sky-500" : "text-amber-500")} /></span>;
 }
 
 function PeriodCalendar({ view, selectedDate, events, onSelect }: { view: "week" | "month"; selectedDate: Date; events: CalendarEvent[]; onSelect: (date: Date) => void }) {

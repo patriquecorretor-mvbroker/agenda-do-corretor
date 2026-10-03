@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getWeather, weatherMessage } from "@/features/dashboard/weather-service";
+import { getWeather, getWeatherForecast, weatherMessage } from "@/features/dashboard/weather-service";
 
 describe("weather service", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -25,5 +25,17 @@ describe("weather service", () => {
     const weather = await getWeather("Capão da Canoa");
     expect(weather.temperature).toBeNull();
     expect(weatherMessage(weather)).toContain("indisponível");
+  });
+
+  it("returns dated forecast with sunrise and sunset", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [{ latitude: -29.76, longitude: -50.03, timezone: "America/Sao_Paulo" }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ daily: {
+        time: ["2026-10-03"], weather_code: [0], temperature_2m_max: [24.4], temperature_2m_min: [16.2],
+        precipitation_probability_max: [10], sunrise: ["2026-10-03T05:51"], sunset: ["2026-10-03T18:21"]
+      } }), { status: 200 }));
+
+    const forecast = await getWeatherForecast("Capão da Canoa", "2026-10-03", "2026-10-03");
+    expect(forecast[0]).toEqual({ date: "2026-10-03", max: 24, min: 16, rainChance: 10, condition: "Ensolarado", sunrise: "05:51", sunset: "18:21" });
   });
 });

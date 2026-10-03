@@ -9,6 +9,16 @@ export type WeatherData = {
   source: "api" | "open-meteo" | "unavailable";
 };
 
+export type DailyWeather = {
+  date: string;
+  max: number | null;
+  min: number | null;
+  rainChance: number | null;
+  condition: string | null;
+  sunrise: string | null;
+  sunset: string | null;
+};
+
 export async function getWeather(city?: string | null): Promise<WeatherData> {
   const url = import.meta.env.VITE_WEATHER_API_URL as string | undefined;
   if (!city) return unavailableWeather();
@@ -70,6 +80,49 @@ export function weatherMessage(weather: WeatherData) {
   return "Dados de clima disponíveis parcialmente.";
 }
 
+export async function getWeatherForecast(city: string | null | undefined, from: string, to: string): Promise<DailyWeather[]> {
+  if (!city) return [];
+
+  try {
+    const location = await findLocation(city);
+    if (!location) return [];
+
+    const params = new URLSearchParams({
+      latitude: String(location.latitude),
+      longitude: String(location.longitude),
+      daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset",
+      timezone: location.timezone ?? "auto",
+      start_date: from,
+      end_date: to
+    });
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+    if (!response.ok) return [];
+    const payload = await response.json() as {
+      daily?: {
+        time?: string[];
+        weather_code?: number[];
+        temperature_2m_max?: number[];
+        temperature_2m_min?: number[];
+        precipitation_probability_max?: number[];
+        sunrise?: string[];
+        sunset?: string[];
+      };
+    };
+
+    return (payload.daily?.time ?? []).map((date, index) => ({
+      date,
+      max: round(payload.daily?.temperature_2m_max?.[index]),
+      min: round(payload.daily?.temperature_2m_min?.[index]),
+      rainChance: round(payload.daily?.precipitation_probability_max?.[index]),
+      condition: weatherCodeLabel(payload.daily?.weather_code?.[index]),
+      sunrise: timeOnly(payload.daily?.sunrise?.[index]),
+      sunset: timeOnly(payload.daily?.sunset?.[index])
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function findLocation(city: string) {
   const candidates = Array.from(new Set([city.trim(), city.split(",")[0]?.trim()].filter(Boolean)));
   for (const candidate of candidates) {
@@ -96,6 +149,12 @@ function unavailableWeather(): WeatherData {
 
 function round(value?: number) {
   return value === undefined || Number.isNaN(value) ? null : Math.round(value);
+}
+
+function timeOnly(value?: string) {
+  if (!value) return null;
+  const time = value.includes("T") ? value.split("T")[1] : value;
+  return time?.slice(0, 5) || null;
 }
 
 function weatherCodeLabel(code?: number) {
