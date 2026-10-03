@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, FileArchive, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
+import { Bell, Building2, CalendarDays, ChevronDown, CirclePlus, CreditCard, FileArchive, Home, Images, LandPlot, LayoutGrid, Library, LogOut, Moon, Newspaper, Search, Settings, ShieldCheck, Sun, Target, TimerReset, User, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
@@ -11,6 +11,9 @@ import { useProfile } from "@/features/profile/use-profile";
 import type { PaletteId } from "@/lib/appearance";
 import type { AppView } from "@/types/ui";
 import { canAccessView } from "@/features/admin/subscription-access";
+import { NotificationCenter } from "@/features/notifications/NotificationCenter";
+import { useNotifications } from "@/features/notifications/use-notifications";
+import { BillingPage } from "@/features/billing/BillingPage";
 
 const QuickAddDialog = lazy(() => import("@/components/layout/QuickAddDialog").then((module) => ({ default: module.QuickAddDialog })));
 const AgendaPage = lazy(() => import("@/features/calendar/AgendaPage").then((module) => ({ default: module.AgendaPage })));
@@ -45,7 +48,7 @@ const navSections: Array<{ id: string; label: string; plan: string; items: NavIt
     { view: "news", label: "Notícias", icon: Newspaper }, { view: "city-media", label: "Mídia da Cidade", icon: Images }
   ] },
   { id: "account", label: "Conta", plan: "Todos", items: [
-    { view: "profile", label: "Perfil", icon: User }, { view: "settings", label: "Configurações", icon: Settings }
+    { view: "profile", label: "Perfil", icon: User }, { view: "billing", label: "Minha assinatura", icon: CreditCard }, { view: "settings", label: "Configurações", icon: Settings }
   ] }
 ];
 export function AppShell({
@@ -63,14 +66,16 @@ export function AppShell({
   customColor: string;
   onCustomColorChange: (color: string) => void;
 }) {
-  const [view, setView] = useState<AppView>("day");
+  const [view, setView] = useState<AppView>(() => initialView());
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const saasAdmin = useSaasAdmin();
   const subscription = useSubscriptionAccess();
+  const notifications = useNotifications();
   const { toast } = useToast();
   const accessibleSections = useMemo(() => navSections.map((section) => ({ ...section, items: section.items.filter((item) => canAccessView(item.view, subscription.data)) })).filter((section) => section.items.length), [subscription.data]);
   const accessibleItems = accessibleSections.flatMap((section) => section.items);
@@ -153,8 +158,8 @@ export function AppShell({
             <input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className={cn("h-11 w-full rounded-xl border bg-card/70 pl-11 pr-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/10", view === "focus" && "border-white/10 bg-white/[0.035] text-white placeholder:text-white/30")} placeholder="Buscar clientes, imóveis, compromissos..." aria-label="Busca global" />
           </form>
           <div className="flex items-center gap-2">
-            <Button size="icon" variant="ghost" aria-label="Notificações" onClick={() => toast({ title: "Nenhuma nova notificação." })} className="relative">
-              <Bell className="h-[18px] w-[18px]" /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-destructive" />
+            <Button size="icon" variant="ghost" aria-label={`Notificações${notifications.unreadCount ? `, ${notifications.unreadCount} não lidas` : ""}`} onClick={() => setNotificationsOpen(true)} className="relative">
+              <Bell className="h-[18px] w-[18px]" />{notifications.unreadCount > 0 && <span className="absolute right-1.5 top-1.5 grid min-h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[8px] font-bold text-white">{Math.min(notifications.unreadCount, 9)}</span>}
             </Button>
             <button type="button" onClick={() => setView("profile")} className="flex min-w-[190px] items-center gap-3 rounded-xl border bg-card/70 p-1.5 pr-3 text-left transition hover:border-primary/35">
               {profile?.foto ? <img src={profile.foto} alt="" className="h-9 w-9 rounded-full object-cover" /> : <span className="grid h-9 w-9 place-items-center rounded-full border border-primary/30 bg-primary/10 text-xs font-semibold text-primary">{(profile?.nome ?? "C").split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>}
@@ -176,6 +181,7 @@ export function AppShell({
             {view === "files" && <MyFilesPage />}
             {view === "finance" && <FinancePage />}
             {view === "goals" && <GoalsPage />}
+            {view === "billing" && <BillingPage />}
             {view === "profile" && (
               <ProfilePage
                 dark={dark}
@@ -225,11 +231,18 @@ export function AppShell({
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Mais áreas</DialogTitle><DialogDescription>Acesse os demais módulos e configurações.</DialogDescription></DialogHeader>
-          <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">{moreSections.map((section) => <section key={section.id}><div className="mb-2 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{section.label}</p><span className="text-[10px] text-muted-foreground">{section.plan}</span></div><div className="grid grid-cols-2 gap-2">{section.items.map((item) => <button key={item.view} type="button" onClick={() => { setView(item.view); setMoreOpen(false); }} className={cn("flex min-h-14 items-center gap-3 rounded-xl border bg-card px-3 text-left transition hover:border-primary/45", view === item.view && "border-primary bg-primary/10")}><item.icon className="h-5 w-5 shrink-0 text-primary" /><span className="text-sm font-semibold">{item.label}</span></button>)}</div></section>)}{saasAdmin.isAdmin && <section className="border-t pt-4"><button type="button" onClick={() => { setView("admin"); setMoreOpen(false); }} className={cn("flex min-h-16 w-full items-center gap-3 rounded-xl border border-primary/25 bg-foreground px-4 text-left text-background", view === "admin" && "ring-2 ring-primary")}><ShieldCheck className="h-5 w-5 text-primary" /><span><span className="block text-sm font-semibold">Super Admin</span><span className="block text-[10px] opacity-60">Assinantes, planos, cobrança e conteúdo</span></span></button></section>}</div>
+          <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1"><button type="button" onClick={() => { setMoreOpen(false); setNotificationsOpen(true); }} className="flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card px-3 text-left"><span className="relative grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Bell className="h-4 w-4" />{notifications.unreadCount > 0 && <span className="absolute -right-1 -top-1 h-4 min-w-4 rounded-full bg-destructive px-1 text-center text-[8px] font-bold leading-4 text-white">{Math.min(notifications.unreadCount, 9)}</span>}</span><span><span className="block text-sm font-semibold">Notificações</span><span className="block text-[10px] text-muted-foreground">{notifications.unreadCount ? `${notifications.unreadCount} não lidas` : "Tudo em dia"}</span></span></button>{moreSections.map((section) => <section key={section.id}><div className="mb-2 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{section.label}</p><span className="text-[10px] text-muted-foreground">{section.plan}</span></div><div className="grid grid-cols-2 gap-2">{section.items.map((item) => <button key={item.view} type="button" onClick={() => { setView(item.view); setMoreOpen(false); }} className={cn("flex min-h-14 items-center gap-3 rounded-xl border bg-card px-3 text-left transition hover:border-primary/45", view === item.view && "border-primary bg-primary/10")}><item.icon className="h-5 w-5 shrink-0 text-primary" /><span className="text-sm font-semibold">{item.label}</span></button>)}</div></section>)}{saasAdmin.isAdmin && <section className="border-t pt-4"><button type="button" onClick={() => { setView("admin"); setMoreOpen(false); }} className={cn("flex min-h-16 w-full items-center gap-3 rounded-xl border border-primary/25 bg-foreground px-4 text-left text-background", view === "admin" && "ring-2 ring-primary")}><ShieldCheck className="h-5 w-5 text-primary" /><span><span className="block text-sm font-semibold">Super Admin</span><span className="block text-[10px] opacity-60">Assinantes, planos, cobrança e conteúdo</span></span></button></section>}</div>
         </DialogContent>
       </Dialog>
+      <NotificationCenter open={notificationsOpen} onOpenChange={setNotificationsOpen} onNavigate={setView} />
     </div>
   );
+}
+
+function initialView(): AppView {
+  const value = new URLSearchParams(window.location.search).get("view") as AppView | null;
+  const valid: AppView[] = ["day", "agenda", "clients", "focus", "buildings", "condominiums", "city-media", "news", "library", "files", "finance", "goals", "profile", "settings", "billing", "admin"];
+  return value && valid.includes(value) ? value : "day";
 }
 
 function PageLoading() {

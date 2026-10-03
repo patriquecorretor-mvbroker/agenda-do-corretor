@@ -27,7 +27,7 @@ const featureByView: Partial<Record<AppView, string>> = {
   "city-media": "Mídia da Cidade"
 };
 
-const alwaysAvailable = new Set<AppView>(["day", "profile", "settings"]);
+const alwaysAvailable = new Set<AppView>(["day", "profile", "settings", "billing"]);
 
 export function hasSubscriptionAccess(access?: SubscriptionAccess | null, now = new Date()) {
   if (!access) return false;

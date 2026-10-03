@@ -1,11 +1,10 @@
-const CACHE_NAME = "agenda-corretor-v65";
+const CACHE_NAME = "agenda-corretor-v67";
 const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/favicon-32.png", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/mv-broker-logo.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
   self.skipWaiting();
 });
-
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -61,6 +60,3 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-self.addEventListener("push", () => {
-  // Preparado para notificações futuras; a assinatura será implementada em etapa própria.
-});

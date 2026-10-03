@@ -3,7 +3,8 @@ import { hasSupabaseConfig, requireSupabase } from "@/lib/supabase";
 const userTables = [
   "profiles", "calendar_events", "tasks", "daily_summaries", "clients", "client_activities", "client_map_marks",
   "commissions", "commission_installments", "financial_transactions", "financial_categories", "monthly_budgets", "financial_attachments",
-  "building_overrides", "condominiums", "condominium_assets", "city_media", "broker_files", "market_news_user_state", "market_news_settings"
+  "building_overrides", "condominiums", "condominium_assets", "city_media", "broker_files", "market_news_user_state", "market_news_settings",
+  "subscriptions", "subscription_payments", "billing_requests", "notification_preferences", "notifications", "legal_consents", "account_deletion_requests"
 ];
 
 export function collectLocalAccountData(storage: Storage) {

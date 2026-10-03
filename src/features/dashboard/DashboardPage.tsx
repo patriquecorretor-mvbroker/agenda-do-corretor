@@ -43,6 +43,7 @@ import { useTasks } from "@/features/tasks/use-tasks";
 import { useProfile } from "@/features/profile/use-profile";
 import { useFinance } from "@/features/finance/use-finance";
 import { useClients } from "@/features/clients/use-clients";
+import { buildCommercialMetrics } from "@/features/analytics/broker-metrics";
 import { getWeather, weatherMessage } from "@/features/dashboard/weather-service";
 import { hasSupabaseConfig } from "@/lib/supabase";
 import type { AppView } from "@/types/ui";
@@ -96,30 +97,10 @@ export function DashboardPage({
   const dailyGoalTotal = Math.max(events.length + todayTasks.length, 1);
   const dailyDone = completedEvents.length + todayTasks.filter((task) => task.status === "concluída").length;
   const dailyProgress = clampPercent((dailyDone / dailyGoalTotal) * 100);
-  const commercialMetrics = useMemo(() => {
-    const visitedProperties = events.filter((event) => event.type === "visita" && event.status === "concluído").length;
-    const scheduledVisits = events.filter((event) => event.type === "visita" && event.status === "agendado").length;
-    const convertedSales = finance.commissions.filter((commission) =>
-      ["confirmada", "parcialmente recebida", "recebida"].includes(commission.status)
-    ).length;
-    const leadCount = clients.filter((client) => client.status === "lead").length;
-    const contactedLeads = clients.filter((client) => ["em contato", "qualificado"].includes(client.status)).length;
-    const propertyProfile = mostServedPropertyProfile(clients.map((client) => client.property_profile).filter(Boolean) as string[]);
-    const conversionBase = leadCount || contactedLeads;
-    const conversionRate = conversionBase ? clampPercent((convertedSales / conversionBase) * 100) : null;
-
-    return {
-      demoMode: !hasSupabaseConfig,
-      visitedProperties,
-      leadsReceived: leadCount,
-      contactedLeads,
-      scheduledVisits,
-      convertedSales,
-      conversionRate,
-      propertyProfile: propertyProfile ?? "Dados insuficientes",
-      clientPortfolio: clients.length
-    };
-  }, [clients, events, finance.commissions]);
+  const commercialMetrics = useMemo(() => ({
+    ...buildCommercialMetrics({ clients, events, commissions: finance.commissions }),
+    demoMode: !hasSupabaseConfig
+  }), [clients, events, finance.commissions]);
 
   const priorities = useMemo(() => {
     return tasks

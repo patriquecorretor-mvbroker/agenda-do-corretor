@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Download, Loader2, Moon, Palette, ShieldCheck, Sparkles, Sun, Trash2 } from "lucide-react";
+import { BellRing, Check, Download, Loader2, Moon, Palette, ShieldCheck, Sparkles, Sun, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { downloadAccountExport, exportAccountData, requestAccountDeletion } from "@/features/legal/account-data";
 import { LegalDocumentDialog } from "@/features/legal/LegalDocumentDialog";
 import type { LegalDocumentType } from "@/features/legal/legal-content";
+import { useNotifications } from "@/features/notifications/use-notifications";
 
 export function SettingsPage({
   dark,
@@ -35,6 +36,7 @@ export function SettingsPage({
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
+  const notifications = useNotifications();
 
   async function handleExport() {
     if (!user) return;
@@ -145,6 +147,18 @@ export function SettingsPage({
           </CardContent>
         </Card>
       </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><BellRing className="h-5 w-5" /></span><div><CardTitle>Lembretes e notificações</CardTitle><CardDescription>Escolha o que merece interromper seu dia. O pedido de permissão só acontece quando você tocar em ativar.</CardDescription></div></div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-2xl border bg-muted/25 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Notificações push</p><p className="mt-1 text-xs text-muted-foreground">{notifications.pushState === "enabled" ? "Ativas neste dispositivo." : notifications.pushState === "blocked" ? "Bloqueadas nas configurações do navegador." : notifications.configured ? "Prontas para serem ativadas. No iPhone, abra o PWA instalado pela Tela de Início." : "Aguardando a chave pública do OneSignal."}</p></div><Button onClick={() => void notifications.enablePush.mutateAsync().then(() => toast({ title: "Notificações ativadas neste dispositivo." })).catch((error) => toast({ title: error instanceof Error ? error.message : "Não foi possível ativar.", variant: "error" }))} disabled={!notifications.configured || notifications.pushState === "enabled" || notifications.enablePush.isPending}>{notifications.enablePush.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}{notifications.pushState === "enabled" ? "Ativadas" : "Ativar neste aparelho"}</Button></div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{[
+            ["appointments", "Compromissos"], ["tasks", "Tarefas"], ["follow_ups", "Follow-ups"], ["finance", "Contas e vencimentos"], ["commissions", "Comissões"], ["market_news", "Notícias do mercado"]
+          ].map(([key, label]) => <label key={key} className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3 text-sm font-medium"><span>{label}</span><input type="checkbox" checked={Boolean(notifications.preferences[key as keyof typeof notifications.preferences])} onChange={(event) => void notifications.savePreferences.mutateAsync({ [key]: event.target.checked })} className="h-4 w-4 accent-primary" /></label>)}</div>
+          <div className="grid gap-3 sm:grid-cols-3"><div><Label htmlFor="reminder-minutes">Avisar antes</Label><select id="reminder-minutes" value={notifications.preferences.reminder_minutes} onChange={(event) => void notifications.savePreferences.mutateAsync({ reminder_minutes: Number(event.target.value) })} className="mt-2 h-11 w-full rounded-xl border bg-background px-3 text-sm"><option value="5">5 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option><option value="60">1 hora</option><option value="120">2 horas</option><option value="1440">1 dia</option></select></div><div><Label htmlFor="quiet-start">Silenciar a partir de</Label><Input id="quiet-start" type="time" className="mt-2" value={notifications.preferences.quiet_start.slice(0,5)} onChange={(event) => void notifications.savePreferences.mutateAsync({ quiet_start: event.target.value })} /></div><div><Label htmlFor="quiet-end">Voltar a avisar às</Label><Input id="quiet-end" type="time" className="mt-2" value={notifications.preferences.quiet_end.slice(0,5)} onChange={(event) => void notifications.savePreferences.mutateAsync({ quiet_end: event.target.value })} /></div></div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="h-5 w-5" /></span><div><CardTitle>Privacidade e seus dados</CardTitle><CardDescription>Consulte os documentos, baixe uma cópia dos dados da conta ou solicite a exclusão.</CardDescription></div></div>

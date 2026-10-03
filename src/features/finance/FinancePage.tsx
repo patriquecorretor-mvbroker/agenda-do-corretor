@@ -1137,13 +1137,7 @@ export function CommissionForm({ onSaved }: { onSaved: () => void }) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const vgv = Number(form.get("vgv") || 0);
-    const totalPercent = Number(form.get("total_commission_percent") || 0);
-    const brokerPercent = Number(form.get("broker_percent") || 100);
-    const gross = Number(form.get("gross_commission") || (vgv * totalPercent) / 100);
-    const brokerCommission = (gross * brokerPercent) / 100;
-    const discounts = Number(form.get("discounts") || 0);
-    const partnerSplit = Number(form.get("partner_split") || 0);
-    const net = Math.max(brokerCommission - discounts - partnerSplit, 0);
+    const commissionAmount = Number(form.get("commission_amount") || 0);
     await finance.createCommission.mutateAsync({
       client: String(form.get("client") || ""),
       property: String(form.get("property") || ""),
@@ -1151,13 +1145,13 @@ export function CommissionForm({ onSaved }: { onSaved: () => void }) {
       builder: String(form.get("builder") || "") || null,
       sale_date: String(form.get("sale_date") || format(new Date(), "yyyy-MM-dd")),
       vgv,
-      total_commission_percent: totalPercent,
-      gross_commission: gross,
-      broker_percent: brokerPercent,
-      broker_commission: brokerCommission,
-      discounts,
-      partner_split: partnerSplit,
-      net_commission: net,
+      total_commission_percent: 0,
+      gross_commission: commissionAmount,
+      broker_percent: 100,
+      broker_commission: commissionAmount,
+      discounts: 0,
+      partner_split: 0,
+      net_commission: commissionAmount,
       installments_count: Number(form.get("installments_count") || 1),
       first_expected_date: String(form.get("first_expected_date") || format(new Date(), "yyyy-MM-dd")),
       notes: String(form.get("notes") || "") || null,
@@ -1174,16 +1168,12 @@ export function CommissionForm({ onSaved }: { onSaved: () => void }) {
         <Field name="property" label="Imóvel" required />
         <Field name="development" label="Empreendimento" />
         <Field name="builder" label="Construtora" />
-        <Field name="sale_date" label="Data da venda" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} />
-        <Field name="vgv" label="VGV" type="number" step="0.01" required />
-        <Field name="total_commission_percent" label="% comissão total" type="number" step="0.01" defaultValue="4" />
-        <Field name="gross_commission" label="Comissão bruta" type="number" step="0.01" />
-        <Field name="broker_percent" label="% do corretor" type="number" step="0.01" defaultValue="100" />
-        <Field name="discounts" label="Descontos" type="number" step="0.01" defaultValue="0" />
-        <Field name="partner_split" label="Divisão parceiro" type="number" step="0.01" defaultValue="0" />
+        <Field name="sale_date" label="Data da comissão" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} />
+        <Field name="commission_amount" label="Valor da comissão" type="number" min="0.01" step="0.01" required />
         <Field name="installments_count" label="Número de parcelas" type="number" defaultValue="1" />
         <Field name="first_expected_date" label="1º recebimento" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} />
       </div>
+      <details className="rounded-2xl border p-4"><summary className="cursor-pointer text-sm font-semibold">Informações opcionais</summary><div className="mt-4 grid gap-3 md:grid-cols-2"><Field name="vgv" label="VGV de referência" type="number" min="0" step="0.01" /><p className="self-end text-xs leading-5 text-muted-foreground">O VGV é apenas informativo. A agenda não calcula comissão por percentual.</p></div></details>
       <div className="space-y-2">
         <Label>Status</Label>
         <Select name="status" defaultValue="confirmada">

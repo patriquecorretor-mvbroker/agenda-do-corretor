@@ -1,1 +1,1 @@
-export type AppView = "day" | "agenda" | "clients" | "focus" | "buildings" | "condominiums" | "city-media" | "news" | "library" | "files" | "finance" | "goals" | "profile" | "settings" | "admin";
+export type AppView = "day" | "agenda" | "clients" | "focus" | "buildings" | "condominiums" | "city-media" | "news" | "library" | "files" | "finance" | "goals" | "profile" | "settings" | "billing" | "admin";

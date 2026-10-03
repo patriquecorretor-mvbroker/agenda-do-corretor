@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCurrency } from "@/lib/utils";
 import { buildingAddress, useBuildings } from "@/features/buildings/use-buildings";
+import { deduplicateClients } from "@/features/analytics/broker-metrics";
 
 type ClientStage = "lead" | "em contato" | "visita agendada" | "comprador" | "pós-venda";
 
@@ -106,6 +107,7 @@ export function ClientsPage() {
   const marks = useClientMarks();
   const calendar = useEvents();
   const crm = useClients();
+  const uniqueCrmClients = deduplicateClients(crm.clients);
   const buildingCatalog = useBuildings();
   const [mapFilter, setMapFilter] = useState("todos");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -241,15 +243,15 @@ export function ClientsPage() {
   const selectedClientVisits = selectedClient ? visitLog.filter((visit) => visit.clientId === selectedClient.id) : [];
   const selectedVisitedToday = selectedClient ? visitLog.some((visit) => visit.clientId === selectedClient.id && isTodayKey(visit.date)) : false;
   const selectedCrmClient = crm.clients.find((client) => client.id === selectedCrmId);
-  const activeClients = crm.clients.filter((client) => !["venda realizada", "pós-venda", "perdido"].includes(client.status)).length;
-  const followUpsToday = crm.clients.filter((client) => client.next_follow_up === todayKey).length;
-  const scheduledVisits = crm.clients.filter((client) => client.status === "visita agendada").length;
-  const negotiations = crm.clients.filter((client) => ["proposta", "negociação"].includes(client.status)).length;
-  const attentionClients = crm.clients
+  const activeClients = uniqueCrmClients.filter((client) => !["venda realizada", "pós-venda", "perdido"].includes(client.status)).length;
+  const followUpsToday = uniqueCrmClients.filter((client) => client.next_follow_up === todayKey).length;
+  const scheduledVisits = uniqueCrmClients.filter((client) => client.status === "visita agendada").length;
+  const negotiations = uniqueCrmClients.filter((client) => ["proposta", "negociação"].includes(client.status)).length;
+  const attentionClients = uniqueCrmClients
     .filter((client) => !["venda realizada", "pós-venda", "perdido"].includes(client.status))
     .sort((a, b) => attentionScore(b, now) - attentionScore(a, now))
     .slice(0, 5);
-  const sourcePerformance = acquisitionPerformance(crm.clients);
+  const sourcePerformance = acquisitionPerformance(uniqueCrmClients);
   const activeFilterCount = [city, profile, stage, source, paymentCondition].filter((value) => value !== allValue).length + (insightFilter !== "all" ? 1 : 0) + (budgetFrom ? 1 : 0) + (budgetTo ? 1 : 0);
   const cityGroups = groupClientsByCity(clients);
   const cityExplorerClients = cityExplorer ? clients.filter((client) => client.city === cityExplorer) : [];

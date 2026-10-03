@@ -12,6 +12,7 @@ import { PublicCityPage } from "@/features/city-media/PublicCityPage";
 import { readSharedCityPage } from "@/features/city-media/city-pages";
 import { useSubscriptionAccess } from "@/features/admin/use-saas-admin";
 import { hasSubscriptionAccess } from "@/features/admin/subscription-access";
+import { BillingPage } from "@/features/billing/BillingPage";
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -20,6 +21,7 @@ function AppContent() {
   const [dark, setDark] = useState(() => safeStorageGet("theme") !== "light");
   const [palette, setPalette] = useState<PaletteId>(() => normalizePalette(safeStorageGet("palette")));
   const [customColor, setCustomColor] = useState(() => safeStorageGet("custom-color") ?? "#f47c20");
+  const [billingOpen, setBillingOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -60,6 +62,7 @@ function AppContent() {
   }
 
   if (access.error || !hasSubscriptionAccess(access.data)) {
+    if (billingOpen) return <main className="min-h-screen bg-background px-3 py-5 sm:px-6"><BillingPage onBack={() => setBillingOpen(false)} /></main>;
     const status = access.data?.status;
     const detail = access.error
       ? "Não foi possível confirmar sua assinatura. Verifique a conexão e tente novamente."
@@ -72,7 +75,7 @@ function AppContent() {
             : status === "canceled"
               ? "Sua assinatura foi cancelada. Escolha um plano para voltar a usar a agenda."
               : "Sua conta ainda não possui um plano ativo. Entre em contato para liberar o acesso.";
-    return <main className="grid min-h-screen place-items-center bg-[#05070a] px-5 text-white"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0e13] p-7 text-center shadow-2xl"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary"><CreditCard className="h-6 w-6" /></span><p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">Assinatura</p><h1 className="mt-2 text-2xl font-semibold">Acesso temporariamente indisponível</h1><p className="mt-3 text-sm leading-6 text-white/50">{detail}</p>{access.error && <Button className="mt-6 w-full" onClick={() => void access.refetch()}><RefreshCw className="h-4 w-4" />Tentar novamente</Button>} {!access.error && <Button className="mt-6 w-full" asChild><a href="mailto:suporte@mvbroker.com.br">Regularizar assinatura</a></Button>}<Button variant="ghost" className="mt-2 w-full text-white/60 hover:bg-white/5 hover:text-white" onClick={() => void signOut()}><LogOut className="h-4 w-4" />Sair</Button></section></main>;
+    return <main className="grid min-h-screen place-items-center bg-[#05070a] px-5 text-white"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0e13] p-7 text-center shadow-2xl"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary"><CreditCard className="h-6 w-6" /></span><p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">Assinatura</p><h1 className="mt-2 text-2xl font-semibold">Acesso temporariamente indisponível</h1><p className="mt-3 text-sm leading-6 text-white/50">{detail}</p>{access.error && <Button className="mt-6 w-full" onClick={() => void access.refetch()}><RefreshCw className="h-4 w-4" />Tentar novamente</Button>} {!access.error && <Button className="mt-6 w-full" onClick={() => setBillingOpen(true)}>Ver planos e regularizar</Button>}<Button variant="ghost" className="mt-2 w-full text-white/60 hover:bg-white/5 hover:text-white" onClick={() => void signOut()}><LogOut className="h-4 w-4" />Sair</Button></section></main>;
   }
 
   const onboardingComplete = Boolean(
