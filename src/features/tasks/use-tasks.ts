@@ -33,7 +33,7 @@ export function useTasks() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["tasks", user?.id] });
 
   return {
-    tasks: tasksQuery.data?.length ? tasksQuery.data : tasksQuery.data ?? demoTasks,
+    tasks: tasksQuery.data ?? [],
     isLoading: tasksQuery.isLoading,
     error: tasksQuery.error,
     createTask: useMutation({

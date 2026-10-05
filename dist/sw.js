@@ -1,5 +1,5 @@
-const CACHE_NAME = "agenda-corretor-v69";
-const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/favicon-32.png", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/mv-broker-logo.jpg"];
+const CACHE_NAME = "agenda-corretor-v70";
+const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/favicon-32.png", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/app-icon-master.png", "/brand/mv-broker-logo.jpg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

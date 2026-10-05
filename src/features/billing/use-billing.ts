@@ -21,7 +21,7 @@ export function useBilling() {
   const queryClient = useQueryClient();
   const key = ["billing", user?.id];
   const query = useQuery({ queryKey: key, enabled: Boolean(user), queryFn: async () => {
-    if (!hasSupabaseConfig) return { plans: demoPlans, subscription: { plan_id: "plan-profissional", status: "active", billing_cycle: "monthly", trial_ends_at: null, current_period_end: "2026-10-18" }, payments: [{ id: "demo-payment", amount: 89.9, due_date: "2026-10-18", paid_at: null, status: "pending", payment_method: "PIX" }] as BillingPayment[], requests: readRequests(), providerReady: false };
+    if (!hasSupabaseConfig) return { plans: demoPlans, subscription: { plan_id: "plan-profissional", status: "active", billing_cycle: "monthly", trial_ends_at: null, current_period_end: null }, payments: [] as BillingPayment[], requests: readRequests(), providerReady: false };
     const db = requireSupabase() as any;
     const [plans, subscription, payments, requests] = await Promise.all([
       db.from("subscription_plans").select("id,name,slug,description,monthly_price,annual_price,features,active").eq("active", true).order("monthly_price"),

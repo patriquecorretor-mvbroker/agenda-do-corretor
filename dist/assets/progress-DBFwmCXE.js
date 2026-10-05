@@ -1,1 +1,0 @@
-import{j as r,F as a}from"./index-DXaGDuSu.js";function e({value:l,className:s}){return r.jsx("div",{className:a("h-2.5 w-full overflow-hidden rounded-full bg-muted",s),children:r.jsx("div",{className:"h-full rounded-full bg-primary transition-all duration-500",style:{width:`${Math.max(0,Math.min(100,l))}%`}})})}export{e as P};

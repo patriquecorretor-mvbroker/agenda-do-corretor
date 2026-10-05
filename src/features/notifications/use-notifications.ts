@@ -10,10 +10,7 @@ export type AppNotification = { id: string; kind: "appointment" | "task" | "foll
 const defaults: NotificationPreferences = { enabled: false, appointments: true, tasks: true, follow_ups: true, finance: true, commissions: true, market_news: false, reminder_minutes: 30, quiet_start: "21:00", quiet_end: "08:00", timezone: "America/Sao_Paulo" };
 const preferencesKey = "agenda-notification-preferences";
 const readKey = "agenda-demo-read-notifications";
-const demoNotifications: AppNotification[] = [
-  { id: "demo-notification-1", kind: "appointment", title: "Visita se aproximando", body: "Visita agendada em 30 minutos. Confira endereço e cliente.", target_view: "agenda", created_at: new Date().toISOString(), read_at: null, status: "sent" },
-  { id: "demo-notification-2", kind: "finance", title: "Recebimento previsto", body: "Há uma comissão prevista para hoje no seu financeiro.", target_view: "finance", created_at: new Date(Date.now() - 3600000).toISOString(), read_at: null, status: "sent" }
-];
+const demoNotifications: AppNotification[] = [];
 let oneSignalInitialized = false;
 let oneSignalInitPromise: Promise<void> | null = null;
 

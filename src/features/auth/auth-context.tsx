@@ -10,17 +10,22 @@ type AuthContextValue = {
   session: Session | null;
   loading: boolean;
   isDemo: boolean;
+  recoveringPassword: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, legal: LegalAcceptance) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+prepareCleanLocalMvp();
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [demoEnabled, setDemoEnabled] = useState(() => safeStorageGet("agenda-demo-session") === "true");
+  const [recoveringPassword, setRecoveringPassword] = useState(() => isRecoveryUrl());
   const [loading, setLoading] = useState(hasSupabaseConfig);
 
   useEffect(() => {
@@ -47,8 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (event === "PASSWORD_RECOVERY") setRecoveringPassword(true);
       setLoading(false);
     });
 
@@ -65,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       isDemo: !hasSupabaseConfig && demoEnabled,
+      recoveringPassword,
       async signIn(email, password) {
         if (!supabase) {
           safeStorageSet("agenda-demo-session", "true");
@@ -97,24 +104,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async resetPassword(email) {
         if (!supabase) throw new Error("Supabase não configurado.");
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin
+          redirectTo: `${window.location.origin}/?auth=recovery`
         });
         if (error) throw error;
+      },
+      async updatePassword(password) {
+        if (!supabase) throw new Error("Supabase não configurado.");
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        setRecoveringPassword(false);
+        window.history.replaceState({}, document.title, window.location.pathname);
       },
       async signOut() {
         if (!supabase) {
           safeStorageRemove("agenda-demo-session");
           setDemoEnabled(false);
+          setRecoveringPassword(false);
           return;
         }
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
+        setRecoveringPassword(false);
       }
     }),
-    [demoEnabled, loading, session]
+    [demoEnabled, loading, recoveringPassword, session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function isRecoveryUrl() {
+  if (typeof window === "undefined") return false;
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  return query.get("auth") === "recovery" || query.get("type") === "recovery" || hash.get("type") === "recovery";
+}
+
+function prepareCleanLocalMvp() {
+  if (hasSupabaseConfig || typeof window === "undefined") return;
+  const marker = "agenda-clean-mvp-v1";
+  try {
+    if (localStorage.getItem(marker) === "true") return;
+    const visualPreferences = {
+      theme: localStorage.getItem("theme"),
+      palette: localStorage.getItem("palette"),
+      customColor: localStorage.getItem("custom-color")
+    };
+    localStorage.clear();
+    if (visualPreferences.theme) localStorage.setItem("theme", visualPreferences.theme);
+    if (visualPreferences.palette) localStorage.setItem("palette", visualPreferences.palette);
+    if (visualPreferences.customColor) localStorage.setItem("custom-color", visualPreferences.customColor);
+    localStorage.setItem(marker, "true");
+    for (const database of ["agenda-corretor-files", "agenda-corretor-media", "agenda-corretor-condominium-assets"]) {
+      indexedDB.deleteDatabase(database);
+    }
+  } catch {
+    // Browsers with restricted storage still receive the empty in-memory defaults.
+  }
 }
 
 function safeStorageGet(key: string) {

@@ -15,7 +15,7 @@ import { hasSubscriptionAccess } from "@/features/admin/subscription-access";
 import { BillingPage } from "@/features/billing/BillingPage";
 
 function AppContent() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, recoveringPassword, signOut } = useAuth();
   const { profile, isLoading } = useProfile();
   const access = useSubscriptionAccess();
   const [dark, setDark] = useState(() => safeStorageGet("theme") !== "light");
@@ -51,7 +51,7 @@ function AppContent() {
     );
   }
 
-  if (!user) return <AuthPage />;
+  if (!user || recoveringPassword) return <AuthPage />;
 
   if (isLoading || access.isLoading) {
     return (

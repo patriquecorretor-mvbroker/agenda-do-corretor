@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEqualInstallments, installmentBalance } from "@/features/finance/finance-utils";
+import { buildEqualInstallments, installmentBalance, isPaidExpense, isReceivedTransaction } from "@/features/finance/finance-utils";
 import { inferFinancialCategory } from "@/features/finance/finance-import";
 
 describe("finance utilities", () => {
@@ -21,5 +21,12 @@ describe("finance utilities", () => {
   it("classifies common broker expenses", () => {
     expect(inferFinancialCategory("POSTO IPIRANGA", "expense")).toBe("combustível");
     expect(inferFinancialCategory("MENSALIDADE MV BROKER", "expense")).toBe("MV Broker");
+  });
+
+  it("counts expenses only after payment and income only after receipt", () => {
+    expect(isPaidExpense({ type: "expense", status: "pago" } as never)).toBe(true);
+    expect(isPaidExpense({ type: "expense", status: "pendente" } as never)).toBe(false);
+    expect(isReceivedTransaction({ type: "income", status: "recebido" } as never)).toBe(true);
+    expect(isReceivedTransaction({ type: "income", status: "pendente" } as never)).toBe(false);
   });
 });

@@ -24,20 +24,9 @@ const demoPlans: SaasPlan[] = [
   { id: "plan-essencial", name: "Essencial", slug: "essencial", description: "Agenda, clientes e foco comercial.", monthly_price: 49.9, annual_price: 499, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos"] },
   { id: "plan-profissional", name: "Profissional", slug: "profissional", description: "Gestão comercial e financeira completa.", monthly_price: 89.9, annual_price: 899, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos", "Financeiro", "Metas", "Edifícios", "Condomínios", "Mercado", "Mídia da Cidade"] }
 ];
-const demoMembers: SaasMember[] = [
-  { id: "sub-1", user_id: "demo-user", name: "Patrique Lopes", email: "patrique@mvbroker.com.br", city: "Capão da Canoa", plan_id: "plan-profissional", status: "active", renewal: "2026-10-18", created_at: "2026-06-18" },
-  { id: "sub-2", user_id: "member-2", name: "Mariana Costa", email: "mariana@corretora.com.br", city: "Xangri-Lá", plan_id: "plan-essencial", status: "trialing", renewal: "2026-10-07", created_at: "2026-09-23" },
-  { id: "sub-3", user_id: "member-3", name: "Lucas Martins", email: "lucas@imoveis.com.br", city: "Capão da Canoa", plan_id: "plan-profissional", status: "past_due", renewal: "2026-09-28", created_at: "2026-04-11" }
-];
-const demoPayments: SaasPayment[] = [
-  { id: "pay-1", user_id: "demo-user", member_name: "Patrique Lopes", amount: 89.9, due_date: "2026-09-18", status: "paid", payment_method: "PIX" },
-  { id: "pay-2", user_id: "member-2", member_name: "Mariana Costa", amount: 49.9, due_date: "2026-10-07", status: "pending", payment_method: "Cartão" },
-  { id: "pay-3", user_id: "member-3", member_name: "Lucas Martins", amount: 89.9, due_date: "2026-09-28", status: "overdue", payment_method: "Boleto" }
-];
-const demoMaterials: SaasMaterial[] = [
-  { id: "mat-1", title: "Campanha Vista Mar", description: "Kit de stories e feed para imóveis com vista para o mar.", category: "Marketing", material_type: "drive", thumbnail_url: "/brand/capao-sunset.png", external_url: "https://drive.google.com/", storage_path: null, target_plan_ids: [], published: true, created_at: "2026-09-29T12:00:00Z" },
-  { id: "mat-2", title: "Roteiro de visita premium", description: "PDF para conduzir visitas de imóveis de alto padrão.", category: "Vendas", material_type: "pdf", thumbnail_url: "/brand/capao-sunset.png", external_url: "https://example.com/roteiro.pdf", storage_path: null, target_plan_ids: [], published: true, created_at: "2026-09-27T12:00:00Z" }
-];
+const demoMembers: SaasMember[] = [];
+const demoPayments: SaasPayment[] = [];
+const demoMaterials: SaasMaterial[] = [];
 
 function readLocal<T>(key: string, fallback: T): T { try { const saved = localStorage.getItem(key); return saved ? JSON.parse(saved) as T : fallback; } catch { return fallback; } }
 function writeLocal(key: string, value: unknown) { localStorage.setItem(key, JSON.stringify(value)); }
@@ -49,7 +38,7 @@ export function useSaasAdmin() {
   const queryClient = useQueryClient();
   const key = ["saas-admin", user?.id];
   const query = useQuery<AdminData>({ queryKey: key, enabled: Boolean(user), refetchOnMount: "always", queryFn: async () => {
-    if (!hasSupabaseConfig) return { isAdmin: isDemo, plans: readLocal(plansKey, demoPlans), members: readLocal(membersKey, demoMembers), payments: readLocal(paymentsKey, demoPayments), billingRequests: readLocal<SaasBillingRequest[]>(billingRequestsKey, []).map((item) => ({ ...item, member_name: "Patrique Lopes", user_id: "demo-user" })), materials: readLocal(materialsKey, demoMaterials), deletionRequests: readDemoDeletionRequests() };
+    if (!hasSupabaseConfig) return { isAdmin: false, plans: readLocal(plansKey, demoPlans), members: readLocal(membersKey, demoMembers), payments: readLocal(paymentsKey, demoPayments), billingRequests: readLocal<SaasBillingRequest[]>(billingRequestsKey, []).map((item) => ({ ...item, member_name: "Assinante local", user_id: "demo-user" })), materials: readLocal(materialsKey, demoMaterials), deletionRequests: readDemoDeletionRequests() };
     const db = requireSupabase() as any;
     const admin = await db.from("app_admins").select("user_id").eq("user_id", user!.id).maybeSingle();
     if (admin.error || !admin.data) return { isAdmin: false, plans: [], members: [], payments: [], billingRequests: [], materials: [], deletionRequests: [] };
@@ -137,7 +126,7 @@ export function usePublishedMaterials() {
 export function useSubscriptionAccess() {
   const { user, isDemo } = useAuth();
   return useQuery({ queryKey: ["subscription-access", user?.id], enabled: Boolean(user), queryFn: async () => {
-    if (!hasSupabaseConfig) return { status: isDemo ? "active" as const : null, currentPeriodEnd: null, trialEndsAt: null, planId: isDemo ? "plan-profissional" : null, planName: isDemo ? "Profissional" : null, planSlug: isDemo ? "profissional" : null, features: isDemo ? demoPlans[1].features : [], isAdmin: isDemo } satisfies SubscriptionAccess;
+    if (!hasSupabaseConfig) return { status: isDemo ? "active" as const : null, currentPeriodEnd: null, trialEndsAt: null, planId: isDemo ? "plan-profissional" : null, planName: isDemo ? "Profissional" : null, planSlug: isDemo ? "profissional" : null, features: isDemo ? demoPlans[1].features : [], isAdmin: false } satisfies SubscriptionAccess;
     const db = requireSupabase() as any;
     const admin = await db.from("app_admins").select("user_id").eq("user_id", user!.id).maybeSingle();
     if (admin.data) return { status: "active", currentPeriodEnd: null, trialEndsAt: null, planId: null, planName: "Administração", planSlug: "profissional", features: demoPlans[1].features, isAdmin: true } satisfies SubscriptionAccess;

@@ -6,30 +6,8 @@ import type { CityMedia } from "@/types/database";
 const bucket = "city-media";
 const databaseName = "agenda-corretor-media";
 const storeName = "media";
-const favoriteKey = "agenda-city-media-demo-favorite";
 
 export type CityMediaInput = Pick<CityMedia, "title" | "city" | "neighborhood" | "category" | "orientation" | "tags" | "captured_at"> & { file: File };
-
-const demoMedia: CityMedia = {
-  id: "demo-city-capao-sunset",
-  user_id: "demo-user",
-  title: "Orla ao pôr do sol",
-  city: "Capão da Canoa",
-  neighborhood: "Centro",
-  media_type: "photo",
-  category: "praia",
-  orientation: "horizontal",
-  storage_path: null,
-  mime_type: "image/png",
-  file_size: 2408253,
-  tags: ["orla", "pôr do sol", "litoral"],
-  favorite: false,
-  captured_at: null,
-  created_at: "2026-09-28T08:00:00-03:00",
-  updated_at: "2026-09-28T08:00:00-03:00",
-  media_url: "/brand/capao-sunset.png",
-  demo: true
-};
 
 export function useCityMedia() {
   const { user } = useAuth();
@@ -95,8 +73,7 @@ async function remoteRemove(userId: string, media: CityMedia) {
 
 async function localList(): Promise<CityMedia[]> {
   const records = await allLocal();
-  const favorite = localStorage.getItem(favoriteKey) === "true";
-  return [{ ...demoMedia, favorite }, ...records.map((record) => ({ ...record.media, media_url: URL.createObjectURL(record.blob) }))];
+  return records.map((record) => ({ ...record.media, media_url: URL.createObjectURL(record.blob) }));
 }
 
 async function localUpload(userId: string, input: CityMediaInput): Promise<CityMedia> {
@@ -108,7 +85,6 @@ async function localUpload(userId: string, input: CityMediaInput): Promise<CityM
 }
 
 async function localFavorite(media: CityMedia, value: boolean) {
-  if (media.demo) { localStorage.setItem(favoriteKey, String(value)); return; }
   const database = await openDatabase();
   const record = await requestPromise<LocalRecord | undefined>(database.transaction(storeName).objectStore(storeName).get(media.id));
   if (!record) return;
@@ -118,7 +94,6 @@ async function localFavorite(media: CityMedia, value: boolean) {
 }
 
 async function localRemove(media: CityMedia) {
-  if (media.demo) return;
   const database = await openDatabase();
   await transactionPromise(database, "readwrite", (store) => store.delete(media.id));
 }

@@ -38,7 +38,7 @@ export function useEvents(period: EventPeriod = format(new Date(), "yyyy-MM-dd")
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["events", user?.id] });
 
   return {
-    events: eventsQuery.data?.length ? eventsQuery.data : eventsQuery.data ?? demoEvents.filter((event) => event.date >= from && event.date <= to),
+    events: eventsQuery.data ?? [],
     isLoading: eventsQuery.isLoading,
     error: eventsQuery.error,
     createEvent: useMutation({

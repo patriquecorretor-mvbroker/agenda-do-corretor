@@ -10,14 +10,15 @@ import { useAuth } from "@/features/auth/auth-context";
 import { LegalDocumentDialog } from "@/features/legal/LegalDocumentDialog";
 import { legalVersions, type LegalDocumentType } from "@/features/legal/legal-content";
 
-type Mode = "login" | "signup" | "reset";
+type Mode = "login" | "signup" | "reset" | "update";
 
 export function AuthPage() {
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, updatePassword, recoveringPassword } = useAuth();
   const { toast } = useToast();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [loading, setLoading] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [legalDocument, setLegalDocument] = useState<LegalDocumentType | null>(null);
@@ -26,8 +27,9 @@ export function AuthPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      if (mode === "login") await signIn(email, password);
-      if (mode === "signup") {
+      const activeMode = recoveringPassword ? "update" : mode;
+      if (activeMode === "login") await signIn(email, password);
+      if (activeMode === "signup") {
         if (!acceptedLegal) throw new Error("Aceite os Termos de Uso e a Política de Privacidade para criar a conta.");
         await signUp(email, password, {
           termsVersion: legalVersions.terms,
@@ -35,13 +37,20 @@ export function AuthPage() {
           acceptedAt: new Date().toISOString()
         });
       }
-      if (mode === "reset") await resetPassword(email);
+      if (activeMode === "reset") await resetPassword(email);
+      if (activeMode === "update") {
+        if (password.length < 8) throw new Error("A nova senha deve ter pelo menos 8 caracteres.");
+        if (password !== passwordConfirmation) throw new Error("As senhas não coincidem.");
+        await updatePassword(password);
+      }
       toast({
         title:
-          mode === "reset"
+          activeMode === "reset"
             ? "Enviamos as instruções de recuperação."
-            : mode === "signup"
+            : activeMode === "signup"
               ? "Conta criada. Verifique seu e-mail se a confirmação estiver ativa."
+              : activeMode === "update"
+                ? "Senha atualizada com sucesso."
               : "Login realizado."
       });
     } catch (error) {
@@ -50,6 +59,8 @@ export function AuthPage() {
       setLoading(false);
     }
   }
+
+  const activeMode: Mode = recoveringPassword ? "update" : mode;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(218,165,57,0.26),_transparent_34%),linear-gradient(135deg,#050403,#15100a_48%,#faf8f1_48%)] p-4 text-foreground dark:from-background">
@@ -96,33 +107,42 @@ export function AuthPage() {
               <form className="space-y-5" onSubmit={handleSubmit}>
                 <div>
                   <h2 className="text-2xl font-semibold">
-                    {mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Recuperar senha"}
+                    {activeMode === "login" ? "Entrar" : activeMode === "signup" ? "Criar conta" : activeMode === "reset" ? "Recuperar senha" : "Criar nova senha"}
                   </h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {mode === "login"
+                    {activeMode === "login"
                       ? "Acesse seu painel diário."
-                      : mode === "signup"
+                      : activeMode === "signup"
                         ? "Cadastre-se para iniciar o onboarding."
-                        : "Informe seu e-mail para receber as instruções."}
+                        : activeMode === "reset"
+                          ? "Informe seu e-mail para receber as instruções."
+                          : "Escolha uma senha segura para recuperar o acesso."}
                   </p>
                 </div>
-                <div className="space-y-2">
+                {activeMode !== "update" && <div className="space-y-2">
                   <Label htmlFor="email">E-mail</Label>
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input id="email" type="email" className="pl-11" value={email} onChange={(event) => setEmail(event.target.value)} required />
                   </div>
-                </div>
-                {mode !== "reset" && (
+                </div>}
+                {activeMode !== "reset" && (
                   <div className="space-y-2">
-                    <Label htmlFor="password">Senha</Label>
+                    <Label htmlFor="password">{activeMode === "update" ? "Nova senha" : "Senha"}</Label>
                     <div className="relative">
                       <LockKeyhole className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input id="password" type="password" className="pl-11" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} />
+                      <Input id="password" type="password" className="pl-11" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={activeMode === "login" ? 6 : 8} autoComplete={activeMode === "login" ? "current-password" : "new-password"} />
                     </div>
                   </div>
                 )}
-                {mode === "signup" && (
+                {activeMode === "update" && <div className="space-y-2">
+                  <Label htmlFor="password-confirmation">Confirmar nova senha</Label>
+                  <div className="relative">
+                    <LockKeyhole className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input id="password-confirmation" type="password" className="pl-11" value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} required minLength={8} autoComplete="new-password" />
+                  </div>
+                </div>}
+                {activeMode === "signup" && (
                   <label className="flex items-start gap-3 rounded-2xl border bg-muted/35 p-4 text-sm leading-5">
                     <input type="checkbox" checked={acceptedLegal} onChange={(event) => setAcceptedLegal(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
                     <span>
@@ -132,9 +152,9 @@ export function AuthPage() {
                 )}
                 <Button className="w-full" size="lg" disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Enviar recuperação"}
+                  {activeMode === "login" ? "Entrar" : activeMode === "signup" ? "Criar conta" : activeMode === "reset" ? "Enviar recuperação" : "Atualizar senha"}
                 </Button>
-                <div className="flex flex-wrap justify-center gap-2 text-sm text-muted-foreground">
+                {activeMode !== "update" && <div className="flex flex-wrap justify-center gap-2 text-sm text-muted-foreground">
                   <button type="button" className="font-medium text-foreground" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
                     {mode === "login" ? "Criar conta" : "Já tenho conta"}
                   </button>
@@ -142,7 +162,7 @@ export function AuthPage() {
                   <button type="button" className="font-medium text-foreground" onClick={() => setMode("reset")}>
                     Esqueci a senha
                   </button>
-                </div>
+                </div>}
                 <LegalLinks onOpen={setLegalDocument} />
               </form>
             )}

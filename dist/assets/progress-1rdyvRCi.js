@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-react-Ckx0istL.js";import{l as t}from"./index-B_P7uazk.js";function o({value:l,className:s}){return r.jsx("div",{className:t("h-2.5 w-full overflow-hidden rounded-full bg-muted",s),children:r.jsx("div",{className:"h-full rounded-full bg-primary transition-all duration-500",style:{width:`${Math.max(0,Math.min(100,l))}%`}})})}export{o as P};

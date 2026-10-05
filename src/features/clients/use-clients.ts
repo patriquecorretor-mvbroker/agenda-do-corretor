@@ -7,16 +7,7 @@ import { appendLocalClientActivity } from "./use-client-activities";
 
 const demoKey = "mv-broker-crm-clients";
 
-const demoClients: Client[] = [
-  demoClient("crm-1", "Mariana Alves", "visita agendada", "São Paulo", "Apartamento 2 quartos", 1),
-  demoClient("crm-2", "Renata Lima", "em contato", "Guarulhos", "Casa em condomínio", 3),
-  demoClient("crm-3", "Patrícia Gomes", "qualificado", "Barueri", "Casa em condomínio", 5),
-  demoClient("crm-4", "Bianca Reis", "proposta", "Sorocaba", "Casa em condomínio", 2),
-  { ...demoClient("crm-5", "Carlos Mendes", "venda realizada", "São Paulo", "Apartamento 2 quartos", 12), sale_date: "2025-10-05", next_follow_up: "2026-10-05" },
-  { ...demoClient("crm-6", "Aline Souza", "pós-venda", "São Bernardo", "Apartamento 3 quartos", 20), sale_date: "2025-09-25", next_follow_up: "2026-09-25" },
-  { ...demoClient("crm-7", "Marina Lopes", "pós-venda", "São Paulo", "Apartamento 2 quartos", 30), sale_date: new Date().toISOString().slice(0, 10) },
-  { ...demoClient("crm-8", "Rafael Andrade", "venda realizada", "Barueri", "Casa em condomínio", 45), sale_date: new Date().toISOString().slice(0, 10) }
-];
+const demoClients: Client[] = [];
 
 function readLocal(): Client[] {
   try { const saved = localStorage.getItem(demoKey); return saved === null ? demoClients : JSON.parse(saved) as Client[]; } catch { return demoClients; }
@@ -25,17 +16,6 @@ function readLocal(): Client[] {
 function writeLocal(clients: Client[]) { localStorage.setItem(demoKey, JSON.stringify(clients)); }
 function localId() { return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `client-${Date.now()}`; }
 
-function demoClient(id: string, name: string, status: Client["status"], city: string, property: string, followUpDays: number): Client {
-  const followUp = new Date(); followUp.setDate(followUp.getDate() + followUpDays);
-  const now = new Date().toISOString();
-  const sources = ["Instagram", "Indicação", "Portal imobiliário", "WhatsApp", "Placa"];
-  const temperatures = ["quente", "morno", "frio"] as const;
-  const sourceIndex = Number(id.replace(/\D/g, "")) || 0;
-  const budgets = [[650000, 900000], [900000, 1500000], [1500000, 2500000], [500000, 750000]];
-  const paymentConditions = ["Financiamento bancário", "À vista", "Entrada + financiamento", "Permuta"];
-  const [budgetMin, budgetMax] = budgets[sourceIndex % budgets.length];
-  return { id, user_id: "demo-user", name, phone: null, whatsapp: "5511999999999", email: null, city, neighborhood: null, property_profile: property, budget_min: budgetMin, budget_max: budgetMax, payment_condition: paymentConditions[sourceIndex % paymentConditions.length], bedrooms: null, notes: null, source: sources[sourceIndex % sources.length], temperature: temperatures[sourceIndex % temperatures.length], status, sale_date: null, next_follow_up: followUp.toISOString().slice(0, 10), lat: null, lng: null, created_at: now, updated_at: now };
-}
 
 export function useClients() {
   const { user } = useAuth();

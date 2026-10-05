@@ -1,5 +1,19 @@
 # Checklist de lançamento
 
+## Auditoria local de 5 de outubro de 2026
+
+- `pnpm check:launch` aprovado: TypeScript, 21 testes e build de produção.
+- 16 módulos percorridos no desktop e no viewport mobile de 390 x 844, sem tela branca, erro de console ou rolagem horizontal da página.
+- Cadastro rápido de tarefa validado com persistência no modo demonstração.
+- Despesa paga validada no fluxo real: o lançamento alterou despesas e resultado líquido; conta pendente permanece fora do caixa realizado.
+- PWA validado com manifest standalone, atalhos, ícones 192/512 nas dimensões corretas, service worker e fallback offline presentes.
+- Auditoria estática aprovada para 33 tabelas públicas com RLS e policies.
+- Auditoria de dependências aprovada sem vulnerabilidades conhecidas em produção.
+- Pacote inicial reduzido de aproximadamente 686 kB para 156 kB por divisão de módulos e fornecedores.
+- Recuperação de senha concluída com tela de definição e confirmação da nova senha.
+
+**Decisão:** o produto está pronto para homologação interna e demonstração. A venda para assinantes depende dos itens externos abaixo, sobretudo Supabase de produção, cobrança real, identidade legal, e-mail e push.
+
 ## Pronto no código
 
 - PWA instalável, manifest, ícones, service worker e fallback offline.
