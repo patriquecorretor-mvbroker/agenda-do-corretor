@@ -20,7 +20,7 @@ Deno.serve(async (request) => {
     const reference = await sha256(`${deletionRequest.user_id}:${deletionRequest.email ?? ""}`);
     await admin.from("account_deletion_requests").update({ status: "in_review" }).eq("id", requestId);
     await admin.from("privacy_request_audit").insert({ request_id: requestId, subject_reference: reference, action: "review_started", actor_user_id: caller.user.id });
-    for (const bucket of ["city-media", "condominium-assets", "broker-files"]) await removeStorageFolder(admin, bucket, deletionRequest.user_id);
+    for (const bucket of ["city-media", "condominium-assets", "broker-files", "broker-images"]) await removeStorageFolder(admin, bucket, deletionRequest.user_id);
     const result = await admin.auth.admin.deleteUser(deletionRequest.user_id);
     if (result.error) {
       await admin.from("privacy_request_audit").insert({ request_id: requestId, subject_reference: reference, action: "failed", actor_user_id: caller.user.id, detail: result.error.message.slice(0, 500) });

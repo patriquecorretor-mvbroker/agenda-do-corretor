@@ -1,12 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Boxes, CreditCard, FileImage, Library, Link2, Megaphone, MoreHorizontal, ShieldCheck, Upload, UserRoundX, Users, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/auth-context";
+import { saveImageAsset } from "@/lib/image-assets";
 import { useSaasAdmin, type MaterialInput, type SaasBillingRequest, type SaasDeletionRequest, type SaasMaterial, type SaasMember, type SaasPayment, type SaasPlan } from "./use-saas-admin";
 
 type AdminTab = "overview" | "users" | "payments" | "plans" | "materials" | "privacy";
@@ -26,6 +29,7 @@ function hasPlanFeature(plan: SaasPlan, feature: string) {
 
 export function AdminPage() {
   const admin = useSaasAdmin();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [tab, setTab] = useState<AdminTab>("overview");
   const [materialOpen, setMaterialOpen] = useState(false);
@@ -59,11 +63,14 @@ export function AdminPage() {
         {tab === "privacy" && <PrivacyPanel requests={admin.deletionRequests} processing={admin.processDeletionRequest.isPending} onStatus={async (id, status) => { await admin.updateDeletionRequest.mutateAsync({ id, status }); toast({ title: "Solicitação de privacidade atualizada." }); }} onDelete={async (id) => { await admin.processDeletionRequest.mutateAsync(id); toast({ title: "Conta e dados vinculados foram excluídos." }); }} />}
       </div>
     </div>
-    <MaterialDialog open={materialOpen} pending={admin.createMaterial.isPending || admin.uploadMaterial.isPending} onOpenChange={setMaterialOpen} onSubmit={async (input, file) => {
+    <MaterialDialog open={materialOpen} pending={admin.createMaterial.isPending || admin.uploadMaterial.isPending} onOpenChange={setMaterialOpen} onSubmit={async (input, file, coverFile) => {
       let next = input;
       if (file) {
         const uploaded = await admin.uploadMaterial.mutateAsync(file);
         next = { ...input, material_type: uploaded.materialType, external_url: uploaded.externalUrl, storage_path: uploaded.storagePath, thumbnail_url: uploaded.materialType === "image" ? uploaded.externalUrl : input.thumbnail_url };
+      }
+      if (coverFile) {
+        next = { ...next, thumbnail_url: await saveImageAsset(coverFile, user!.id, "materials") };
       }
       await admin.createMaterial.mutateAsync(next);
       setMaterialOpen(false);
@@ -96,10 +103,24 @@ function PrivacyPanel({ requests, processing, onStatus, onDelete }: { requests: 
 
 function PlansPanel({ plans, onEdit }: { plans: SaasPlan[]; onEdit: (plan: SaasPlan) => void }) { return <div className="grid gap-4 lg:grid-cols-3">{plans.map((plan) => <article key={plan.id} className="rounded-2xl border bg-card p-5"><div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase text-primary">{plan.name}</p><span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold", plan.active ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground")}>{plan.active ? "Ativo" : "Inativo"}</span></div><p className="mt-4 text-3xl font-semibold">{brl.format(plan.monthly_price)}<span className="text-xs font-medium text-muted-foreground">/mês</span></p><p className="mt-2 text-sm text-muted-foreground">{plan.description}</p><div className="mt-5 space-y-2">{planFeatures.filter((feature) => hasPlanFeature(plan, feature)).map((feature) => <p key={feature} className="flex items-center gap-2 text-xs"><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-500/10 text-emerald-600">✓</span>{feature}</p>)}</div><Button variant="outline" className="mt-5 w-full" onClick={() => onEdit(plan)}>Editar plano</Button></article>)}</div>; }
 
-function MaterialDialog({ open, pending, onOpenChange, onSubmit }: { open: boolean; pending: boolean; onOpenChange: (open: boolean) => void; onSubmit: (input: MaterialInput, file?: File) => Promise<void> }) {
+function MaterialDialog({ open, pending, onOpenChange, onSubmit }: { open: boolean; pending: boolean; onOpenChange: (open: boolean) => void; onSubmit: (input: MaterialInput, file?: File, coverFile?: File) => Promise<void> }) {
   const [source, setSource] = useState<"upload" | "link">("upload");
-  async function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); const fileValue = form.get("file"); const file = source === "upload" && fileValue instanceof File && fileValue.size > 0 ? fileValue : undefined; const externalUrl = source === "link" ? String(form.get("externalUrl") ?? "") : ""; if (!file && !externalUrl) return; await onSubmit({ title: String(form.get("title")), description: String(form.get("description") ?? ""), category: String(form.get("category")), material_type: String(form.get("materialType")) as MaterialInput["material_type"], thumbnail_url: String(form.get("thumbnailUrl") ?? ""), external_url: externalUrl, storage_path: null, target_plan_ids: [], published: form.get("published") === "on" }, file); }
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle>Distribuir novo material</DialogTitle><DialogDescription>Envie uma imagem, vídeo ou PDF, ou compartilhe uma pasta e um link com os assinantes.</DialogDescription></DialogHeader><form onSubmit={submit} className="grid gap-4"><div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5"><button type="button" onClick={() => setSource("upload")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-xl text-sm font-semibold", source === "upload" && "bg-background shadow-sm")}><Upload className="h-4 w-4" />Enviar arquivo</button><button type="button" onClick={() => setSource("link")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-xl text-sm font-semibold", source === "link" && "bg-background shadow-sm")}><Link2 className="h-4 w-4" />Usar link</button></div><div><Label htmlFor="material-title">Nome do material</Label><Input id="material-title" name="title" className="mt-2" required /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="material-category">Categoria</Label><Input id="material-category" name="category" className="mt-2" placeholder="Marketing" required /></div><div><Label htmlFor="material-type">Tipo</Label><select id="material-type" name="materialType" className="mt-2 h-12 w-full rounded-2xl border bg-background px-4 text-sm" disabled={source === "upload"}><option value="image">Imagem</option><option value="video">Vídeo</option><option value="pdf">PDF</option><option value="drive">Drive</option><option value="link">Link</option></select></div></div>{source === "upload" ? <div><Label htmlFor="material-file">Arquivo</Label><Input id="material-file" name="file" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,application/pdf" className="mt-2 cursor-pointer file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-semibold" required /><p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WebP e PDF até 20 MB. MP4 e MOV até 200 MB.</p></div> : <div><Label htmlFor="material-url">Link do arquivo ou pasta</Label><Input id="material-url" name="externalUrl" type="url" className="mt-2" required /></div>}<div><Label htmlFor="material-cover">Link da capa (opcional)</Label><Input id="material-cover" name="thumbnailUrl" type="url" className="mt-2" /></div><div><Label htmlFor="material-description">Descrição</Label><Textarea id="material-description" name="description" className="mt-2" /></div><label className="flex items-center gap-3 rounded-xl border p-3 text-sm font-semibold"><input type="checkbox" name="published" defaultChecked className="h-4 w-4 accent-primary" />Publicar agora para os assinantes</label><Button disabled={pending}>{pending ? "Enviando..." : "Salvar material"}</Button></form></DialogContent></Dialog>;
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const { toast } = useToast();
+  useEffect(() => { if (open) setCoverFile(null); }, [open]);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const fileValue = form.get("file");
+    const file = source === "upload" && fileValue instanceof File && fileValue.size > 0 ? fileValue : undefined;
+    const externalUrl = source === "link" ? String(form.get("externalUrl") ?? "") : "";
+    if (!file && !externalUrl) return;
+    try {
+      await onSubmit({ title: String(form.get("title")), description: String(form.get("description") ?? ""), category: String(form.get("category")), material_type: String(form.get("materialType")) as MaterialInput["material_type"], thumbnail_url: "", external_url: externalUrl, storage_path: null, target_plan_ids: [], published: form.get("published") === "on" }, file, coverFile ?? undefined);
+      setCoverFile(null);
+    } catch (error) { toast({ title: error instanceof Error ? error.message : "Não foi possível enviar o material.", variant: "error" }); }
+  }
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle>Distribuir novo material</DialogTitle><DialogDescription>Envie uma imagem, vídeo ou PDF, ou compartilhe uma pasta e um link com os assinantes.</DialogDescription></DialogHeader><form onSubmit={submit} className="grid gap-4"><div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted p-1.5"><button type="button" onClick={() => setSource("upload")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-xl text-sm font-semibold", source === "upload" && "bg-background shadow-sm")}><Upload className="h-4 w-4" />Enviar arquivo</button><button type="button" onClick={() => setSource("link")} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-xl text-sm font-semibold", source === "link" && "bg-background shadow-sm")}><Link2 className="h-4 w-4" />Usar link</button></div><div><Label htmlFor="material-title">Nome do material</Label><Input id="material-title" name="title" className="mt-2" required /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="material-category">Categoria</Label><Input id="material-category" name="category" className="mt-2" placeholder="Marketing" required /></div><div><Label htmlFor="material-type">Tipo</Label><select id="material-type" name="materialType" className="mt-2 h-12 w-full rounded-2xl border bg-background px-4 text-sm" disabled={source === "upload"}><option value="image">Imagem</option><option value="video">Vídeo</option><option value="pdf">PDF</option><option value="drive">Drive</option><option value="link">Link</option></select></div></div>{source === "upload" ? <div><Label htmlFor="material-file">Arquivo</Label><Input id="material-file" name="file" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,application/pdf" className="mt-2 cursor-pointer file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-semibold" required /><p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WebP e PDF até 20 MB. MP4 e MOV até 200 MB.</p></div> : <div><Label htmlFor="material-url">Link do arquivo ou pasta</Label><Input id="material-url" name="externalUrl" type="url" className="mt-2" required /></div>}<ImageUploadField label="Foto de capa (opcional)" file={coverFile} onFileChange={setCoverFile} onClear={() => setCoverFile(null)} /><div><Label htmlFor="material-description">Descrição</Label><Textarea id="material-description" name="description" className="mt-2" /></div><label className="flex items-center gap-3 rounded-xl border p-3 text-sm font-semibold"><input type="checkbox" name="published" defaultChecked className="h-4 w-4 accent-primary" />Publicar agora para os assinantes</label><Button disabled={pending}>{pending ? "Enviando..." : "Salvar material"}</Button></form></DialogContent></Dialog>;
 }
 
 function PlanDialog({ plan, pending, onOpenChange, onSubmit }: { plan: SaasPlan | null; pending: boolean; onOpenChange: (open: boolean) => void; onSubmit: (id: string, input: Partial<SaasPlan>) => Promise<void> }) {

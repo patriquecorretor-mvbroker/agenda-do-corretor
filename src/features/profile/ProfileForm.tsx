@@ -1,31 +1,27 @@
 import { useEffect, useState } from "react";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/features/auth/auth-context";
 import { useProfile } from "@/features/profile/use-profile";
+import { saveImageAsset } from "@/lib/image-assets";
 import type { Profile } from "@/types/database";
 
 export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; onSaved?: () => void }) {
   const { user } = useAuth();
   const { profile, saveProfile } = useProfile();
   const { toast } = useToast();
+  const [foto, setFoto] = useState(profile?.foto ?? "");
   const [logo, setLogo] = useState(profile?.logo ?? "");
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [savingImages, setSavingImages] = useState(false);
 
+  useEffect(() => setFoto(profile?.foto ?? ""), [profile?.foto]);
   useEffect(() => setLogo(profile?.logo ?? ""), [profile?.logo]);
-
-  function selectLogo(file?: File) {
-    if (!file) return;
-    if (file.size > 1_500_000) {
-      toast({ title: "Use uma imagem de até 1,5 MB.", variant: "error" });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setLogo(String(reader.result));
-    reader.readAsDataURL(file);
-  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,8 +31,8 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
       user_id: user.id,
       email: user.email ?? null,
       nome: String(form.get("nome") || "").trim(),
-      foto: String(form.get("foto") || "").trim() || null,
-      logo: String(form.get("logo") || "").trim() || null,
+      foto: foto || null,
+      logo: logo || null,
       nome_marca: String(form.get("nome_marca") || "").trim() || null,
       telefone: String(form.get("telefone") || "").trim() || null,
       whatsapp: String(form.get("whatsapp") || "").trim() || null,
@@ -51,29 +47,28 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
     };
 
     try {
+      setSavingImages(true);
+      if (fotoFile) payload.foto = await saveImageAsset(fotoFile, user.id, "profile");
+      if (logoFile) payload.logo = await saveImageAsset(logoFile, user.id, "brand");
       await saveProfile.mutateAsync(payload);
+      setFoto(payload.foto ?? "");
+      setLogo(payload.logo ?? "");
+      setFotoFile(null);
+      setLogoFile(null);
       toast({ title: "Perfil salvo." });
       onSaved?.();
     } catch (error) {
       toast({ title: error instanceof Error ? error.message : "Erro ao salvar perfil.", variant: "error" });
-    }
+    } finally { setSavingImages(false); }
   }
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit}>
       <div className={compact ? "grid gap-4" : "grid gap-4 md:grid-cols-2"}>
         <Field label="Nome" name="nome" defaultValue={profile?.nome ?? ""} required />
-        <Field label="Foto (URL)" name="foto" defaultValue={profile?.foto ?? ""} />
+        <ImageUploadField label="Foto do corretor" value={foto} file={fotoFile} onFileChange={setFotoFile} onClear={() => setFoto("")} />
         <Field label="Nome da marca" name="nome_marca" defaultValue={profile?.nome_marca ?? ""} />
-        <div className="space-y-2">
-          <Label>Logo da marca</Label>
-          <input type="hidden" name="logo" value={logo} />
-          <label className="flex min-h-24 cursor-pointer items-center gap-3 rounded-2xl border border-dashed p-3 transition hover:bg-muted/60">
-            {logo ? <img src={logo} alt="Prévia da logo" className="h-16 w-16 rounded-xl object-cover" /> : <span className="grid h-16 w-16 place-items-center rounded-xl bg-muted"><ImagePlus className="h-6 w-6 text-muted-foreground" /></span>}
-            <span><span className="block text-sm font-semibold">Escolher logo</span><span className="text-xs text-muted-foreground">PNG, JPG ou WebP até 1,5 MB</span></span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { selectLogo(event.target.files?.[0]); event.target.value = ""; }} />
-          </label>
-        </div>
+        <ImageUploadField label="Logo da marca" value={logo} file={logoFile} onFileChange={setLogoFile} onClear={() => setLogo("")} />
         <Field label="Telefone" name="telefone" defaultValue={profile?.telefone ?? ""} />
         <Field label="WhatsApp" name="whatsapp" defaultValue={profile?.whatsapp ?? ""} />
         <Field label="CRECI" name="creci" defaultValue={profile?.creci ?? ""} required />
@@ -85,9 +80,9 @@ export function ProfileForm({ compact = false, onSaved }: { compact?: boolean; o
         </div>
         <Field label="Meta mensal de comissão" name="meta_comissao_mensal" type="number" defaultValue={String(profile?.meta_comissao_mensal ?? 50000)} required />
       </div>
-      <Button disabled={saveProfile.isPending} size="lg">
-        {saveProfile.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-        Salvar perfil
+      <Button disabled={saveProfile.isPending || savingImages} size="lg">
+        {(saveProfile.isPending || savingImages) && <Loader2 className="h-4 w-4 animate-spin" />}
+        {savingImages ? "Enviando imagens..." : "Salvar perfil"}
       </Button>
     </form>
   );

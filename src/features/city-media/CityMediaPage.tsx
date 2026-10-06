@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Copy, Download, ExternalLink, Film, FolderHeart, FolderOpen, Heart, Image as ImageIcon, Link2, MapPin, Play, Plus, ScanLine, Search, Send, Settings2, Share2, Trash2, Upload, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,8 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { CityMedia } from "@/types/database";
 import { useProfile } from "@/features/profile/use-profile";
+import { useAuth } from "@/features/auth/auth-context";
+import { saveImageAsset } from "@/lib/image-assets";
 import { categoryLabels, cityProfile, makeSharedCityPage, saveCityProfile, sharedCityUrl, type CityPageProfile, type SharedCityBroker } from "./city-pages";
 import { useCityMedia, type CityMediaInput } from "./use-city-media";
 
@@ -131,8 +134,23 @@ function CityWorkspace({ city, media, broker, onBack, onAdd, onOpen, onFavorite 
 }
 
 function CitySettingsDialog({ open, profile, onOpenChange, onSave }: { open: boolean; profile: CityPageProfile; onOpenChange: (open: boolean) => void; onSave: (profile: CityPageProfile) => void }) {
-  function submit(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); onSave({ ...profile, folderName: String(form.get("folderName") || "").trim() || `Guia de ${profile.name}`, tagline: String(form.get("tagline") || "").trim(), description: String(form.get("description") || "").trim(), coverUrl: String(form.get("coverUrl") || "").trim() || "/brand/capao-sunset.png", tourUrl: normalizedWebUrl(form.get("tourUrl")), driveUrl: normalizedWebUrl(form.get("driveUrl")) }); }
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>Configurar página de {profile.name}</DialogTitle><DialogDescription>Personalize a experiência que será compartilhada com o cliente.</DialogDescription></DialogHeader><form onSubmit={submit} className="grid gap-4"><Field name="folderName" label="Nome da pasta para o cliente" defaultValue={profile.folderName || `Guia de ${profile.name}`} required /><Field name="tagline" label="Frase de capa" defaultValue={profile.tagline} required /><Field name="coverUrl" label="URL da foto de capa" defaultValue={profile.coverUrl} required /><div className="space-y-2"><Label htmlFor="city-description">Apresentação</Label><textarea id="city-description" name="description" defaultValue={profile.description} className="min-h-24 w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" /></div><div className="grid gap-4 sm:grid-cols-2"><Field name="tourUrl" label="Link do Tour 360" defaultValue={profile.tourUrl} placeholder="https://..." /><Field name="driveUrl" label="Pasta no Google Drive" defaultValue={profile.driveUrl} placeholder="https://drive.google.com/..." /></div><Button>Salvar página</Button></form></DialogContent></Dialog>;
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverUrl, setCoverUrl] = useState(profile.coverUrl);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { if (open) { setCoverFile(null); setCoverUrl(profile.coverUrl); } }, [profile, open]);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setSaving(true);
+    try {
+      const savedCover = coverFile && user ? await saveImageAsset(coverFile, user.id, "cities") : coverUrl;
+      onSave({ ...profile, folderName: String(form.get("folderName") || "").trim() || `Guia de ${profile.name}`, tagline: String(form.get("tagline") || "").trim(), description: String(form.get("description") || "").trim(), coverUrl: savedCover || "/brand/capao-sunset.png", tourUrl: normalizedWebUrl(form.get("tourUrl")), driveUrl: normalizedWebUrl(form.get("driveUrl")) });
+    } catch (error) { toast({ title: error instanceof Error ? error.message : "Não foi possível salvar a página.", variant: "error" }); }
+    finally { setSaving(false); }
+  }
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>Configurar página de {profile.name}</DialogTitle><DialogDescription>Personalize a experiência que será compartilhada com o cliente.</DialogDescription></DialogHeader><form onSubmit={submit} className="grid gap-4"><Field name="folderName" label="Nome da pasta para o cliente" defaultValue={profile.folderName || `Guia de ${profile.name}`} required /><Field name="tagline" label="Frase de capa" defaultValue={profile.tagline} required /><ImageUploadField label="Foto de capa" value={coverUrl} file={coverFile} onFileChange={setCoverFile} onClear={() => setCoverUrl("")} /><div className="space-y-2"><Label htmlFor="city-description">Apresentação</Label><textarea id="city-description" name="description" defaultValue={profile.description} className="min-h-24 w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" /></div><div className="grid gap-4 sm:grid-cols-2"><Field name="tourUrl" label="Link do Tour 360" defaultValue={profile.tourUrl} placeholder="https://..." /><Field name="driveUrl" label="Pasta no Google Drive" defaultValue={profile.driveUrl} placeholder="https://drive.google.com/..." /></div><Button disabled={saving}>{saving ? "Enviando foto..." : "Salvar página"}</Button></form></DialogContent></Dialog>;
 }
 
 function ShareCityDialog({ open, profile, media, broker, onOpenChange }: { open: boolean; profile: CityPageProfile; media: CityMedia[]; broker: SharedCityBroker; onOpenChange: (open: boolean) => void }) {

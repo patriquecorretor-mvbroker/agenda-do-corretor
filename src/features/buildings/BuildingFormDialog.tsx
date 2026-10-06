@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
-import { Building2, Check, ExternalLink, Image as ImageIcon, Search } from "lucide-react";
+import { Building2, Check, ExternalLink, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { useToast } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { saveImageAsset } from "@/lib/image-assets";
+import { useAuth } from "@/features/auth/auth-context";
 import type { Building } from "@/types/database";
 
 const amenityOptions = ["Academia", "Acessibilidade", "Água quente", "Áreas sociais mobiliadas", "Bicicletário", "Brinquedoteca", "Churrasqueira", "Coworking", "Espaço gourmet", "Espaço kids", "Espaço pet", "Gás central", "Gerador", "Hall decorado", "Hidromassagem", "Jacuzzi", "Jardim", "Pet place", "Piscina", "Piscina aquecida", "Piscina com borda infinita", "Playground", "Portaria 24h", "Portaria eletrônica", "Quadra esportiva", "Rooftop", "Sala de cinema", "Sala de jogos", "Salão de festas", "Sauna", "Segurança 24h", "Solarium", "Varanda", "Vista para o mar", "Zeladoria"];
@@ -14,7 +18,10 @@ const amenityOptions = ["Academia", "Acessibilidade", "Água quente", "Áreas so
 export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { open: boolean; building: Building; onOpenChange: (open: boolean) => void; onSave: (building: Building) => Promise<void> }) {
   const [draft, setDraft] = useState(building);
   const [saving, setSaving] = useState(false);
-  useEffect(() => setDraft(building), [building]);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  useEffect(() => { if (open) { setDraft(building); setCoverFile(null); } }, [building, open]);
 
   const set = <K extends keyof Building>(key: K, value: Building[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const number = (value: string) => value === "" ? null : Number(value);
@@ -24,7 +31,11 @@ export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { o
     event.preventDefault();
     if (!draft.name.trim() || !draft.street.trim() || !draft.neighborhood.trim()) return;
     setSaving(true);
-    try { await onSave({ ...draft, name: draft.name.trim(), street: draft.street.trim(), neighborhood: draft.neighborhood.trim() }); onOpenChange(false); }
+    try {
+      const coverUrl = coverFile && user ? await saveImageAsset(coverFile, user.id, "buildings") : draft.coverUrl;
+      await onSave({ ...draft, coverUrl, name: draft.name.trim(), street: draft.street.trim(), neighborhood: draft.neighborhood.trim() });
+      onOpenChange(false);
+    } catch (error) { toast({ title: error instanceof Error ? error.message : "Não foi possível salvar o edifício.", variant: "error" }); }
     finally { setSaving(false); }
   }
 
@@ -65,7 +76,7 @@ export function BuildingFormDialog({ open, building, onOpenChange, onSave }: { o
         <div><p className="mb-3 text-sm font-semibold">Infraestrutura</p><div className="flex flex-wrap gap-2">{amenityOptions.map((item) => <button key={item} type="button" onClick={() => toggleAmenity(item)} className={cn("inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition", draft.amenities?.includes(item) ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Check className={cn("h-3.5 w-3.5", !draft.amenities?.includes(item) && "opacity-0")} />{item}</button>)}</div></div>
 
         <FormSection title="Apresentação">
-          <Field label="URL da foto de capa" className="sm:col-span-2"><div className="relative"><ImageIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-10" value={draft.coverUrl ?? ""} onChange={(event) => set("coverUrl", event.target.value || null)} placeholder="https://..." /></div></Field>
+          <ImageUploadField label="Foto de capa" value={draft.coverUrl} file={coverFile} onFileChange={setCoverFile} onClear={() => set("coverUrl", null)} className="sm:col-span-2" />
           <Field label="Site do empreendimento"><Input value={draft.websiteUrl ?? ""} onChange={(event) => set("websiteUrl", event.target.value || null)} /></Field>
           <Field label="Descrição" className="sm:col-span-2"><Textarea value={draft.description ?? ""} onChange={(event) => set("description", event.target.value || null)} /></Field>
           <Field label="Observações internas" className="sm:col-span-2"><Textarea value={draft.notes ?? ""} onChange={(event) => set("notes", event.target.value || null)} /></Field>

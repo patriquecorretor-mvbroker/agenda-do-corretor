@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/features/auth/auth-context";
+import { saveImageAsset } from "@/lib/image-assets";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +15,11 @@ export function CondominiumFormDialog({ open, condominium, onOpenChange, onSave 
   const [city, setCity] = useState(condominium.city);
   const [unitType, setUnitType] = useState(condominium.unitType);
   const [saving, setSaving] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverUrl, setCoverUrl] = useState(condominium.coverUrl);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  useEffect(() => { if (open) { setCoverFile(null); setCoverUrl(condominium.coverUrl); } }, [condominium, open]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -18,16 +27,19 @@ export function CondominiumFormDialog({ open, condominium, onOpenChange, onSave 
     const number = (key: string) => form.get(key) ? Number(form.get(key)) : null;
     setSaving(true);
     try {
+      const savedCover = coverFile && user ? await saveImageAsset(coverFile, user.id, "condominiums") : coverUrl;
       await onSave({
         ...condominium,
         name: String(form.get("name") || "").trim(), city, neighborhood: String(form.get("neighborhood") || "").trim() || null,
         status, developer: String(form.get("developer") || "").trim() || null, launchYear: number("launchYear"),
         totalUnits: number("totalUnits"), areaHa: number("areaHa"), unitType, areaMin: number("areaMin"), areaMax: number("areaMax"),
         hasBeachClub: form.get("hasBeachClub") === "on", amenities: String(form.get("amenities") || "").split(",").map((item) => item.trim()).filter(Boolean),
-        description: String(form.get("description") || "").trim() || null, coverUrl: String(form.get("coverUrl") || "").trim() || null,
+        description: String(form.get("description") || "").trim() || null, coverUrl: savedCover,
         notes: String(form.get("notes") || "").trim() || null, verificationStatus: "manual"
       });
       onOpenChange(false);
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Não foi possível salvar o condomínio.", variant: "error" });
     } finally { setSaving(false); }
   }
 
@@ -48,7 +60,7 @@ export function CondominiumFormDialog({ open, condominium, onOpenChange, onSave 
       <Field label="Infraestrutura" className="sm:col-span-2"><Input name="amenities" defaultValue={condominium.amenities.join(", ")} placeholder="Clube, piscina, quadras..." /></Field>
       <label className="flex items-center gap-3 rounded-2xl border p-4 text-sm font-medium sm:col-span-2"><input type="checkbox" name="hasBeachClub" defaultChecked={condominium.hasBeachClub} className="h-5 w-5 accent-primary" />Possui paradouro / clube de praia</label>
       <Field label="Descrição" className="sm:col-span-2"><textarea name="description" defaultValue={condominium.description ?? ""} className="min-h-24 w-full rounded-2xl border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring" /></Field>
-      <Field label="URL da capa" className="sm:col-span-2"><Input name="coverUrl" type="url" defaultValue={condominium.coverUrl ?? ""} placeholder="https://..." /></Field>
+      <ImageUploadField label="Foto de capa" value={coverUrl} file={coverFile} onFileChange={setCoverFile} onClear={() => setCoverUrl(null)} className="sm:col-span-2" />
       <Field label="Observações" className="sm:col-span-2"><Input name="notes" defaultValue={condominium.notes ?? ""} /></Field>
       <div className="sticky bottom-0 -mx-5 -mb-5 grid grid-cols-2 gap-2 border-t bg-background p-5 sm:col-span-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar condomínio"}</Button></div>
     </form>
