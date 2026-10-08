@@ -7,8 +7,77 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes landing-scroll-reveal {
+  from { opacity: 0; transform: translateY(34px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes landing-building-arrive {
+  from { opacity: .25; transform: translate(-50%, 22%) scale(.82); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes landing-door-open-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-86%); }
+}
+
+@keyframes landing-door-open-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(86%); }
+}
+
+@keyframes landing-wave-drift {
+  0%, 100% { transform: translateX(-2%) translateY(0); }
+  50% { transform: translateX(2%) translateY(-5px); }
+}
+
+@keyframes landing-window-glow {
+  0%, 100% { background-color: rgba(247, 217, 147, .12); }
+  50% { background-color: rgba(247, 217, 147, .42); }
+}
+
+.landing-scroll-reveal,
+.landing-journey-step {
+  animation: landing-scroll-reveal linear both;
+  animation-timeline: view();
+  animation-range: entry 5% cover 28%;
+}
+
+.landing-journey-step {
+  animation-range: entry 6% cover 30%;
+}
+
+.landing-building {
+  animation: landing-building-arrive linear both;
+  animation-timeline: view();
+  animation-range: entry 2% cover 48%;
+}
+
+.landing-door-left,
+.landing-door-right {
+  animation-timeline: view();
+  animation-range: entry 18% cover 52%;
+  animation-fill-mode: both;
+  animation-timing-function: linear;
+}
+
+.landing-door-left { animation-name: landing-door-open-left; }
+.landing-door-right { animation-name: landing-door-open-right; }
+.landing-wave { animation: landing-wave-drift 6s ease-in-out infinite; }
+.landing-wave-two { animation-delay: -3s; animation-duration: 8s; }
+.landing-window:nth-child(3n + 1) { animation: landing-window-glow 3.6s ease-in-out infinite; }
+.landing-window:nth-child(4n + 2) { animation: landing-window-glow 4.8s ease-in-out -2s infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .landing-scroll-reveal,
+  .landing-journey-step,
+  .landing-building,
+  .landing-door-left,
+  .landing-door-right,
+  .landing-wave,
+  .landing-window { animation: none; }
 }
 
 @layer utilities {
