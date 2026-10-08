@@ -10,8 +10,10 @@ export type SaasPayment = { id: string; user_id: string; member_name: string; am
 export type SaasBillingRequest = { id: string; user_id: string; member_name: string; plan_id: string | null; action: "subscribe" | "change_plan" | "cancel" | "reactivate"; billing_cycle: "monthly" | "annual"; status: "pending" | "processing" | "completed" | "failed" | "canceled"; created_at: string };
 export type SaasDeletionRequest = { id: string; user_id: string; email: string; status: "requested" | "in_review" | "completed" | "canceled"; requested_at: string; resolved_at: string | null };
 export type SaasMaterial = { id: string; title: string; description: string; category: string; material_type: "image" | "video" | "pdf" | "drive" | "link"; thumbnail_url: string; external_url: string; storage_path: string | null; target_plan_ids: string[]; published: boolean; created_at: string };
+export type SaasGiveawayDraw = { id: string; winner_user_id: string | null; winner_name: string; winner_email: string | null; winner_city: string | null; winner_plan_name: string | null; prize_title: string; prize_description: string | null; participant_count: number; participant_user_ids: string[]; created_by: string; drawn_at: string };
+export type GiveawayInput = Omit<SaasGiveawayDraw, "id" | "created_by" | "drawn_at">;
 export type MaterialInput = Omit<SaasMaterial, "id" | "created_at">;
-type AdminData = { isAdmin: boolean; plans: SaasPlan[]; members: SaasMember[]; payments: SaasPayment[]; billingRequests: SaasBillingRequest[]; materials: SaasMaterial[]; deletionRequests: SaasDeletionRequest[] };
+type AdminData = { isAdmin: boolean; plans: SaasPlan[]; members: SaasMember[]; payments: SaasPayment[]; billingRequests: SaasBillingRequest[]; materials: SaasMaterial[]; deletionRequests: SaasDeletionRequest[]; giveaways: SaasGiveawayDraw[] };
 
 const materialsKey = "agenda-saas-materials";
 const membersKey = "agenda-saas-members";
@@ -19,6 +21,7 @@ const paymentsKey = "agenda-saas-payments";
 const plansKey = "agenda-saas-plans";
 const deletionRequestKey = "agenda-demo-deletion-request";
 const billingRequestsKey = "agenda-demo-billing-requests";
+const giveawaysKey = "agenda-saas-giveaways";
 
 const demoPlans: SaasPlan[] = [
   { id: "plan-essencial", name: "Essencial", slug: "essencial", description: "Agenda, clientes e foco comercial.", monthly_price: 49.9, annual_price: 499, active: true, features: ["Agenda", "Clientes", "Foco", "Materiais", "Meus Arquivos"] },
@@ -38,22 +41,23 @@ export function useSaasAdmin() {
   const queryClient = useQueryClient();
   const key = ["saas-admin", user?.id];
   const query = useQuery<AdminData>({ queryKey: key, enabled: Boolean(user), refetchOnMount: "always", queryFn: async () => {
-    if (!hasSupabaseConfig) return { isAdmin: false, plans: readLocal(plansKey, demoPlans), members: readLocal(membersKey, demoMembers), payments: readLocal(paymentsKey, demoPayments), billingRequests: readLocal<SaasBillingRequest[]>(billingRequestsKey, []).map((item) => ({ ...item, member_name: "Assinante local", user_id: "demo-user" })), materials: readLocal(materialsKey, demoMaterials), deletionRequests: readDemoDeletionRequests() };
+    if (!hasSupabaseConfig) return { isAdmin: false, plans: readLocal(plansKey, demoPlans), members: readLocal(membersKey, demoMembers), payments: readLocal(paymentsKey, demoPayments), billingRequests: readLocal<SaasBillingRequest[]>(billingRequestsKey, []).map((item) => ({ ...item, member_name: "Assinante local", user_id: "demo-user" })), materials: readLocal(materialsKey, demoMaterials), deletionRequests: readDemoDeletionRequests(), giveaways: readLocal(giveawaysKey, []) };
     const db = requireSupabase() as any;
     const admin = await db.from("app_admins").select("user_id").eq("user_id", user!.id).maybeSingle();
-    if (admin.error || !admin.data) return { isAdmin: false, plans: [], members: [], payments: [], billingRequests: [], materials: [], deletionRequests: [] };
-    const [plans, profiles, subscriptions, payments, billingRequests, materials, deletionRequests] = await Promise.all([
+    if (admin.error || !admin.data) return { isAdmin: false, plans: [], members: [], payments: [], billingRequests: [], materials: [], deletionRequests: [], giveaways: [] };
+    const [plans, profiles, subscriptions, payments, billingRequests, materials, deletionRequests, giveaways] = await Promise.all([
       db.from("subscription_plans").select("*").order("monthly_price"),
       db.from("profiles").select("user_id,nome,email,cidade,created_at"),
       db.from("subscriptions").select("*").order("created_at", { ascending: false }),
       db.from("subscription_payments").select("*").order("due_date", { ascending: false }),
       db.from("billing_requests").select("*").order("created_at", { ascending: false }),
       db.from("admin_materials").select("*").order("created_at", { ascending: false }),
-      db.from("account_deletion_requests").select("id,user_id,email,status,requested_at,resolved_at").order("requested_at", { ascending: false })
+      db.from("account_deletion_requests").select("id,user_id,email,status,requested_at,resolved_at").order("requested_at", { ascending: false }),
+      db.from("admin_giveaway_draws").select("*").order("drawn_at", { ascending: false }).limit(30)
     ]);
     const profileByUser = new Map<string, { nome?: string; email?: string; cidade?: string }>((profiles.data ?? []).map((profile: any) => [profile.user_id, profile]));
     const mappedMembers = (subscriptions.data ?? []).map((subscription: any) => { const profile: any = profileByUser.get(subscription.user_id) ?? {}; return { id: subscription.id, user_id: subscription.user_id, name: profile.nome ?? "Assinante", email: profile.email ?? "E-mail não informado", city: profile.cidade ?? "Não informada", plan_id: subscription.plan_id, status: subscription.status, renewal: subscription.current_period_end?.slice(0, 10) ?? "", created_at: subscription.created_at }; });
-    return { isAdmin: true, plans: plans.data ?? [], members: mappedMembers, payments: (payments.data ?? []).map((payment: any) => ({ ...payment, member_name: profileByUser.get(payment.user_id)?.nome ?? "Assinante" })), billingRequests: (billingRequests.data ?? []).map((request: any) => ({ ...request, member_name: profileByUser.get(request.user_id)?.nome ?? "Assinante" })), materials: materials.data ?? [], deletionRequests: deletionRequests.data ?? [] } as AdminData;
+    return { isAdmin: true, plans: plans.data ?? [], members: mappedMembers, payments: (payments.data ?? []).map((payment: any) => ({ ...payment, member_name: profileByUser.get(payment.user_id)?.nome ?? "Assinante" })), billingRequests: (billingRequests.data ?? []).map((request: any) => ({ ...request, member_name: profileByUser.get(request.user_id)?.nome ?? "Assinante" })), materials: materials.data ?? [], deletionRequests: deletionRequests.data ?? [], giveaways: giveaways.data ?? [] } as AdminData;
   }});
   const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
   const uploadMaterial = useMutation({ mutationFn: async (file: File) => {
@@ -105,7 +109,17 @@ export function useSaasAdmin() {
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
   }, onSuccess: invalidate });
-  return { isAdmin: query.data?.isAdmin ?? false, isLoading: query.isLoading, plans: query.data?.plans ?? [], members: query.data?.members ?? [], payments: query.data?.payments ?? [], billingRequests: query.data?.billingRequests ?? [], materials: query.data?.materials ?? [], deletionRequests: query.data?.deletionRequests ?? [], uploadMaterial, createMaterial, toggleMaterial, updateMember, updatePlan, updatePayment, updateBillingRequest, updateDeletionRequest, processDeletionRequest };
+  const createGiveaway = useMutation({ mutationFn: async (input: GiveawayInput) => {
+    if (!hasSupabaseConfig) {
+      const draw = { ...input, id: localId("draw"), created_by: user!.id, drawn_at: new Date().toISOString() };
+      writeLocal(giveawaysKey, [draw, ...readLocal<SaasGiveawayDraw[]>(giveawaysKey, [])]);
+      return draw;
+    }
+    const { data, error } = await (requireSupabase() as any).from("admin_giveaway_draws").insert({ ...input, created_by: user!.id }).select("*").single();
+    if (error) throw error;
+    return data as SaasGiveawayDraw;
+  }, onSuccess: invalidate });
+  return { isAdmin: query.data?.isAdmin ?? false, isLoading: query.isLoading, plans: query.data?.plans ?? [], members: query.data?.members ?? [], payments: query.data?.payments ?? [], billingRequests: query.data?.billingRequests ?? [], materials: query.data?.materials ?? [], deletionRequests: query.data?.deletionRequests ?? [], giveaways: query.data?.giveaways ?? [], uploadMaterial, createMaterial, toggleMaterial, updateMember, updatePlan, updatePayment, updateBillingRequest, updateDeletionRequest, processDeletionRequest, createGiveaway };
 }
 
 export function usePublishedMaterials() {
