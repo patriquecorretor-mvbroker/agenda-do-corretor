@@ -14,7 +14,7 @@ export function OnboardingPage() {
             <div>
               <CardTitle className="text-3xl">Vamos configurar sua base</CardTitle>
               <CardDescription className="mt-2 text-base">
-                Preencha os dados essenciais para abrir o Meu Dia com horários, cidade, CRECI e metas corretas.
+                Comece com o essencial. Os demais dados, horários e metas podem ser preenchidos depois no Perfil.
               </CardDescription>
             </div>
           </CardHeader>

@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/features/auth/auth-context";
 import { AuthPage } from "@/features/auth/AuthPage";
 import { useProfile } from "@/features/profile/use-profile";
 import { OnboardingPage } from "@/features/profile/OnboardingPage";
+import { isOnboardingComplete } from "@/features/profile/onboarding";
 import { AppShell } from "@/components/layout/AppShell";
 import { getPalette, hexToHsl, primaryForegroundFor, type PaletteId } from "@/lib/appearance";
 import { PublicCityPage } from "@/features/city-media/PublicCityPage";
@@ -78,16 +79,7 @@ function AppContent() {
     return <main className="grid min-h-screen place-items-center bg-[#05070a] px-5 text-white"><section className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0e13] p-7 text-center shadow-2xl"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary"><CreditCard className="h-6 w-6" /></span><p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-primary">Assinatura</p><h1 className="mt-2 text-2xl font-semibold">Acesso temporariamente indisponível</h1><p className="mt-3 text-sm leading-6 text-white/50">{detail}</p>{access.error && <Button className="mt-6 w-full" onClick={() => void access.refetch()}><RefreshCw className="h-4 w-4" />Tentar novamente</Button>} {!access.error && <Button className="mt-6 w-full" onClick={() => setBillingOpen(true)}>Ver planos e regularizar</Button>}<Button variant="ghost" className="mt-2 w-full text-white/60 hover:bg-white/5 hover:text-white" onClick={() => void signOut()}><LogOut className="h-4 w-4" />Sair</Button></section></main>;
   }
 
-  const onboardingComplete = Boolean(
-    profile?.nome &&
-      profile.creci &&
-      profile.cidade &&
-      profile.horario_inicio &&
-      profile.horario_fim &&
-      profile.meta_comissao_mensal !== null
-  );
-
-  if (!onboardingComplete) return <OnboardingPage />;
+  if (!isOnboardingComplete(profile)) return <OnboardingPage />;
 
   return (
     <AppShell
