@@ -2,7 +2,7 @@
 
 ## Auditoria local de 5 de outubro de 2026
 
-- `pnpm check:launch` aprovado: TypeScript, 21 testes e build de produção.
+- `pnpm check:launch` aprovado: TypeScript, 27 testes e build de produção.
 - 16 módulos percorridos no desktop e no viewport mobile de 390 x 844, sem tela branca, erro de console ou rolagem horizontal da página.
 - Cadastro rápido de tarefa validado com persistência no modo demonstração.
 - Despesa paga validada no fluxo real: o lançamento alterou despesas e resultado líquido; conta pendente permanece fora do caixa realizado.
@@ -21,7 +21,9 @@
 - Autenticação e isolamento por usuário preparados para Supabase.
 - Termos de Uso, Política de Privacidade e aceite versionado no cadastro.
 - Exportação dos dados da conta e solicitação de exclusão.
-- Super Admin com assinantes, planos, cobranças e distribuição de materiais.
+- Super Admin com assinantes, planos, cobranças, distribuição de materiais e sorteios.
+- Ficha operacional do assinante com filtros, controle de acesso, histórico e exportação CSV protegida contra fórmulas.
+- Centro operacional com estado real das integrações e trilha de auditoria para ações administrativas sensíveis.
 - Área Minha assinatura com planos individuais, histórico e solicitações idempotentes de troca/reativação.
 - Central de notificações no app, preferências por assunto, horário silencioso e integração OneSignal preparada.
 - Processamento administrativo de exclusão real da conta com trilha técnica de auditoria.
