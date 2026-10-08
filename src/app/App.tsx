@@ -3,7 +3,8 @@ import { CreditCard, Loader2, LogOut, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
-import { AuthPage } from "@/features/auth/AuthPage";
+import { AuthPage, type AuthMode } from "@/features/auth/AuthPage";
+import { MarketingPage } from "@/features/marketing/MarketingPage";
 import { useProfile } from "@/features/profile/use-profile";
 import { OnboardingPage } from "@/features/profile/OnboardingPage";
 import { isOnboardingComplete } from "@/features/profile/onboarding";
@@ -23,6 +24,10 @@ function AppContent() {
   const [palette, setPalette] = useState<PaletteId>(() => normalizePalette(safeStorageGet("palette")));
   const [customColor, setCustomColor] = useState(() => safeStorageGet("custom-color") ?? "#f47c20");
   const [billingOpen, setBillingOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(() => {
+    const requested = new URLSearchParams(window.location.search).get("acesso");
+    return requested === "cadastro" ? "signup" : requested === "entrar" ? "login" : null;
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -52,7 +57,8 @@ function AppContent() {
     );
   }
 
-  if (!user || recoveringPassword) return <AuthPage />;
+  if (recoveringPassword) return <AuthPage />;
+  if (!user) return authMode ? <AuthPage initialMode={authMode} onBack={() => setAuthMode(null)} /> : <MarketingPage onAuth={setAuthMode} />;
 
   if (isLoading || access.isLoading) {
     return (

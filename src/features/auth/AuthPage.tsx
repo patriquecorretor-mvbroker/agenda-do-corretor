@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, LockKeyhole, Mail } from "lucide-react";
+import { ArrowLeft, Loader2, LockKeyhole, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,12 @@ import { useAuth } from "@/features/auth/auth-context";
 import { LegalDocumentDialog } from "@/features/legal/LegalDocumentDialog";
 import { legalVersions, type LegalDocumentType } from "@/features/legal/legal-content";
 
-type Mode = "login" | "signup" | "reset" | "update";
+export type AuthMode = "login" | "signup" | "reset" | "update";
 
-export function AuthPage() {
+export function AuthPage({ initialMode = "login", onBack }: { initialMode?: AuthMode; onBack?: () => void }) {
   const { signIn, signUp, resetPassword, updatePassword, recoveringPassword } = useAuth();
   const { toast } = useToast();
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -60,7 +60,7 @@ export function AuthPage() {
     }
   }
 
-  const activeMode: Mode = recoveringPassword ? "update" : mode;
+  const activeMode: AuthMode = recoveringPassword ? "update" : mode;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(218,165,57,0.26),_transparent_34%),linear-gradient(135deg,#050403,#15100a_48%,#faf8f1_48%)] p-4 text-foreground dark:from-background">
@@ -87,6 +87,7 @@ export function AuthPage() {
 
         <Card className="glass-card">
           <CardContent className="p-6 md:p-8">
+            {onBack && !recoveringPassword && <Button type="button" variant="ghost" size="sm" className="mb-4 -ml-2" onClick={onBack}><ArrowLeft className="h-4 w-4" />Voltar</Button>}
             {!hasSupabaseConfig ? (
               <div className="space-y-4">
                 <div>
