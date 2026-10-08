@@ -2,6 +2,7 @@ node_modules
 dist
 .sites-package
 .pnpm-store
+supabase/.temp/
 *.tar
 *.tar.gz
 *.tsbuildinfo
