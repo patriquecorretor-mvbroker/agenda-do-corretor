@@ -12,19 +12,9 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes landing-building-arrive {
-  from { opacity: .25; transform: translate(-50%, 22%) scale(.82); }
-  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
-}
-
-@keyframes landing-door-open-left {
-  from { transform: translateX(0); }
-  to { transform: translateX(-86%); }
-}
-
-@keyframes landing-door-open-right {
-  from { transform: translateX(0); }
-  to { transform: translateX(86%); }
+@keyframes landing-ocean-breathe {
+  0%, 100% { transform: scale(1.06) translate3d(0, 0, 0); }
+  50% { transform: scale(1.1) translate3d(-1.5%, -1%, 0); }
 }
 
 @keyframes landing-wave-drift {
@@ -32,9 +22,14 @@
   50% { transform: translateX(2%) translateY(-5px); }
 }
 
-@keyframes landing-window-glow {
-  0%, 100% { background-color: rgba(247, 217, 147, .12); }
-  50% { background-color: rgba(247, 217, 147, .42); }
+@keyframes landing-buoy-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes landing-current-fill {
+  from { transform: scaleX(0); opacity: .2; }
+  to { transform: scaleX(1); opacity: 1; }
 }
 
 .landing-scroll-reveal,
@@ -48,36 +43,34 @@
   animation-range: entry 6% cover 30%;
 }
 
-.landing-building {
-  animation: landing-building-arrive linear both;
-  animation-timeline: view();
-  animation-range: entry 2% cover 48%;
+.landing-ocean-photo {
+  animation: landing-ocean-breathe 12s ease-in-out infinite;
+  will-change: transform;
 }
 
-.landing-door-left,
-.landing-door-right {
+.landing-sales-current {
+  animation: landing-current-fill linear both;
   animation-timeline: view();
-  animation-range: entry 18% cover 52%;
-  animation-fill-mode: both;
-  animation-timing-function: linear;
+  animation-range: entry 12% cover 45%;
 }
 
-.landing-door-left { animation-name: landing-door-open-left; }
-.landing-door-right { animation-name: landing-door-open-right; }
+.landing-buoy {
+  animation: landing-buoy-float 3.4s ease-in-out infinite;
+}
+
 .landing-wave { animation: landing-wave-drift 6s ease-in-out infinite; }
 .landing-wave-two { animation-delay: -3s; animation-duration: 8s; }
-.landing-window:nth-child(3n + 1) { animation: landing-window-glow 3.6s ease-in-out infinite; }
-.landing-window:nth-child(4n + 2) { animation: landing-window-glow 4.8s ease-in-out -2s infinite; }
+.landing-wave-three { animation-delay: -5s; animation-duration: 10s; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .landing-scroll-reveal,
   .landing-journey-step,
-  .landing-building,
-  .landing-door-left,
-  .landing-door-right,
+  .landing-ocean-photo,
+  .landing-sales-current,
+  .landing-buoy,
   .landing-wave,
-  .landing-window { animation: none; }
+  .landing-wave-three { animation: none; }
 }
 
 @layer utilities {
