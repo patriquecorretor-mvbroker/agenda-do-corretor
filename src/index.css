@@ -32,6 +32,11 @@
   to { transform: scaleX(1); opacity: 1; }
 }
 
+@keyframes landing-growth-rise {
+  from { transform: scaleY(0); filter: saturate(.5); }
+  to { transform: scaleY(1); filter: saturate(1); }
+}
+
 .landing-scroll-reveal,
 .landing-journey-step {
   animation: landing-scroll-reveal linear both;
@@ -58,6 +63,14 @@
   animation: landing-buoy-float 3.4s ease-in-out infinite;
 }
 
+.landing-growth-bar {
+  transform-origin: bottom;
+  animation: landing-growth-rise linear both;
+  animation-timeline: view();
+  animation-range: entry 8% cover 42%;
+  will-change: transform;
+}
+
 .landing-wave { animation: landing-wave-drift 6s ease-in-out infinite; }
 .landing-wave-two { animation-delay: -3s; animation-duration: 8s; }
 .landing-wave-three { animation-delay: -5s; animation-duration: 10s; }
@@ -69,6 +82,7 @@
   .landing-ocean-photo,
   .landing-sales-current,
   .landing-buoy,
+  .landing-growth-bar,
   .landing-wave,
   .landing-wave-three { animation: none; }
 }
